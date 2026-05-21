@@ -8,8 +8,8 @@
     "watchPatterns": ["HOA-API/**"]
   },
   "deploy": {
-    "//": "Push schema before booting so a fresh deploy never crashes against an out-of-date DB. `db push --accept-data-loss` is the right call here because Prisma migrations aren't checked in — the schema file is the source of truth.",
-    "startCommand": "npx prisma db push --skip-generate --accept-data-loss && node dist/main",
+    "//": "Push schema before booting so a fresh deploy never crashes against an out-of-date DB. `db push --accept-data-loss` is the right call here because Prisma migrations aren't checked in — the schema file is the source of truth. The dist path is `dist/src/main.js` (not `dist/main.js`) because tsconfig.json includes both src/** and prisma/**, so TypeScript's rootDir resolves to the project root and the src/ prefix is preserved in the build output.",
+    "startCommand": "npx prisma db push --skip-generate --accept-data-loss && node dist/src/main",
     "healthcheckPath": "/api/docs",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
