@@ -2,7 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci && npm run build",
+    "//buildCommand": "npm install (not ci) is required because Railpack mounts a build cache at /app/node_modules/.cache. `npm ci` wipes node_modules entirely as its first step, which tries to rmdir the mounted .cache and dies with EBUSY. `npm install` leaves node_modules in place so the mount survives. --no-audit shaves a few seconds off the build and silences noise.",
+    "buildCommand": "npm install --no-audit && npm run build",
     "//": "watchPatterns are evaluated relative to the repo root. Limiting to HOA-ENTERPRISE/** stops sibling-app changes from triggering a redeploy of this service.",
     "watchPatterns": ["HOA-ENTERPRISE/**"]
   },

@@ -2,8 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "//buildCommand": "Peer-dep tolerance is required because @nestjs/apollo currently lags behind @nestjs/common (apollo wants ^11.0.1, common is 11.1.x). Using --legacy-peer-deps is the documented escape hatch.",
-    "buildCommand": "npm ci --legacy-peer-deps && npx prisma generate && npm run build",
+    "//buildCommand": "Two reasons we use `npm install` instead of `npm ci`: (1) Railpack mounts /app/node_modules/.cache as a build cache volume — `npm ci` wipes node_modules entirely as step one and EBUSYs on rmdir of the mounted .cache. `npm install` leaves node_modules in place. (2) Peer-dep tolerance: @nestjs/apollo wants @nestjs/common ^11.0.1 while we track 11.1.x — handled by the .npmrc legacy-peer-deps=true in this directory.",
+    "buildCommand": "npm install --no-audit && npx prisma generate && npm run build",
     "//": "watchPatterns are evaluated relative to the repo root. Limiting to HOA-API/** stops sibling-app changes (HOA-ENTERPRISE, HOA-RESIDENTS, HOA-MARKETING) from triggering an API redeploy.",
     "watchPatterns": ["HOA-API/**"]
   },

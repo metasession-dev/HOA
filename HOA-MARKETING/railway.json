@@ -2,7 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci --legacy-peer-deps && npm run build",
+    "//buildCommand": "npm install (not ci) is required because Railpack mounts /app/node_modules/.cache as a build cache and `npm ci` wipes node_modules wholesale, EBUSY-ing on the mount. --legacy-peer-deps because the lovable-tagger dep has peer-dep noise across React 18.",
+    "buildCommand": "npm install --legacy-peer-deps --no-audit && npm run build",
     "//": "watchPatterns are evaluated relative to the repo root. Limiting to HOA-MARKETING/** stops sibling-app changes from triggering a redeploy of this service.",
     "watchPatterns": ["HOA-MARKETING/**"]
   },
