@@ -394,6 +394,10 @@ Set-RailwayVar $API_SERVICE 'REDIS_URL'    (Get-RailwayRef $REDIS_SERVICE 'REDIS
 
 Set-RailwayVar $API_SERVICE 'NODE_ENV'       'production'
 Set-RailwayVar $API_SERVICE 'JWT_EXPIRES_IN' '24h'
+# Explicit PORT so it matches the public-domain targetPort the wiring
+# script creates. Railway's default is 8080 but the API's main.ts
+# already documents 3003 — pinning here keeps everything aligned.
+Set-RailwayVar $API_SERVICE 'PORT'           '3003'
 
 # Secrets — preserved across reruns so live sessions don't die.
 Set-RailwayVarIfUnset $API_SERVICE 'JWT_SECRET'         $JWT_SECRET
@@ -430,6 +434,13 @@ $entBase = 'https://' + (Get-RailwayRef $ENT_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 $resBase = 'https://' + (Get-RailwayRef $RES_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 $mktBase = 'https://' + (Get-RailwayRef $MKT_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 
+# Next.js standalone defaults HOSTNAME=localhost — that only binds to
+# loopback, so Railway's healthcheck (which hits the container from
+# outside the loopback) gets a connection refused. Setting 0.0.0.0
+# binds to all interfaces. PORT 8080 matches Railway's default and the
+# public domain's targetPort.
+Set-RailwayVar $ENT_SERVICE 'HOSTNAME'                    '0.0.0.0'
+Set-RailwayVar $ENT_SERVICE 'PORT'                        '8080'
 Set-RailwayVar $ENT_SERVICE 'NODE_ENV'                    'production'
 Set-RailwayVar $ENT_SERVICE 'NEXT_PUBLIC_API_URL'         $apiBase
 Set-RailwayVar $ENT_SERVICE 'NEXT_PUBLIC_ENTERPRISE_URL'  $entBase
@@ -439,6 +450,8 @@ Set-RailwayVar $ENT_SERVICE 'NEXT_PUBLIC_POSTHOG_HOST'    'https://us.i.posthog.
 
 # ---------- HOA-RESIDENTS ----------
 Write-Step "Setting HOA-RESIDENTS ($RES_SERVICE) variables…"
+Set-RailwayVar $RES_SERVICE 'HOSTNAME'                    '0.0.0.0'
+Set-RailwayVar $RES_SERVICE 'PORT'                        '8080'
 Set-RailwayVar $RES_SERVICE 'NODE_ENV'                    'production'
 Set-RailwayVar $RES_SERVICE 'NEXT_PUBLIC_API_URL'         $apiBase
 Set-RailwayVar $RES_SERVICE 'NEXT_PUBLIC_ENTERPRISE_URL'  $entBase

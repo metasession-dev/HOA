@@ -40,13 +40,18 @@ param(
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() } catch { }
 
-# Per-service Root Directory + watch patterns. The monorepo has each app
-# at the top level; Railway needs to know which subfolder to build from.
+# Per-service Root Directory + watch patterns + public-domain target
+# port. The monorepo has each app at the top level; Railway needs to
+# know which subfolder to build from and which container port to route
+# external traffic to.
+#   - hoa-api: 3003 — matches main.ts PORT default
+#   - Next.js services: 8080 — matches Railway's default $PORT
+#   - hoa-marketing: 8080 — `serve` reads $PORT, defaults to 8080
 $SERVICE_CONFIG = @{
-    'hoa-api'        = @{ root = 'HOA-API';        watch = @('HOA-API/**') }
-    'hoa-enterprise' = @{ root = 'HOA-ENTERPRISE'; watch = @('HOA-ENTERPRISE/**') }
-    'hoa-residents'  = @{ root = 'HOA-RESIDENTS';  watch = @('HOA-RESIDENTS/**') }
-    'hoa-marketing'  = @{ root = 'HOA-MARKETING';  watch = @('HOA-MARKETING/**') }
+    'hoa-api'        = @{ root = 'HOA-API';        watch = @('HOA-API/**');        port = 3003 }
+    'hoa-enterprise' = @{ root = 'HOA-ENTERPRISE'; watch = @('HOA-ENTERPRISE/**'); port = 8080 }
+    'hoa-residents'  = @{ root = 'HOA-RESIDENTS';  watch = @('HOA-RESIDENTS/**');  port = 8080 }
+    'hoa-marketing'  = @{ root = 'HOA-MARKETING';  watch = @('HOA-MARKETING/**');  port = 8080 }
 }
 
 # ---------- helpers ----------
@@ -197,6 +202,32 @@ mutation ServiceInstanceDeploy(
 }
 '@
 
+# Public domain (`*.up.railway.app`) — Railway doesn't auto-create one
+# when a service is provisioned via GraphQL. Without it, external HTTP
+# can't reach the container and the healthcheck never sees the app from
+# its real route. Idempotent via the "domain already exists" branch.
+$serviceDomainCreateMutation = @'
+mutation ServiceDomainCreate($input: ServiceDomainCreateInput!) {
+  serviceDomainCreate(input: $input) {
+    id
+    domain
+  }
+}
+'@
+
+# Query existing domains so we can detect "already there" cleanly.
+$serviceDomainsQuery = @'
+query DomainsForService($serviceId: String!, $environmentId: String!) {
+  domains(serviceId: $serviceId, environmentId: $environmentId) {
+    serviceDomains {
+      id
+      domain
+      targetPort
+    }
+  }
+}
+'@
+
 # ---------- wire each app service ----------
 foreach ($name in $SERVICE_CONFIG.Keys) {
     $cfg = $SERVICE_CONFIG[$name]
@@ -244,7 +275,33 @@ foreach ($name in $SERVICE_CONFIG.Keys) {
         Write-Warn "  → Set Root Directory '$($cfg.root)' manually in dashboard."
     }
 
-    # Step 3: trigger a fresh deploy from the wired source. Some API
+    # Step 3: ensure a public *.up.railway.app domain exists pointing at
+    # the right container port. Railway doesn't auto-issue one for
+    # services created via GraphQL.
+    try {
+        $domains = Invoke-Railway -Query $serviceDomainsQuery -Variables @{
+            serviceId     = $svcId
+            environmentId = $ENV_ID
+        }
+        $existing = $domains.domains.serviceDomains | Where-Object { $_.domain -match '\.up\.railway\.app$' } | Select-Object -First 1
+        if ($existing) {
+            Write-Step "  → public domain already present: $($existing.domain)"
+        } else {
+            $created = Invoke-Railway -Query $serviceDomainCreateMutation -Variables @{
+                input = @{
+                    serviceId     = $svcId
+                    environmentId = $ENV_ID
+                    targetPort    = $cfg.port
+                }
+            }
+            Write-Step "  ✓ public domain created: $($created.serviceDomainCreate.domain) (port $($cfg.port))"
+        }
+    } catch {
+        Write-Warn "  domain step failed: $($_.Exception.Message)"
+        Write-Warn "  → Generate manually in dashboard: Settings → Networking → Generate Domain"
+    }
+
+    # Step 4: trigger a fresh deploy from the wired source. Some API
     # versions don't expose serviceInstanceDeploy directly; the
     # mutation may also no-op if the connect call already enqueued one.
     try {
