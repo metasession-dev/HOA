@@ -52,7 +52,7 @@ const CTASection = () => {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </a>
-            <a href="mailto:hello@hoa.africa">
+            <a href="https://metasession.thorstack.com/book/grey/30mins-hoa-demo">
               <Button
                 size="xl"
                 variant="outline"

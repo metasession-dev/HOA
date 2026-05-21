@@ -41,7 +41,9 @@ const Footer = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">hello@hoa.africa</span>
+                <span className="text-sm">
+                  <a href="https://metasession.thorstack.com/book/grey/30mins-hoa-demo" className="text-primary hover:underline">Book a demo</a>
+                </span>
               </div>
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Phone className="w-4 h-4" />
