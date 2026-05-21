@@ -9,4 +9,8 @@ dist/
 .vscode/
 coverage/
 .tsbuildinfo
-storage/
+# Anchor the storage exclusion to the project root so it only ignores the
+# local upload-storage directory (where multer drops files in dev), NOT
+# src/storage/ which is the NestJS module that handles file uploads.
+# Bare `storage/` would match every dir named storage anywhere in the tree.
+/storage/
