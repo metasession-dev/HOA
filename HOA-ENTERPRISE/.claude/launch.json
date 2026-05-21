@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+      "runtimeArgs": ["--prefix", "C:\\Users\\kolag\\Dev\\HOA-AFRICA\\HOA-API", "run", "dev"],
+      "port": 3003
+    },
+    {
+      "name": "enterprise",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npx.cmd",
+      "runtimeArgs": ["next", "dev", "--port", "3002"],
+      "port": 3002
+    },
+    {
+      "name": "residents",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+      "runtimeArgs": ["--prefix", "C:\\Users\\kolag\\Dev\\HOA-AFRICA\\HOA-RESIDENTS", "run", "dev"],
+      "port": 3005
+    }
+  ]
+}

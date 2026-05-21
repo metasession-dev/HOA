@@ -1,0 +1,9 @@
+# SPA fallback — route every unmatched URL back to index.html so React
+# Router can take over on the client. Without this, hard-refreshing
+# /login (or any other client-side route) returns the host's default 404
+# because no file exists at that path.
+#
+# Honored by Netlify, Render static sites, and Cloudflare Pages. Vercel
+# uses vercel.json (also in this repo). Other hosts: configure the
+# equivalent rewrite rule.
+/*    /index.html   200

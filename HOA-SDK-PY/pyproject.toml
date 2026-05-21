@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hoa-africa"
+version = "0.1.0"
+description = "Official Python SDK for the HOA.africa API."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "HOA.africa", email = "engineering@hoa.africa" }]
+keywords = ["hoa", "hoa.africa", "property-management", "api", "sdk"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: Apache Software License",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "responses>=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://hoa.africa"
+Documentation = "https://docs.hoa.africa"
+Repository = "https://github.com/hoa-africa/sdk-python"
+
+[tool.setuptools.packages.find]
+include = ["hoa_africa*"]

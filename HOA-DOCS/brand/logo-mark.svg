@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logo mark only — the house + Africa silhouette, no background. Used in
+     sidebar topcorner avatars, email signatures, and any context where the
+     wrapper supplies its own background. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="houseStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7CC04C"/>
+      <stop offset="100%" stop-color="#3F8B22"/>
+    </linearGradient>
+    <linearGradient id="africaFill" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#7BBE45"/>
+      <stop offset="100%" stop-color="#3D8A20"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 70 L96 222 L96 432 Q96 444 108 444 L404 444 Q416 444 416 432 L416 222 Z"
+        fill="none" stroke="url(#houseStroke)" stroke-width="22" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M232 180
+           Q210 178 200 200
+           Q190 224 198 252
+           Q200 270 212 286
+           Q220 296 218 312
+           Q216 326 222 342
+           Q230 366 248 384
+           Q256 392 260 404
+           Q264 416 274 410
+           Q288 400 296 384
+           Q310 360 318 332
+           Q326 304 322 280
+           Q318 256 304 234
+           Q288 210 268 196
+           Q252 184 232 180 Z"
+        fill="url(#africaFill)"/>
+  <g fill="#ffffff">
+    <circle cx="248" cy="218" r="7"/>
+    <circle cx="282" cy="244" r="9"/>
+    <circle cx="232" cy="242" r="6"/>
+    <circle cx="262" cy="280" r="9"/>
+    <circle cx="296" cy="306" r="7"/>
+    <circle cx="240" cy="320" r="6"/>
+    <circle cx="272" cy="356" r="7"/>
+  </g>
+</svg>

@@ -1,0 +1,35 @@
+{
+  "name": "@hoa-africa/sdk",
+  "version": "0.1.0",
+  "description": "Official JavaScript / TypeScript SDK for the HOA.africa API.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json",
+    "test": "node --test test/*.test.mjs",
+    "smoke": "ts-node smoke/smoke.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["hoa", "hoa.africa", "property-management", "api", "sdk"],
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
