@@ -8,7 +8,10 @@ const Footer = () => {
     product: [
       { label: "Features", href: "#features" },
       { label: "Pricing", href: "#pricing" },
-      { label: "FAQ", href: "#faq" },
+      // /faq is a dedicated route, not an in-page anchor. `internal` flag
+      // tells the renderer below to use React Router <Link> instead of
+      // <a>, so navigation stays client-side.
+      { label: "FAQ", href: "/faq", internal: true },
     ],
     support: [
       { label: "How It Works", href: "#how-it-works" },
@@ -59,18 +62,29 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Product Links */}
+          {/* Product Links — supports both in-page anchors (#features) and
+              SPA routes (/faq). The `internal` flag on a link entry picks
+              <Link> for client-side navigation; anchors keep using <a>. */}
           <div>
             <h4 className="font-semibold text-foreground mb-4">Product</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors text-sm"
-                  >
-                    {link.label}
-                  </a>
+                  {link.internal ? (
+                    <Link
+                      to={link.href}
+                      className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
