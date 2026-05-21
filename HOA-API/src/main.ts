@@ -108,8 +108,14 @@ async function bootstrap() {
     },
   }));
 
+  // CORS_ORIGIN accepts both commas AND newlines as separators. Railway's
+  // dashboard exposes a multi-line text editor for env vars, and operators
+  // routinely paste one origin per line — which `.split(',')` alone treats
+  // as a single garbled value that matches no real Origin header. Tolerating
+  // both is one regex character; the alternative is a CORS outage every
+  // time someone edits the allow-list in the UI.
   const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
-    .split(',')
+    .split(/[,\n]/)
     .map((o) => o.trim())
     .filter(Boolean);
   // Refuse a wildcard CORS origin combined with credentials. Browsers
