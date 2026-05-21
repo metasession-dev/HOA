@@ -190,9 +190,37 @@ ensure_service() {
 }
 
 # Set a single variable on a service. Idempotent (Railway --set is upsert).
+# Run a Railway CLI command, retrying transient TLS/network failures
+# with exponential backoff. Railway's GraphQL endpoint occasionally
+# returns BadRecordMac / connection-reset blips when traffic goes
+# through corporate firewalls, flaky Wi-Fi, or aggressive TLS-inspecting
+# antivirus — aborting the bootstrap on one bad TCP connection is the
+# wrong default. Caller passes the full argv; output goes to stdout.
+railway_retry() {
+  local max=4 attempt=0 output rc
+  local transient='BadRecordMac|Failed to fetch|connection (error|reset|refused)|client error \(SendRequest\)|timed? out|temporarily unavailable|502 Bad Gateway|503 Service|504 Gateway'
+  while true; do
+    attempt=$((attempt + 1))
+    if output="$("$RAILWAY_BIN" "$@" 2>&1)"; then
+      printf "%s" "$output"
+      return 0
+    fi
+    rc=$?
+    if [[ $attempt -lt $max ]] && printf "%s" "$output" | grep -qE "$transient"; then
+      local delay=$((1 << attempt))     # 2, 4, 8, 16…
+      [[ $delay -gt 8 ]] && delay=8
+      warn "  Transient Railway failure (attempt ${attempt}/${max}) — retrying in ${delay}s…"
+      sleep "$delay"
+      continue
+    fi
+    printf "%s" "$output" >&2
+    return "$rc"
+  done
+}
+
 rv() {
   local svc="$1" key="$2" value="$3"
-  "$RAILWAY_BIN" variables --service "$svc" --set "${key}=${value}" >/dev/null
+  railway_retry variables --service "$svc" --set "${key}=${value}" >/dev/null
 }
 
 # Set a variable ONLY if it isn't already set on the service. Used for

@@ -126,20 +126,45 @@ function Get-RailwayRef {
 # Capture stdout from a native command without losing the exit code.
 # Out-String pipelines occasionally insert a trailing CRLF that breaks
 # JSON parsing on PS 5.1, so we trim defensively.
+#
+# Retries transient-looking failures (TLS handshake glitches like
+# BadRecordMac, 5xx, connection-reset) with exponential backoff — these
+# show up sporadically when hitting Railway's GraphQL endpoint through
+# corporate firewalls or flaky home Wi-Fi, and aborting the whole
+# bootstrap because of one bad TCP connection is the wrong default.
 function Invoke-Native {
-    param([string]$Exe, [string[]]$ArgList, [switch]$IgnoreStderr)
-    $stderrTarget = if ($IgnoreStderr) { 'SilentlyContinue' } else { 'Continue' }
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $output = & $Exe @ArgList 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previous
-    }
-    return [PSCustomObject]@{
-        Output   = ($output | Out-String).TrimEnd()
-        ExitCode = $exitCode
+    param(
+        [string]$Exe,
+        [string[]]$ArgList,
+        [switch]$IgnoreStderr,
+        [int]$MaxAttempts = 4
+    )
+    $transientPattern = 'BadRecordMac|Failed to fetch|connection (error|reset|refused)|client error \(SendRequest\)|timed? out|temporarily unavailable|502 Bad Gateway|503 Service|504 Gateway'
+    $attempt = 0
+    while ($true) {
+        $attempt++
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $output = & $Exe @ArgList 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previous
+        }
+        $combined = ($output | Out-String).TrimEnd()
+
+        if ($exitCode -eq 0) {
+            return [PSCustomObject]@{ Output = $combined; ExitCode = $exitCode }
+        }
+
+        $isTransient = $combined -match $transientPattern
+        if ($isTransient -and $attempt -lt $MaxAttempts) {
+            $delay = [int]([Math]::Min(8, [Math]::Pow(2, $attempt)))
+            Write-Warn "  Transient Railway failure (attempt $attempt/$MaxAttempts) — retrying in ${delay}s…"
+            Start-Sleep -Seconds $delay
+            continue
+        }
+        return [PSCustomObject]@{ Output = $combined; ExitCode = $exitCode }
     }
 }
 
