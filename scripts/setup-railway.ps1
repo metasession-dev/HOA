@@ -398,6 +398,17 @@ Set-RailwayVar $API_SERVICE 'JWT_EXPIRES_IN' '24h'
 # script creates. Railway's default is 8080 but the API's main.ts
 # already documents 3003 — pinning here keeps everything aligned.
 Set-RailwayVar $API_SERVICE 'PORT'           '3003'
+# Bind the Nest listener to all interfaces. main.ts defaults to '0.0.0.0'
+# when HOST is unset, but pinning it explicitly here documents intent and
+# matches what we do for the Next.js services below.
+Set-RailwayVar $API_SERVICE 'HOST'           '0.0.0.0'
+# Railway terminates TLS one hop in front of the container, so X-Forwarded-*
+# headers carry the real client IP. main.ts refuses to boot in production
+# unless TRUST_PROXY_HOPS > 0 — without this, the throttler buckets collapse
+# to one global bucket and the IP allowlist matches every request against
+# the proxy's address. Set to 1 for a single-proxy chain (Railway alone) or
+# 2 when Cloudflare sits in front.
+Set-RailwayVar $API_SERVICE 'TRUST_PROXY_HOPS' '1'
 
 # Secrets — preserved across reruns so live sessions don't die.
 Set-RailwayVarIfUnset $API_SERVICE 'JWT_SECRET'         $JWT_SECRET

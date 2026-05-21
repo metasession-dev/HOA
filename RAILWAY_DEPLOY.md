@@ -107,7 +107,13 @@ What it does, in order — every step is idempotent and safe to re-run:
    This guard means re-running the script doesn't rotate keys and
    invalidate live sessions.
 5. Pushes all the non-secret config (CORS, URLs, model defaults, mail
-   sender, storage root) via `railway variables --set` — all upserts.
+   sender, storage root, `PORT=3003`, `HOST=0.0.0.0`,
+   `TRUST_PROXY_HOPS=1`) via `railway variables --set` — all upserts.
+   `TRUST_PROXY_HOPS` is mandatory: `main.ts` refuses to boot in
+   production without it because rate-limit buckets collapse to one
+   global bucket when `req.ip` resolves to the proxy. Without that var
+   the deploy's healthcheck loops with "service unavailable" because
+   the app exits before binding.
 6. Wires every cross-service URL as a **Railway reference variable**
    (`${{ hoa-api.RAILWAY_PUBLIC_DOMAIN }}`, `${{ Postgres.DATABASE_URL }}`,
    etc.) so renaming a service or moving environments self-heals every
@@ -189,10 +195,12 @@ railway up --service hoa-marketing
 
 Healthchecks:
 
-- `hoa-api`        → `GET /api/docs`  (Swagger landing page)
+- `hoa-api`        → `GET /api/health`  (lightweight `{status:'ok',timestamp}` JSON; @Public so the JWT guard short-circuits)
 - `hoa-enterprise` → `GET /login`
 - `hoa-residents`  → `GET /login`
 - `hoa-marketing`  → `GET /`
+
+Previously this was `GET /api/docs` (the Swagger UI). It worked when everything was perfect, but failed deploys whenever Swagger setup threw or the HTML+JS bundle was slow to render — making "service unavailable" loops opaque. `/api/health` is the dedicated lifecycle endpoint and the correct deploy gate.
 
 Railway will mark each service "Active" once the corresponding 200 is
 returned. If a healthcheck fails, the deploy is rolled back and the
@@ -235,6 +243,10 @@ For a clean prod environment, you typically:
 Quick smoke after first boot:
 
 ```bash
+# API healthcheck (deploy gate)
+curl -fsS https://api.hoa.africa/api/health
+# → {"status":"ok","timestamp":"..."}
+
 # API reachable + docs render
 curl -fsS https://api.hoa.africa/api/docs | head -c 200
 

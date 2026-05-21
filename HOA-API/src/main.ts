@@ -150,8 +150,23 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || process.env.API_PORT || 3001;
-  await app.listen(port);
-  console.log(`HOA.africa API running on port ${port}`);
-  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  // Bind explicitly to 0.0.0.0 so the server is reachable through Railway's
+  // (and every other PaaS') reverse proxy. Node's default host varies by
+  // version and DNS family, and a healthcheck on /api/health that never
+  // gets a TCP accept is impossible to diagnose from the outside.
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
+  console.log(`HOA.africa API running on http://${host}:${port}`);
+  console.log(`Swagger docs:  http://${host}:${port}/api/docs`);
+  console.log(`Healthcheck:   http://${host}:${port}/api/health`);
 }
-bootstrap();
+
+// Surface boot failures explicitly. Without this, a throw inside bootstrap()
+// (e.g. assertProductionSecrets, TRUST_PROXY_HOPS guard, Prisma init) becomes
+// an unhandled promise rejection that Node may print without context — making
+// the Railway "service unavailable" loop look opaque.
+bootstrap().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error('[bootstrap] Fatal startup error:', err);
+  process.exit(1);
+});
