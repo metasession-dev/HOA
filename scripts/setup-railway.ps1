@@ -440,7 +440,14 @@ Set-RailwayVar $API_SERVICE 'STORAGE_ROOT'    '/data/storage'
 
 # ---------- HOA-ENTERPRISE ----------
 Write-Step "Setting HOA-ENTERPRISE ($ENT_SERVICE) variables…"
-$apiBase = 'https://' + (Get-RailwayRef $API_SERVICE 'RAILWAY_PUBLIC_DOMAIN') + '/api'
+# NEXT_PUBLIC_API_URL is the API's *origin only* — no /api suffix.
+# The frontend api client (src/lib/api.ts) prepends `/api${path}` to
+# every request, so adding /api here results in `/api/api/...` paths.
+# That hits two issues at once: the API 404s (no /api/api/* routes
+# registered), and CSP blocks the fetch because `connect-src` source
+# expressions with a path and no trailing slash match only that exact
+# URL per the CSP spec — sub-paths fall through and get refused.
+$apiBase = 'https://' + (Get-RailwayRef $API_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 $entBase = 'https://' + (Get-RailwayRef $ENT_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 $resBase = 'https://' + (Get-RailwayRef $RES_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
 $mktBase = 'https://' + (Get-RailwayRef $MKT_SERVICE 'RAILWAY_PUBLIC_DOMAIN')
