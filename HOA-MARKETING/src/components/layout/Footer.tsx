@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Home, Mail, Phone, MapPin } from "lucide-react";
+import { MapPin, Calendar } from "lucide-react";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -15,10 +15,13 @@ const Footer = () => {
       { label: "Contact", href: "#contact" },
       { label: "Blog", href: "#" },
     ],
+    // Internal SPA routes — rendered with React Router <Link> below so
+    // navigation stays client-side. The `internal` flag tells the
+    // renderer to switch from <a> to <Link>.
     legal: [
-      { label: "Privacy Policy", href: "#" },
-      { label: "Terms of Service", href: "#" },
-      { label: "Cookie Policy", href: "#" },
+      { label: "Privacy Policy", href: "/privacy", internal: true },
+      { label: "Terms of Service", href: "/terms", internal: true },
+      { label: "Cookie Policy", href: "/cookies", internal: true },
     ],
   };
 
@@ -40,15 +43,15 @@ const Footer = () => {
             </p>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-muted-foreground">
-                <Mail className="w-4 h-4" />
+                <Calendar className="w-4 h-4" />
                 <span className="text-sm">
                   <a href="https://metasession.thorstack.com/book/grey/30mins-hoa-demo" className="text-primary hover:underline">Book a demo</a>
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-muted-foreground">
+              {/* <div className="flex items-center gap-3 text-muted-foreground">
                 <Phone className="w-4 h-4" />
                 <span className="text-sm">+234 (706) 069 4202</span>
-              </div>
+              </div> */}
               <div className="flex items-center gap-3 text-muted-foreground">
                 <MapPin className="w-4 h-4" />
                 <span className="text-sm">Lagos . London . Dubai</span>
@@ -90,18 +93,21 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* Legal Links */}
+          {/* Legal Links — internal SPA routes use <Link> so React Router
+              handles the navigation client-side without a full page reload.
+              That preserves state (e.g. the cookie consent banner) and is
+              noticeably faster on slow connections. */}
           <div>
             <h4 className="font-semibold text-foreground mb-4">Legal</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
+                  <Link
+                    to={link.href}
                     className="text-muted-foreground hover:text-foreground transition-colors text-sm"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

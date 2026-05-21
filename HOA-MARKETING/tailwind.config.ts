@@ -123,5 +123,11 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Provides the `prose` utility used by the legal pages (Privacy,
+    // Terms, Cookies) to get consistent typography without per-element
+    // styling. The package is already in devDependencies.
+    require("@tailwindcss/typography"),
+  ],
 } satisfies Config;
