@@ -108,7 +108,9 @@ function LoginInner() {
         <div className="w-full max-w-md">
           {/* Mobile-only header — replaces the hidden hero panel. */}
           <div className="mb-8 lg:hidden flex items-center justify-center gap-2">
-            <img src="/icons/logo.png" alt="HOA.africa" className="h-10 w-10" />
+            <div className="p-2 rounded-lg bg-white">
+              <img src="/icons/logo.png" alt="HOA.africa" className="h-10 w-10" />
+            </div>
             <span className="font-display text-heading-sm text-charcoal-primary">
               HOA.africa
             </span>

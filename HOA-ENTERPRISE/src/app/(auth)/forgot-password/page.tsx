@@ -76,7 +76,9 @@ export default function ForgotPasswordPage() {
       <main className="flex w-full lg:w-1/2 items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden flex items-center justify-center gap-2">
-            <img src="/icons/logo.png" alt="HOA.africa" className="h-10 w-10" />
+            <div className="p-2 rounded-lg bg-white">
+              <img src="/icons/logo.png" alt="HOA.africa" className="h-10 w-10" />
+            </div>
             <span className="font-display text-heading-sm text-charcoal-primary">HOA.africa</span>
           </div>
 
