@@ -55,7 +55,7 @@
 set -euo pipefail
 
 # ---------- constants ----------
-PROJECT_ID="d436a63d-be9f-49dc-92a7-fd3215684a5f"
+PROJECT_ID="132485f6-967c-4586-a477-85c955fba43b"
 API_SERVICE="hoa-api"
 ENT_SERVICE="hoa-enterprise"
 RES_SERVICE="hoa-residents"
@@ -63,12 +63,17 @@ MKT_SERVICE="hoa-marketing"
 DB_SERVICE="Postgres"
 REDIS_SERVICE="Redis"
 
-# ---------- repo linkage (optional) ----------
-GITHUB_OWNER="${GITHUB_OWNER:-}"
-HOA_API_REPO="${HOA_API_REPO:-${GITHUB_OWNER:+${GITHUB_OWNER}/HOA-API}}"
-HOA_ENTERPRISE_REPO="${HOA_ENTERPRISE_REPO:-${GITHUB_OWNER:+${GITHUB_OWNER}/HOA-ENTERPRISE}}"
-HOA_RESIDENTS_REPO="${HOA_RESIDENTS_REPO:-${GITHUB_OWNER:+${GITHUB_OWNER}/HOA-RESIDENTS}}"
-HOA_MARKETING_REPO="${HOA_MARKETING_REPO:-${GITHUB_OWNER:+${GITHUB_OWNER}/HOA-MARKETING}}"
+# ---------- monorepo layout ----------
+# All four apps live in a single GitHub repo. Each Railway service is
+# pointed at its subfolder via --root-directory on create, with
+# RAILWAY_ROOT_DIRECTORY as a build-time fallback.
+GITHUB_OWNER="${GITHUB_OWNER:-metasession-dev}"
+GITHUB_REPO="${GITHUB_REPO:-HOA}"
+MONOREPO="${GITHUB_OWNER}/${GITHUB_REPO}"
+API_ROOT="HOA-API"
+ENT_ROOT="HOA-ENTERPRISE"
+RES_ROOT="HOA-RESIDENTS"
+MKT_ROOT="HOA-MARKETING"
 
 # ---------- helpers ----------
 log()  { printf "\033[1;32m▶\033[0m %s\n" "$*"; }
@@ -149,29 +154,39 @@ ensure_database() {
   fi
 }
 
-# Create an app service if it doesn't exist. When the *_REPO variable for
-# this service is non-empty, link the service to that GitHub repo so
-# Railway auto-deploys on push. Otherwise create an empty service and the
-# operator wires the repo through the dashboard once.
+# Create an app service for the monorepo if it doesn't exist. Wires the
+# GitHub repo + Root Directory on first create. If the v4 CLI doesn't
+# honour --root-directory, falls back to setting RAILWAY_ROOT_DIRECTORY
+# as a build-time variable. If neither sticks, the dashboard step is
+# documented in the summary.
 ensure_service() {
-  local name="$1" repo="${2:-}"
+  local name="$1" repo="$2" root_dir="$3"
   if service_exists "$name"; then
     log "Service '${name}' already exists, skipping create."
     return
   fi
-  if [[ -n "$repo" ]]; then
-    log "Creating service '${name}' wired to ${repo}…"
-    if ! "$RAILWAY_BIN" add --service "$name" --repo "$repo" >/dev/null 2>&1; then
-      # Fallback: create empty service. Operator will link the repo via UI.
-      warn "Could not wire ${repo} (private/unauthorised?); creating empty service '${name}'."
-      "$RAILWAY_BIN" add --service "$name" >/dev/null 2>&1 \
-        || fail "Could not create service '${name}'."
-    fi
-  else
-    log "Creating empty service '${name}' (no GITHUB_OWNER set)…"
+  if [[ -z "$repo" ]]; then
+    log "Creating empty service '${name}' (no monorepo wired)…"
+    "$RAILWAY_BIN" add --service "$name" >/dev/null 2>&1 \
+      || fail "Could not create service '${name}'."
+    return
+  fi
+
+  log "Creating service '${name}' wired to ${repo}:${root_dir}…"
+  if "$RAILWAY_BIN" add --service "$name" --repo "$repo" --root-directory "$root_dir" >/dev/null 2>&1; then
+    return
+  fi
+
+  warn "  --root-directory not honoured by this CLI; creating service then setting RAILWAY_ROOT_DIRECTORY as a build-time variable."
+  if ! "$RAILWAY_BIN" add --service "$name" --repo "$repo" >/dev/null 2>&1; then
+    warn "  Could not wire ${repo} (private/unauthorised?); creating empty service '${name}'."
     "$RAILWAY_BIN" add --service "$name" >/dev/null 2>&1 \
       || fail "Could not create service '${name}'."
   fi
+  # `RAILWAY_ROOT_DIRECTORY` is documented as a build-time override for
+  # the Source Root Directory. If a given CLI/control-plane version
+  # doesn't honour it, the dashboard step in the summary takes over.
+  rv "$name" RAILWAY_ROOT_DIRECTORY "$root_dir"
 }
 
 # Set a single variable on a service. Idempotent (Railway --set is upsert).
@@ -237,11 +252,19 @@ log "Ensuring database addons…"
 ensure_database postgres "$DB_SERVICE"
 ensure_database redis    "$REDIS_SERVICE"
 
-log "Ensuring app services…"
-ensure_service "$API_SERVICE" "$HOA_API_REPO"
-ensure_service "$ENT_SERVICE" "$HOA_ENTERPRISE_REPO"
-ensure_service "$RES_SERVICE" "$HOA_RESIDENTS_REPO"
-ensure_service "$MKT_SERVICE" "$HOA_MARKETING_REPO"
+log "Ensuring app services (all from ${MONOREPO})…"
+ensure_service "$API_SERVICE" "$MONOREPO" "$API_ROOT"
+ensure_service "$ENT_SERVICE" "$MONOREPO" "$ENT_ROOT"
+ensure_service "$RES_SERVICE" "$MONOREPO" "$RES_ROOT"
+ensure_service "$MKT_SERVICE" "$MONOREPO" "$MKT_ROOT"
+
+# Set RAILWAY_ROOT_DIRECTORY unconditionally so services created on a
+# prior run (when --root-directory wasn't honoured) still get the path.
+# Idempotent — `--set` is upsert.
+rv "$API_SERVICE" RAILWAY_ROOT_DIRECTORY "$API_ROOT"
+rv "$ENT_SERVICE" RAILWAY_ROOT_DIRECTORY "$ENT_ROOT"
+rv "$RES_SERVICE" RAILWAY_ROOT_DIRECTORY "$RES_ROOT"
+rv "$MKT_SERVICE" RAILWAY_ROOT_DIRECTORY "$MKT_ROOT"
 
 # ---------- generate high-entropy secrets ----------
 # These get used only when the corresponding variable is currently unset
@@ -373,11 +396,17 @@ Next steps:
   2. Attach a Volume to ${API_SERVICE} at mount path /data/storage
      (Settings → Volumes → New Volume, 5GB+). The Railway CLI doesn't
      manage volumes yet, so this stays a one-click UI step.
-  3. If GITHUB_OWNER wasn't set when running this script, connect each
-     app service to its GitHub repo via Settings → Source. Otherwise
-     deploys are already wired and happen on every git push.
-  4. Trigger an initial deploy (push to the linked branch, or run
-     \`railway up --service <name>\` from each app's directory).
+  3. Verify each service's Root Directory in the Railway dashboard
+     (Service → Settings → Source → Root Directory). Should be:
+       ${API_SERVICE}        → ${API_ROOT}
+       ${ENT_SERVICE} → ${ENT_ROOT}
+       ${RES_SERVICE}  → ${RES_ROOT}
+       ${MKT_SERVICE}  → ${MKT_ROOT}
+     If the --root-directory CLI flag was honoured (or the
+     RAILWAY_ROOT_DIRECTORY build-time variable is respected), these
+     are already set. If not, click into each service and set it once.
+  4. Trigger an initial deploy: push to ${MONOREPO}'s connected branch,
+     or run \`railway up --service <name>\` from each app's directory.
   5. (Optional) Map custom domains: \`api.hoa.africa\`, \`admin.hoa.africa\`,
      \`app.hoa.africa\`, \`hoa.africa\` — then overwrite the CORS_ORIGIN +
      APP_*_URL vars to point at them instead of *.up.railway.app.

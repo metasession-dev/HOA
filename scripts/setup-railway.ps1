@@ -1,16 +1,26 @@
 <#
 .SYNOPSIS
-  Bootstrap the entire HOA.africa platform on Railway from Windows PowerShell.
+  Bootstrap the HOA.africa monorepo on Railway from Windows PowerShell.
 
 .DESCRIPTION
-  Idempotent end-to-end:
+  Idempotent end-to-end. All four apps live in a single GitHub repo
+  (github.com/metasession-dev/HOA) with this folder layout:
+
+      HOA-API/           → Railway service: hoa-api
+      HOA-ENTERPRISE/    → Railway service: hoa-enterprise
+      HOA-RESIDENTS/     → Railway service: hoa-residents
+      HOA-MARKETING/     → Railway service: hoa-marketing
+
+  Steps:
     1. Links the local checkout to Railway project
-       d436a63d-be9f-49dc-92a7-fd3215684a5f.
+       132485f6-967c-4586-a477-85c955fba43b.
     2. Provisions the Postgres + Redis addons if they're not already there.
-    3. Creates the four app services (hoa-api, hoa-enterprise,
-       hoa-residents, hoa-marketing) if they're not already there. When
-       $env:GITHUB_OWNER is set, services are wired to their GitHub repos
-       so Railway auto-deploys on push.
+    3. Creates the four app services if they're not already there, all
+       wired to the same GitHub repo. Each service gets its build Root
+       Directory set to its subfolder (HOA-API/, HOA-ENTERPRISE/, ...)
+       via the --root-directory CLI flag where supported, falling back
+       to RAILWAY_ROOT_DIRECTORY as a build-time variable. If neither
+       takes effect, the dashboard step is documented in the summary.
     4. Generates the high-entropy secrets locally (JWT_SECRET,
        APP_ENCRYPTION_KEY, STORAGE_URL_SECRET, VAPID keypair) and pushes
        them to each service — only when the variable is currently unset,
@@ -23,8 +33,8 @@
   no openssl required. Re-running is safe.
 
 .PARAMETER GithubOwner
-  Optional GitHub user/org. When supplied, each service is created with
-  its repo wired on first create. Falls back to $env:GITHUB_OWNER.
+  Optional override for the GitHub owner. Defaults to 'metasession-dev'
+  (the canonical home of the monorepo). Also honours $env:GITHUB_OWNER.
 
 .EXAMPLE
   .\scripts\setup-railway.ps1
@@ -50,7 +60,12 @@
 
 [CmdletBinding()]
 param(
-    [string]$GithubOwner = $env:GITHUB_OWNER
+    # Defaults to the canonical monorepo owner. Override only if you
+    # forked or mirrored the repo somewhere else.
+    [string]$GithubOwner = $(if ($env:GITHUB_OWNER) { $env:GITHUB_OWNER } else { 'metasession-dev' }),
+    # The repo name within the owner. Override if your fork uses a
+    # different name than the canonical 'HOA'.
+    [string]$Repo = $(if ($env:GITHUB_REPO) { $env:GITHUB_REPO } else { 'HOA' })
 )
 
 # Stop on any unhandled error — equivalent to `set -e` in bash.
@@ -63,7 +78,7 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() } catch { }
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 # ---------- constants ----------
-$PROJECT_ID    = 'd436a63d-be9f-49dc-92a7-fd3215684a5f'
+$PROJECT_ID    = '132485f6-967c-4586-a477-85c955fba43b'
 $API_SERVICE   = 'hoa-api'
 $ENT_SERVICE   = 'hoa-enterprise'
 $RES_SERVICE   = 'hoa-residents'
@@ -71,18 +86,16 @@ $MKT_SERVICE   = 'hoa-marketing'
 $DB_SERVICE    = 'Postgres'
 $REDIS_SERVICE = 'Redis'
 
-# ---------- repo linkage (optional) ----------
-function Resolve-Repo {
-    param([string]$EnvName, [string]$DefaultRepoName)
-    $explicit = [Environment]::GetEnvironmentVariable($EnvName)
-    if ($explicit) { return $explicit }
-    if ($GithubOwner) { return "$GithubOwner/$DefaultRepoName" }
-    return ''
-}
-$HOA_API_REPO        = Resolve-Repo 'HOA_API_REPO'        'HOA-API'
-$HOA_ENTERPRISE_REPO = Resolve-Repo 'HOA_ENTERPRISE_REPO' 'HOA-ENTERPRISE'
-$HOA_RESIDENTS_REPO  = Resolve-Repo 'HOA_RESIDENTS_REPO'  'HOA-RESIDENTS'
-$HOA_MARKETING_REPO  = Resolve-Repo 'HOA_MARKETING_REPO'  'HOA-MARKETING'
+# ---------- monorepo layout ----------
+# Single GitHub repo houses all four apps. Each Railway service builds
+# from its own subfolder, configured via --root-directory on create
+# (with RAILWAY_ROOT_DIRECTORY as a fallback env var if the CLI flag
+# isn't recognised — see Confirm-AppService).
+$MONOREPO       = "$GithubOwner/$Repo"
+$API_ROOT       = 'HOA-API'
+$ENT_ROOT       = 'HOA-ENTERPRISE'
+$RES_ROOT       = 'HOA-RESIDENTS'
+$MKT_ROOT       = 'HOA-MARKETING'
 
 # ---------- helpers ----------
 function Write-Step { param($Msg) Write-Host "▶ $Msg" -ForegroundColor Green }
@@ -177,26 +190,44 @@ function Confirm-Database {
 }
 
 function Confirm-AppService {
-    param([string]$Name, [string]$Repo)
+    param(
+        [string]$Name,
+        [string]$Repo,
+        [string]$RootDirectory   # subfolder within the monorepo to build from
+    )
     if (Test-RailwayService $Name) {
         Write-Step "Service '$Name' already exists, skipping create."
         return
     }
-    if ($Repo) {
-        Write-Step "Creating service '$Name' wired to $Repo…"
-        $r = Invoke-Native 'railway' @('add','--service',$Name,'--repo',$Repo) -IgnoreStderr
-        if ($r.ExitCode -ne 0) {
-            # Fallback to empty service so the bootstrap doesn't bail —
-            # operator can wire the repo via UI afterward.
-            Write-Warn "Could not wire $Repo (private repo / unauthorised?); creating empty service '$Name'."
-            $r = Invoke-Native 'railway' @('add','--service',$Name) -IgnoreStderr
-            if ($r.ExitCode -ne 0) { Stop-WithError "Could not create service '$Name'." }
-        }
-    } else {
-        Write-Step "Creating empty service '$Name' (no GITHUB_OWNER set)…"
+    if (-not $Repo) {
+        Write-Step "Creating empty service '$Name' (no monorepo wired)…"
+        $r = Invoke-Native 'railway' @('add','--service',$Name) -IgnoreStderr
+        if ($r.ExitCode -ne 0) { Stop-WithError "Could not create service '$Name'." }
+        return
+    }
+
+    # Monorepo path: try the v4 --root-directory flag first so the
+    # subfolder is wired on initial create. Falls back step-by-step so
+    # the bootstrap never bails — any missing piece is documented in
+    # the summary for the operator to fix in the dashboard.
+    Write-Step "Creating service '$Name' wired to ${Repo}:${RootDirectory}…"
+    $r = Invoke-Native 'railway' @(
+        'add','--service',$Name,'--repo',$Repo,'--root-directory',$RootDirectory
+    ) -IgnoreStderr
+    if ($r.ExitCode -eq 0) { return }
+
+    # CLI may not recognise --root-directory. Try without it.
+    Write-Warn "  --root-directory not honoured by this CLI; creating service then setting RAILWAY_ROOT_DIRECTORY as a build-time variable."
+    $r = Invoke-Native 'railway' @('add','--service',$Name,'--repo',$Repo) -IgnoreStderr
+    if ($r.ExitCode -ne 0) {
+        Write-Warn "  Could not wire $Repo (private repo / unauthorised?); creating empty service '$Name'."
         $r = Invoke-Native 'railway' @('add','--service',$Name) -IgnoreStderr
         if ($r.ExitCode -ne 0) { Stop-WithError "Could not create service '$Name'." }
     }
+    # `RAILWAY_ROOT_DIRECTORY` is documented as a build-time override for
+    # the Source Root Directory. If a given CLI/control-plane version
+    # doesn't honour it, the dashboard step in the summary takes over.
+    Set-RailwayVar $Name 'RAILWAY_ROOT_DIRECTORY' $RootDirectory
 }
 
 # ---------- variable helpers ----------
@@ -289,11 +320,20 @@ Write-Step "Ensuring database addons…"
 Confirm-Database 'postgres' $DB_SERVICE
 Confirm-Database 'redis'    $REDIS_SERVICE
 
-Write-Step "Ensuring app services…"
-Confirm-AppService $API_SERVICE $HOA_API_REPO
-Confirm-AppService $ENT_SERVICE $HOA_ENTERPRISE_REPO
-Confirm-AppService $RES_SERVICE $HOA_RESIDENTS_REPO
-Confirm-AppService $MKT_SERVICE $HOA_MARKETING_REPO
+Write-Step "Ensuring app services (all from $MONOREPO)…"
+Confirm-AppService $API_SERVICE $MONOREPO $API_ROOT
+Confirm-AppService $ENT_SERVICE $MONOREPO $ENT_ROOT
+Confirm-AppService $RES_SERVICE $MONOREPO $RES_ROOT
+Confirm-AppService $MKT_SERVICE $MONOREPO $MKT_ROOT
+
+# Make RAILWAY_ROOT_DIRECTORY a no-op rerun guarantee: services already
+# created on a prior pass need this set regardless of how they were
+# initially wired, otherwise Railway would try to build from the repo
+# root and fail. Setting is idempotent (upsert).
+Set-RailwayVar $API_SERVICE 'RAILWAY_ROOT_DIRECTORY' $API_ROOT
+Set-RailwayVar $ENT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $ENT_ROOT
+Set-RailwayVar $RES_SERVICE 'RAILWAY_ROOT_DIRECTORY' $RES_ROOT
+Set-RailwayVar $MKT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $MKT_ROOT
 
 # ---------- generate candidate secrets ----------
 Write-Step "Generating candidate secrets (only applied if currently unset)…"
@@ -416,11 +456,17 @@ Next steps:
   2. Attach a Volume to $API_SERVICE at mount path /data/storage
      (Settings → Volumes → New Volume, 5GB+). Railway CLI doesn't
      manage volumes yet, so this is a one-click UI step.
-  3. If you didn't pass -GithubOwner / `$env:GITHUB_OWNER, connect each
-     app service to its GitHub repo via Settings → Source. Otherwise
-     deploys are already wired and trigger on every git push.
-  4. Trigger an initial deploy: push to the linked branch, or run
-     'railway up --service <name>' from each app's directory.
+  3. Verify each service's Root Directory in the Railway dashboard
+     (Service → Settings → Source → Root Directory). Should be:
+       $API_SERVICE        → $API_ROOT
+       $ENT_SERVICE → $ENT_ROOT
+       $RES_SERVICE  → $RES_ROOT
+       $MKT_SERVICE  → $MKT_ROOT
+     If the --root-directory CLI flag was honoured (or the
+     RAILWAY_ROOT_DIRECTORY build-time var is respected), these are
+     already set. If not, click into each service and set it once.
+  4. Trigger an initial deploy: push to $MONOREPO's connected branch,
+     or run 'railway up --service <name>' from each app's directory.
   5. (Optional) Map custom domains: api.hoa.africa, admin.hoa.africa,
      app.hoa.africa, hoa.africa — then overwrite CORS_ORIGIN +
      APP_*_URL to point at them instead of *.up.railway.app.

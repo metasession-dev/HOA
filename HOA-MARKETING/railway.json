@@ -2,7 +2,9 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci --legacy-peer-deps && npm run build"
+    "buildCommand": "npm ci --legacy-peer-deps && npm run build",
+    "//": "watchPatterns are evaluated relative to the repo root. Limiting to HOA-MARKETING/** stops sibling-app changes from triggering a redeploy of this service.",
+    "watchPatterns": ["HOA-MARKETING/**"]
   },
   "deploy": {
     "//": "Static Vite SPA served by `serve`. `-s` enables SPA fallback so client-side routes (e.g. /login) survive a hard refresh; the public/_redirects + vercel.json files cover other deploy targets, but serve needs the -s flag here.",

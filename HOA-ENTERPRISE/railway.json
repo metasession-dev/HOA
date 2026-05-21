@@ -2,7 +2,9 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci && npm run build"
+    "buildCommand": "npm ci && npm run build",
+    "//": "watchPatterns are evaluated relative to the repo root. Limiting to HOA-ENTERPRISE/** stops sibling-app changes from triggering a redeploy of this service.",
+    "watchPatterns": ["HOA-ENTERPRISE/**"]
   },
   "deploy": {
     "//": "Next.js standalone server. `output: 'standalone'` in next.config.js makes .next/standalone/server.js self-contained — Railway just runs it. PORT is injected by Railway and Next.js reads it automatically.",

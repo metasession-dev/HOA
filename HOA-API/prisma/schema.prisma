@@ -1,0 +1,2320 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH & RBAC ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  emailVerified DateTime?
+  // Gate for HOA-ENTERPRISE login. Residents (owners / tenants) DON'T need
+  // this — they sign into the PWA. Staff (admins, exco, finance, gate, etc.)
+  // DO. Default false so newly-invited residents can't accidentally access
+  // the admin console without explicit enablement. Existing pre-migration
+  // users with admin-shaped roles get back-filled to `true` on first boot.
+  enterpriseAccess Boolean @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  userRoles     UserRole[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  pushSubscriptions PushSubscription[]
+  notificationPreferences NotificationPreference[]
+  invitesSent   Invite[]       @relation("InviteCreator")
+  loginHistory  LoginHistory[]
+  customRoles   CustomRole[]   @relation("CustomRoleCreator")
+  sessions      Session[]
+  trustedDevices TrustedDevice[]
+  magicLinks    MagicLink[]
+  passwordResets PasswordResetToken[]
+  assistantConversations AssistantConversation[]
+  dataExportRequests DataExportRequest[]
+  erasureRequests   ErasureRequest[]
+  consentRecords    ConsentRecord[]
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+
+  // ---- Phase 6: MFA ----
+  // TOTP secret is stored encrypted at rest (AES-GCM with APP_ENCRYPTION_KEY).
+  // The DB column holds the base64 ciphertext; the plain secret never persists.
+  totpSecretEncrypted String?
+  totpEnabled         Boolean  @default(false)
+  totpEnabledAt       DateTime?
+  // Recovery codes are stored as sha256 hashes; each can be redeemed once.
+  recoveryCodesHashed String[] @default([])
+
+  // sessionVersion is incremented to force-logout every existing session of this
+  // user (e.g. on password change or admin "force logout"). JWTs carry the
+  // version they were minted with; mismatches are rejected by JwtAuthGuard.
+  sessionVersion Int @default(0)
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  permissions String[]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id             String    @id @default(cuid())
+  userId         String
+  roleId         String
+  organizationId String
+  customRoleId   String?
+  assignedAt     DateTime  @default(now())
+  assignedBy     String?
+  expiresAt      DateTime?
+  // Optional scope constraints (Phase 5.3 — custom roles)
+  unitIds        String[]  @default([])
+  estateIds      String[]  @default([])
+  approvalLimit  Decimal?  @db.Decimal(12, 2)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
+
+  @@unique([userId, roleId, organizationId])
+  @@index([organizationId, expiresAt])
+  @@map("user_roles")
+}
+
+// ==================== ORGANIZATION ====================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  country   String   @default("ZA")
+  currency  String   @default("ZAR")
+  timezone  String   @default("Africa/Johannesburg")
+  language  String   @default("en")
+  settings  Json     @default("{}")
+  logoUrl   String?
+  // Phase 10.2: per-HOA branding the resident PWA + admin app theme to.
+  accentColor      String?  // hex like #2563EB; null = use platform default
+  brandingTagline  String?  // appears under the logo on the resident login + topbar
+  isActive  Boolean  @default(true)
+  // ---- Phase 6: enterprise security ----
+  // Roles for which MFA is mandatory when set. Empty array = no enforcement.
+  mfaRequiredRoles String[] @default([])
+  // CIDR allowlist applied to authenticated requests. Empty = unrestricted.
+  ipAllowlist      String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates             Estate[]
+  people              Person[]
+  glAccounts          GLAccount[]
+  invoices            Invoice[]
+  journalEntries      JournalEntry[]
+  documents           Document[]
+  broadcasts          Broadcast[]
+  auditLogs           AuditLog[]
+  userRoles           UserRole[]
+  gatePasses          GatePass[]
+  notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
+  violationCategories ViolationCategory[]
+  violations          Violation[]
+  votes               Vote[]
+  surveys             Survey[]
+  vendors             Vendor[]
+  vendorInvoices      VendorInvoice[]
+  approvalRules       ApprovalRule[]
+  resaleCertificates  ResaleCertificate[]
+  funds               Fund[]
+  budgets             Budget[]
+  bankAccounts        BankAccount[]
+  bankReconciliations BankReconciliation[]
+  categorizationRules CategorizationRule[]
+  invites             Invite[]
+  loginHistory        LoginHistory[]
+  customRoles         CustomRole[]
+  assistantConversations AssistantConversation[]
+  anomalies           AnomalyDetection[]
+  exchangeRates       ExchangeRate[]
+  dataExportRequests  DataExportRequest[]
+  erasureRequests     ErasureRequest[]
+  consentRecords      ConsentRecord[]
+  apiKeys             ApiKey[]
+  webhookEndpoints    WebhookEndpoint[]
+  webhookDeliveries   WebhookDelivery[]
+  requestCategories   RequestCategory[]
+  requests            Request[]
+  recurringSchedules  RecurringInvoiceSchedule[]
+  lateFeeConfig       LateFeeConfig?
+  paymentPlans        PaymentPlan[]
+  paymentIntents      PaymentIntent[]
+  emailDeliveries     EmailDelivery[]
+  inboundEmails       InboundEmail[]
+  bookkeepingEngagement BookkeepingEngagement?
+  platformSubscription  PlatformSubscription?
+  platformInvoices      PlatformInvoice[]
+  storedFiles           StoredFile[]
+
+  @@map("organizations")
+}
+
+// ==================== ESTATE & UNITS ====================
+
+model Estate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  address        String?
+  totalUnits     Int      @default(0)
+  settings       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  units        Unit[]
+
+  @@map("estates")
+}
+
+model Unit {
+  id           String   @id @default(cuid())
+  estateId     String
+  unitNumber   String
+  block        String?
+  floor        Int?
+  type         String   @default("apartment")
+  areaSqm      Float?
+  tags         String[] @default([])
+  customFields Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  estate             Estate              @relation(fields: [estateId], references: [id], onDelete: Cascade)
+  occupancies        UnitOccupancy[]
+  invoices           Invoice[]
+  gatePasses         GatePass[]
+  violations         Violation[]
+  resaleCertificates ResaleCertificate[]
+  requests           Request[]
+
+  @@unique([estateId, unitNumber])
+  @@map("units")
+}
+
+// ==================== PEOPLE ====================
+
+model Person {
+  id                String   @id @default(cuid())
+  organizationId    String
+  userId            String?
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  preferredLanguage String   @default("en")
+  preferredCurrency String?
+  // Role on the platform — orthogonal to UnitOccupancy.role (which is
+  // per-unit). A Person's `type` is their global relationship to the HOA:
+  //   owner       → titled property owner; default for invited residents
+  //   tenant      → renting from an owner; pays levies on behalf of unit
+  //   stakeholder → board member, vendor contact, exco — no unit occupancy
+  type              String   @default("owner")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  occupancies  UnitOccupancy[]
+  invites      Invite[]
+
+  @@index([userId])
+  @@index([organizationId, type])
+  @@map("people")
+}
+
+model UnitOccupancy {
+  id               String    @id @default(cuid())
+  unitId           String
+  personId         String
+  role             String // owner, tenant
+  startDate        DateTime
+  endDate          DateTime?
+  isActive         Boolean   @default(true)
+  isPrimaryContact Boolean   @default(false)
+
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@map("unit_occupancies")
+}
+
+// ==================== FINANCIAL ====================
+
+model Invoice {
+  id             String    @id @default(cuid())
+  organizationId String
+  unitId         String
+  invoiceNumber  String
+  type           String    @default("recurring")
+  amount         Decimal   @db.Decimal(12, 2)
+  currency       String    @default("ZAR")
+  dueDate        DateTime
+  status         String    @default("draft")
+  lineItems      Json      @default("[]")
+  notes          String?
+  createdBy      String
+  sentAt         DateTime?
+  paidAt         DateTime?
+  // Phase 8.2: rate captured at invoice creation (vs the org's base currency).
+  // Locked so subsequent FX swings don't retroactively change the invoice.
+  // Null when invoice currency matches org base (no conversion needed).
+  baseCurrency       String?
+  lockedRate         Decimal?  @db.Decimal(18, 8)
+  lockedRateAsOf     DateTime?
+  // Phase 1.2: link back to the schedule that generated this invoice so we
+  // can de-dup repeat runs of the same period.
+  parentScheduleId   String?
+  // Period key (e.g. "2026-05" for monthly, "2026-Q2" for quarterly). Unique
+  // together with parentScheduleId + unitId.
+  periodKey          String?
+  // Pre-late-fee amount, captured at generation time. `amount` is then bumped
+  // each sweep so totalPaid maths stay consistent.
+  originalAmount     Decimal?  @db.Decimal(12, 2)
+  // Marker for idempotency: a sweep with the same lateFeeRuleSignature stops here.
+  lateFeeAppliedAt   DateTime?
+  lateFeeSignature   String?
+  // Payment plan attachment: when set, this invoice is a child of a payment-plan
+  // installment, not a standalone bill. Used by reconciliation + arrears reports.
+  paymentPlanInstallmentId String? @unique
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit             Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  payments         Payment[]
+  violationFineFor Violation?
+  parentSchedule   RecurringInvoiceSchedule? @relation(fields: [parentScheduleId], references: [id])
+  paymentPlanInstallment PaymentPlanInstallment? @relation(fields: [paymentPlanInstallmentId], references: [id])
+  paymentIntents   PaymentIntent[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@unique([parentScheduleId, unitId, periodKey])
+  @@index([organizationId, status, dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id                 String    @id @default(cuid())
+  invoiceId          String
+  amount             Decimal   @db.Decimal(12, 2)
+  currency           String    @default("ZAR")
+  method             String
+  processorReference String?
+  status             String    @default("pending")
+  processedAt        DateTime?
+  loggedBy           String?
+  createdAt          DateTime  @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model GLAccount {
+  id             String  @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  type           String // asset, liability, equity, income, expense
+  parentId       String?
+  isSystem       Boolean @default(false)
+  isActive       Boolean @default(true)
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent              GLAccount?           @relation("GLAccountHierarchy", fields: [parentId], references: [id])
+  children            GLAccount[]          @relation("GLAccountHierarchy")
+  vendors             Vendor[]
+  vendorInvoices      VendorInvoice[]
+  bankAccounts        BankAccount[]
+  bankTransactions    BankTransaction[]
+  categorizationRules CategorizationRule[]
+
+  @@unique([organizationId, code])
+  @@map("gl_accounts")
+}
+
+model JournalEntry {
+  id             String    @id @default(cuid())
+  organizationId String
+  date           DateTime
+  reference      String
+  description    String
+  lines          Json // [{glAccountId, debit, credit, notes, fundId?}]
+  fundId         String?
+  createdBy      String
+  postedAt       DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fund         Fund?        @relation(fields: [fundId], references: [id])
+
+  @@map("journal_entries")
+}
+
+// ==================== DOCUMENTS ====================
+
+model Document {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  path           String
+  fileUrl        String
+  fileSize       Int
+  mimeType       String
+  uploadedBy     String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+// ==================== COMMUNICATIONS ====================
+
+// Phase 2.5: a Broadcast is now a first-class campaign with segment + schedule
+// + merge fields + per-recipient delivery tracking. The pre-2.5 free-form
+// rows still survive (status='queued' from prior phases) but the new admin UI
+// is what residents see going forward.
+//
+// Segment shape: { allOwners?, paidUpOnly?, debtorMinAmount?, estateIds?,
+//   unitTagIn?, roleIn?, personIds?, residenceStatusIn? }.
+// Merge fields supported: {{firstName}}, {{lastName}}, {{email}},
+// {{unitNumber}}, {{estateName}}, {{outstandingAmount}}, {{currency}}.
+model Broadcast {
+  id             String    @id @default(cuid())
+  organizationId String
+  subject        String
+  body           String
+  // Phase 2.5: subject can also use merge fields; the worker substitutes both.
+  channels       String[]  // ["email"] | ["sms"] | ["email","sms"]
+  targetSegment  Json      @default("{}")
+  // Phase 2.5: status state-machine: draft → scheduled → sending → sent | cancelled | failed
+  status         String    @default("draft")
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  createdBy      String
+  stats          Json      @default("{}")
+  // Aggregated counts updated as deliveries land.
+  resolvedRecipients Int   @default(0)
+  successCount    Int      @default(0)
+  failureCount    Int      @default(0)
+  optOutCount     Int      @default(0)
+  // Optional opt-out scope label (e.g. "newsletter") for the opt-out token UX.
+  optOutTopic    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  cancelledAt    DateTime?
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   BroadcastDelivery[]
+
+  @@index([organizationId, status])
+  @@index([scheduledAt, status])
+  @@map("broadcasts")
+}
+
+// One row per resolved (broadcast, recipient) pair. Captures rendered subject
+// + body so admin can verify exactly what was sent, including merge-field
+// substitutions.
+model BroadcastDelivery {
+  id              String   @id @default(cuid())
+  broadcastId     String
+  organizationId  String
+  recipientUserId String?
+  recipientPersonId String?
+  recipientEmail  String?
+  // Rendered, merge-fields applied (saved for audit).
+  renderedSubject String
+  renderedBody    String
+  status          String   @default("pending") // pending | sent | failed | opted_out | bounced
+  channelUsed     String?  // email | sms (only one channel actually delivered per row)
+  emailDeliveryId String?  // link back to EmailDelivery if dispatched via email
+  failureReason   String?
+  optOutTopic     String?
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@index([broadcastId, status])
+  @@unique([broadcastId, recipientEmail])
+  @@map("broadcast_deliveries")
+}
+
+// Topic-scoped opt-outs. Identified by (orgId, email, topic) — null topic
+// means "global opt-out across all marketing-style broadcasts from this org".
+model BroadcastOptOut {
+  id              String   @id @default(cuid())
+  organizationId  String
+  email           String
+  topic           String?
+  // Random secret token in the unsubscribe URL. Validates ownership without
+  // requiring a login.
+  token           String   @unique
+  // Source: how the opt-out was triggered. "email_link" | "admin" | "complaint".
+  source          String   @default("email_link")
+  createdAt       DateTime @default(now())
+
+  @@unique([organizationId, email, topic])
+  @@index([organizationId, email])
+  @@map("broadcast_opt_outs")
+}
+
+// ==================== AUDIT ====================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  actorId        String
+  actorRole      String
+  action         String
+  entityType     String
+  entityId       String
+  changes        Json     @default("{}")
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  // ---- Phase 6: hash chain ----
+  // Each row's rowHash = sha256(canonicalize(thisRow) || previousHash). Verified
+  // by AuditService.verifyChain(). Both nullable for back-compat — historical
+  // rows written before Phase 6 don't participate, but every new row does.
+  previousHash   String?
+  rowHash        String?
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  actor        User          @relation(fields: [actorId], references: [id])
+
+  @@index([organizationId, entityType])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== GATE PASSES & VISITOR MANAGEMENT ====================
+
+model GatePass {
+  id              String    @id @default(cuid())
+  organizationId  String
+  unitId          String
+  code            String    @unique
+  type            String // single_visit | recurring | event | contractor | delivery | emergency
+  status          String    @default("active") // active | used | revoked | expired
+  visitorName     String
+  visitorPhone    String?
+  vehicleReg      String?
+  notes           String?
+  validFrom       DateTime
+  validUntil      DateTime
+  maxUses         Int       @default(1)
+  usesCount       Int       @default(0)
+  recurringDays   String[]  @default([])
+  recurringWindow Json?
+  createdBy       String
+  revokedAt       DateTime?
+  revokedBy       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit         Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  logs         VisitorLog[]
+
+  @@index([organizationId, status])
+  @@index([validUntil])
+  @@map("gate_passes")
+}
+
+model VisitorLog {
+  id             String   @id @default(cuid())
+  gatePassId     String
+  type           String // entry | exit | override_entry | denied
+  occurredAt     DateTime @default(now())
+  recordedBy     String
+  notes          String?
+  overrideReason String?
+
+  gatePass GatePass @relation(fields: [gatePassId], references: [id], onDelete: Cascade)
+
+  @@index([gatePassId])
+  @@index([occurredAt])
+  @@map("visitor_logs")
+}
+
+// ==================== IDEMPOTENCY + NOTIFICATIONS ====================
+
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  response  Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model Notification {
+  id              String    @id @default(cuid())
+  organizationId  String
+  recipientUserId String
+  type            String // violation_issued | vote_opened | approval_needed | resale_pack_ready | ...
+  title           String
+  body            String
+  entityType      String?
+  entityId        String?
+  actionUrl       String?
+  readAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipient    User         @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt])
+  @@index([organizationId, type])
+  @@map("notifications")
+}
+
+// Phase 10.1: a browser-issued Web Push subscription bound to a user. The
+// triple (endpoint, p256dh, auth) is what `web-push` needs to dispatch a
+// payload; the endpoint is unique across the platform.
+model PushSubscription {
+  id              String    @id @default(cuid())
+  userId          String
+  organizationId  String
+  endpoint        String    @unique
+  p256dh          String
+  auth            String
+  userAgent       String?
+  // Tracks delivery health — we mark a subscription revoked after a 404/410
+  // from the push service (browser uninstalled, permission revoked).
+  failureCount    Int       @default(0)
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([organizationId])
+  @@map("push_subscriptions")
+}
+
+// ==================== VIOLATIONS ====================
+
+model ViolationCategory {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  defaultFine    Decimal? @db.Decimal(12, 2)
+  fineCurrency   String   @default("ZAR")
+  noticeTemplate String?
+  graceDays      Int      @default(7)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  violations   Violation[]
+
+  @@unique([organizationId, name])
+  @@map("violation_categories")
+}
+
+model Violation {
+  id             String    @id @default(cuid())
+  organizationId String
+  unitId         String
+  categoryId     String
+  status         String    @default("open") // open | noticed | acknowledged | appealing | board_review | upheld | dismissed | closed
+  occurredAt     DateTime
+  reportedBy     String
+  description    String
+  photos         Json      @default("[]")
+  fineAmount     Decimal?  @db.Decimal(12, 2)
+  fineCurrency   String    @default("ZAR")
+  fineInvoiceId  String?   @unique
+  noticeSentAt   DateTime?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  closedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit         Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  category     ViolationCategory @relation(fields: [categoryId], references: [id])
+  fineInvoice  Invoice?          @relation(fields: [fineInvoiceId], references: [id])
+  appeals      ViolationAppeal[]
+  events       ViolationEvent[]
+
+  @@index([organizationId, status])
+  @@index([unitId])
+  @@map("violations")
+}
+
+model ViolationEvent {
+  id          String   @id @default(cuid())
+  violationId String
+  type        String
+  actorId     String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+
+  @@index([violationId, createdAt])
+  @@map("violation_events")
+}
+
+model ViolationAppeal {
+  id            String    @id @default(cuid())
+  violationId   String
+  submittedBy   String
+  submittedAt   DateTime  @default(now())
+  reason        String
+  evidence      Json      @default("[]")
+  status        String    @default("submitted") // submitted | reviewing | upheld | dismissed
+  decidedAt     DateTime?
+  decidedBy     String?
+  decisionNotes String?
+
+  violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+
+  @@index([violationId])
+  @@map("violation_appeals")
+}
+
+// ==================== VOTES & SURVEYS ====================
+
+model Vote {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  title                String
+  description          String
+  type                 String    @default("standard") // standard | special_resolution | agm
+  status               String    @default("draft")    // draft | open | closed | cancelled
+  createdBy            String
+  secondedBy           String?
+  options              Json      // [{id, label}]
+  allowMultiple        Boolean   @default(false)
+  anonymous            Boolean   @default(false)
+  eligibilityRule      String    @default("all_owners") // all_owners | paid_up_only | all_residents | tag_match
+  eligibilityFilter    Json?
+  quorumPercent        Int       @default(50)
+  passThresholdPercent Int       @default(50)
+  proxyAllowed         Boolean   @default(true)
+  resultsLiveVisible   Boolean   @default(false)
+  opensAt              DateTime
+  closesAt             DateTime
+  noticePeriodDays     Int       @default(0)
+  eligibleCountSnapshot Int?
+  closedAt             DateTime?
+  outcome              String?   // passed | failed | quorum_not_met
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ballots      Ballot[]
+  proxies      VoteProxy[]
+
+  @@index([organizationId, status])
+  @@map("votes")
+}
+
+model Ballot {
+  id                String   @id @default(cuid())
+  voteId            String
+  voterPersonId     String?  // null when anonymous=true
+  castByUserId      String   // who actually cast (may differ via proxy)
+  selectedOptionIds String[]
+  anonymousHash     String?  // sha256(voteId+personId+server-secret) when anonymous=true
+  castAt            DateTime @default(now())
+
+  vote Vote @relation(fields: [voteId], references: [id], onDelete: Cascade)
+
+  @@unique([voteId, voterPersonId])
+  @@unique([voteId, anonymousHash])
+  @@index([voteId])
+  @@map("ballots")
+}
+
+model VoteProxy {
+  id              String    @id @default(cuid())
+  voteId          String
+  grantorPersonId String
+  granteeUserId   String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  vote Vote @relation(fields: [voteId], references: [id], onDelete: Cascade)
+
+  @@unique([voteId, grantorPersonId])
+  @@index([voteId])
+  @@map("vote_proxies")
+}
+
+model Survey {
+  id              String    @id @default(cuid())
+  organizationId  String
+  title           String
+  description     String
+  questions       Json      // [{id, type: 'mc'|'rating'|'text', label, options?, required}]
+  status          String    @default("draft") // draft | open | closed
+  anonymous       Boolean   @default(true)
+  opensAt         DateTime?
+  closesAt        DateTime?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responses    SurveyResponse[]
+
+  @@index([organizationId, status])
+  @@map("surveys")
+}
+
+model SurveyResponse {
+  id               String   @id @default(cuid())
+  surveyId         String
+  respondentUserId String?  // null if anonymous
+  answers          Json
+  submittedAt      DateTime @default(now())
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, respondentUserId])
+  @@index([surveyId])
+  @@map("survey_responses")
+}
+
+// ==================== VENDORS & PAYABLES ====================
+
+model Vendor {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  name               String
+  email              String?
+  phone              String?
+  taxNumber          String?
+  registrationNo     String?
+  bankAccountName    String?
+  bankName           String?
+  bankAccountNo      String?
+  bankBranchCode     String?
+  preferredCurrency  String   @default("ZAR")
+  documents          Json     @default("[]") // [{url, filename, contentType, size, label, expiresAt}]
+  defaultGlAccountId String?
+  rating             Int?
+  status             String   @default("active") // active | suspended | blacklisted
+  notes              String?
+  createdBy          String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  defaultGlAccount GLAccount?      @relation(fields: [defaultGlAccountId], references: [id])
+  invoices         VendorInvoice[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+  @@map("vendors")
+}
+
+model VendorInvoice {
+  id               String    @id @default(cuid())
+  organizationId   String
+  vendorId         String
+  vendorInvoiceNo  String
+  amount           Decimal   @db.Decimal(12, 2)
+  currency         String    @default("ZAR")
+  vatAmount        Decimal?  @db.Decimal(12, 2)
+  issueDate        DateTime
+  dueDate          DateTime
+  status           String    @default("captured") // captured | pending_approval | approved | rejected | paid | cancelled
+  glAccountId      String?
+  lineItems        Json      @default("[]") // [{description, quantity, unitPrice, total, glAccountId?}]
+  attachments      Json      @default("[]") // [{url, filename, contentType, size}]
+  notes            String?
+  capturedBy       String
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  rejectedReason   String?
+  paidAt           DateTime?
+  paymentReference String?
+  duplicateOfId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor       Vendor               @relation(fields: [vendorId], references: [id])
+  glAccount    GLAccount?           @relation(fields: [glAccountId], references: [id])
+  duplicateOf  VendorInvoice?       @relation("DuplicateInvoice", fields: [duplicateOfId], references: [id])
+  duplicates   VendorInvoice[]      @relation("DuplicateInvoice")
+  approvals    Approval[]
+  events       VendorInvoiceEvent[]
+
+  @@unique([organizationId, vendorId, vendorInvoiceNo])
+  @@index([organizationId, status])
+  @@index([vendorId])
+  @@map("vendor_invoices")
+}
+
+model VendorInvoiceEvent {
+  id              String   @id @default(cuid())
+  vendorInvoiceId String
+  type            String // status_change | comment | attachment_added | approval_decision | duplicate_flagged
+  actorId         String
+  payload         Json
+  createdAt       DateTime @default(now())
+
+  vendorInvoice VendorInvoice @relation(fields: [vendorInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([vendorInvoiceId, createdAt])
+  @@map("vendor_invoice_events")
+}
+
+model ApprovalRule {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  minAmount      Decimal? @db.Decimal(12, 2)
+  maxAmount      Decimal? @db.Decimal(12, 2)
+  currency       String   @default("ZAR")
+  glAccountIds   String[] @default([])
+  requiredRoles  String[] // ['finance_officer'] or ['exco_member','exco_chairperson']
+  approverCount  Int      @default(1)
+  mode           String   @default("any") // any | all | sequential
+  priority       Int      @default(100) // lower wins
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, priority])
+  @@map("approval_rules")
+}
+
+model Approval {
+  id              String    @id @default(cuid())
+  vendorInvoiceId String
+  approverUserId  String? // null until decided when mode=any
+  requiredRole    String
+  ruleId          String
+  sequenceIndex   Int       @default(0) // for sequential mode
+  decision        String    @default("pending") // pending | approved | rejected
+  decidedAt       DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  vendorInvoice VendorInvoice @relation(fields: [vendorInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([vendorInvoiceId])
+  @@index([approverUserId, decision])
+  @@map("approvals")
+}
+
+// ==================== RESALE CERTIFICATES ====================
+
+model ResaleCertificate {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  unitId                String
+  certificateNumber     String
+  status                String    @default("draft") // draft | issued | superseded | cancelled
+  transferAttorney      Json? // {firmName, contactName, email, phone, fileReference}
+  buyer                 Json? // {fullName, email, phone}
+  seller                Json? // {fullName, email, phone}
+  transferLevyAmount    Decimal   @db.Decimal(12, 2)
+  transferLevyCurrency  String    @default("ZAR")
+  feeAmount             Decimal   @default(0) @db.Decimal(12, 2)
+  outstandingAtSnapshot Decimal   @db.Decimal(12, 2)
+  financialStatusJson   Json // {invoices: [{id, ref, amount, paid, balance}], payments: [{id, ref, amount, allocatedTo}], totalLevied, totalPaid, balance}
+  disclosureChecklist   Json      @default("[]") // [{label, present, notes?}]
+  attachments           Json      @default("[]") // [{url, filename, contentType, size, label}]
+  goodStanding          Boolean
+  notes                 String?
+  rushProcessing        Boolean   @default(false)
+  slaDueAt              DateTime?
+  issuedAt              DateTime?
+  issuedBy              String?
+  cancelledAt           DateTime?
+  cancelledReason       String?
+  createdBy             String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit         Unit                @relation(fields: [unitId], references: [id])
+  accessLinks  ResaleAccessLink[]
+  events       ResaleEvent[]
+
+  @@unique([organizationId, certificateNumber])
+  @@index([organizationId, status])
+  @@index([unitId])
+  @@map("resale_certificates")
+}
+
+model ResaleAccessLink {
+  id                  String    @id @default(cuid())
+  resaleCertificateId String
+  token               String    @unique
+  recipientLabel      String
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  lastAccessedAt      DateTime?
+  accessCount         Int       @default(0)
+  createdBy           String
+  createdAt           DateTime  @default(now())
+
+  resaleCertificate ResaleCertificate @relation(fields: [resaleCertificateId], references: [id], onDelete: Cascade)
+  accessLogs        ResaleAccessLog[]
+
+  @@index([token])
+  @@index([resaleCertificateId])
+  @@map("resale_access_links")
+}
+
+model ResaleAccessLog {
+  id         String   @id @default(cuid())
+  linkId     String
+  ipAddress  String?
+  userAgent  String?
+  occurredAt DateTime @default(now())
+
+  link ResaleAccessLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, occurredAt])
+  @@map("resale_access_logs")
+}
+
+model ResaleEvent {
+  id                  String   @id @default(cuid())
+  resaleCertificateId String
+  type                String // status_change | snapshot_refreshed | access_link_created | access_link_revoked | comment | attachment_added
+  actorId             String?
+  payload             Json
+  createdAt           DateTime @default(now())
+
+  resaleCertificate ResaleCertificate @relation(fields: [resaleCertificateId], references: [id], onDelete: Cascade)
+
+  @@index([resaleCertificateId, createdAt])
+  @@map("resale_events")
+}
+
+// ==================== FUNDS & BUDGETS ====================
+
+model Fund {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  type           String // operating | reserve | sinking | special_levy
+  description    String?
+  openingBalance Decimal  @default(0) @db.Decimal(14, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  journalEntries JournalEntry[]
+  budgets        Budget[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, type])
+  @@map("funds")
+}
+
+model Budget {
+  id             String   @id @default(cuid())
+  organizationId String
+  fundId         String?
+  name           String
+  fiscalYear     Int
+  currency       String   @default("ZAR")
+  status         String   @default("draft") // draft | active | closed
+  notes          String?
+  createdBy      String
+  approvedBy     String?
+  approvedAt     DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fund         Fund?        @relation(fields: [fundId], references: [id])
+  lines        BudgetLine[]
+
+  @@unique([organizationId, fiscalYear, name])
+  @@index([organizationId, status])
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id           String  @id @default(cuid())
+  budgetId     String
+  glAccountId  String
+  // Monthly amounts: 12 entries for Jan-Dec of the budget's fiscalYear.
+  amounts      Decimal[] @db.Decimal(14, 2)
+  notes        String?
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, glAccountId])
+  @@index([budgetId])
+  @@map("budget_lines")
+}
+
+// ==================== BANK ACCOUNTS & RECONCILIATION ====================
+
+model BankAccount {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  bankName       String?
+  accountNumber  String? // last 4 digits typically stored; never full number in audit
+  currency       String   @default("ZAR")
+  glAccountId    String
+  openingBalance Decimal  @default(0) @db.Decimal(14, 2)
+  lastSyncAt     DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  glAccount        GLAccount            @relation(fields: [glAccountId], references: [id])
+  transactions     BankTransaction[]
+  reconciliations  BankReconciliation[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id             String    @id @default(cuid())
+  bankAccountId  String
+  externalId     String? // upstream bank's reference (Mono/Stitch txn id) — unique per bank account when set
+  date           DateTime
+  amount         Decimal   @db.Decimal(14, 2) // positive = credit (money in), negative = debit (money out)
+  description    String
+  reference      String?
+  rawPayload     Json? // full upstream record, for forensics
+  glAccountId    String? // categorized GL (auto via rule, or manual)
+  status         String    @default("unmatched") // unmatched | matched | excluded
+  matchedEntityType String? // 'Payment' | 'VendorInvoice' | 'JournalEntry' | 'Manual'
+  matchedEntityId   String?
+  matchedAt         DateTime?
+  matchedBy         String?
+  matchedJournalEntryId String?
+  source         String   @default("manual") // manual | csv | mono | stitch | api
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  glAccount   GLAccount?  @relation(fields: [glAccountId], references: [id])
+
+  @@unique([bankAccountId, externalId])
+  @@index([bankAccountId, status])
+  @@index([bankAccountId, date])
+  @@map("bank_transactions")
+}
+
+model CategorizationRule {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  matchType      String   @default("contains") // contains | starts_with | regex | equals
+  pattern        String
+  caseInsensitive Boolean @default(true)
+  amountMin      Decimal? @db.Decimal(14, 2)
+  amountMax      Decimal? @db.Decimal(14, 2)
+  glAccountId    String
+  fundId         String?
+  priority       Int      @default(100) // lower wins
+  isActive       Boolean  @default(true)
+  hits           Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  glAccount    GLAccount    @relation(fields: [glAccountId], references: [id])
+
+  @@index([organizationId, priority, isActive])
+  @@map("categorization_rules")
+}
+
+model BankReconciliation {
+  id             String    @id @default(cuid())
+  organizationId String
+  bankAccountId  String
+  periodStart    DateTime
+  periodEnd      DateTime
+  openingBalance Decimal   @db.Decimal(14, 2)
+  closingBalance Decimal   @db.Decimal(14, 2)
+  statementBalance Decimal @db.Decimal(14, 2)
+  status         String    @default("open") // open | locked
+  notes          String?
+  lockedAt       DateTime?
+  lockedBy       String?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bankAccount  BankAccount  @relation(fields: [bankAccountId], references: [id])
+
+  @@unique([bankAccountId, periodStart, periodEnd])
+  @@index([organizationId, status])
+  @@map("bank_reconciliations")
+}
+
+// ==================== TEAM MANAGEMENT (Phase 5) ====================
+
+model Invite {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String
+  firstName      String?
+  lastName       String?
+  // Role to assign on redemption — either a system role name or a custom-role id.
+  roleName       String?
+  customRoleId   String?
+  expiresAt      DateTime?
+  unitIds        String[] @default([])
+  estateIds      String[] @default([])
+  approvalLimit  Decimal? @db.Decimal(12, 2)
+  // 'team_member' = staff who'll log into the admin app (any non-resident role)
+  // 'resident'    = owner / tenant getting a login to the resident PWA. We use
+  //                 this to route the new-invite UI into two distinct forms
+  //                 and (for residents) link an existing Person record so
+  //                 redemption can set Person.userId without a duplicate row.
+  kind           String   @default("team_member")
+  // When `kind = 'resident'`, this points at the existing Person record the
+  // invite is for. On redemption we set this Person's userId to the new User
+  // so the resident already has occupancies, invoices, etc. wired up.
+  personId       String?
+  // Whether the invited user should be granted access to the admin console.
+  // Nullable so the redeem path can derive the right default from `kind`
+  // when the inviter doesn't specify (team_member → true, resident → false).
+  enterpriseAccess Boolean?
+  // Onboarding security
+  token          String   @unique
+  tokenExpiresAt DateTime
+  status         String   @default("pending") // pending | redeemed | revoked | expired
+  redeemedAt     DateTime?
+  redeemedUserId String?
+  revokedAt      DateTime?
+  revokedBy      String?
+  createdBy      String
+  // Optional CSV bulk import correlation
+  bulkImportId   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User         @relation("InviteCreator", fields: [createdBy], references: [id])
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
+  person       Person?      @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  // Note: app-level guard in InvitesService.create() rejects creating a new
+  // pending invite when one already exists. A DB-level unique constraint
+  // including `status` would block legitimate re-invites after a redeem/revoke,
+  // so we rely on the app-level check instead.
+  @@index([organizationId, email, status])
+  @@index([organizationId, status])
+  @@index([token])
+  @@map("invites")
+}
+
+model LoginHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String?
+  // 'success' | 'failed' | 'mfa_required' | 'rate_limited'
+  outcome        String
+  ipAddress      String?
+  userAgent      String?
+  failureReason  String?
+  occurredAt     DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([userId, occurredAt])
+  @@index([organizationId, occurredAt])
+  @@map("login_history")
+}
+
+// ==================== CUSTOM ROLES & PERMISSIONS (Phase 5.3) ====================
+
+model CustomRole {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  displayName    String
+  description    String?
+  // Each permission is "module.entity.action" (e.g. "finance.invoice.create", "violations.appeal.decide").
+  permissions    String[] @default([])
+  // Defaults applied to every assignment unless overridden at the assignment level
+  defaultApprovalLimit Decimal? @db.Decimal(12, 2)
+  isActive       Boolean  @default(true)
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User         @relation("CustomRoleCreator", fields: [createdBy], references: [id])
+  userRoles    UserRole[]
+  invites      Invite[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("custom_roles")
+}
+
+// ==================== SESSIONS & DEVICE TRUST (Phase 6.2) ====================
+
+model Session {
+  id                String   @id @default(cuid())
+  userId            String
+  // Refresh token is stored as sha256 hash; raw token only ever returns once.
+  refreshTokenHash  String   @unique
+  // Family id for refresh-token rotation: a stolen-then-rotated token is
+  // detected when an old hash from the same family is presented. We revoke
+  // the whole family on detection.
+  family            String
+  deviceLabel       String?
+  trustedDeviceId   String?
+  ipAddress         String?
+  userAgent         String?
+  // The User.sessionVersion in effect when this session was issued. JWTs minted
+  // off this session carry the same number; mismatches → forced logout.
+  sessionVersion    Int
+  lastUsedAt        DateTime @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  revokedReason     String?
+  createdAt         DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustedDevice  TrustedDevice? @relation(fields: [trustedDeviceId], references: [id])
+
+  @@index([userId, revokedAt])
+  @@index([family])
+  @@map("sessions")
+}
+
+model TrustedDevice {
+  id            String   @id @default(cuid())
+  userId        String
+  // Stable per-device cookie; we store the hash, set the raw value as an
+  // HttpOnly Secure cookie on the client.
+  deviceTokenHash String  @unique
+  label         String
+  userAgent     String?
+  ipAddress     String?
+  lastSeenAt    DateTime @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@index([userId, revokedAt])
+  @@map("trusted_devices")
+}
+
+// ==================== MAGIC LINKS (passwordless login) ====================
+
+model MagicLink {
+  id           String   @id @default(cuid())
+  userId       String?  // optional — for unregistered emails we don't reveal user existence
+  emailLower   String
+  tokenHash    String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([emailLower, usedAt])
+  @@map("magic_links")
+}
+
+// Password reset tokens — one row per request. The plaintext token only
+// exists in the link we email; we store its sha256. Single-use, 30-minute
+// TTL, scoped to one of the two front-end apps so the email link points to
+// the app the user originated from.
+//
+// Security: the request endpoint NEVER reveals whether an email belongs to
+// a real user — it always returns success. Looking at this table tells you
+// which emails have requested resets, but only the bearer of the unhashed
+// token can complete one.
+model PasswordResetToken {
+  id                 String   @id @default(cuid())
+  userId             String
+  tokenHash          String   @unique
+  /// 'enterprise' or 'residents' — chooses which app the email link lands on.
+  app                String
+  expiresAt          DateTime
+  usedAt             DateTime?
+  requestedIp        String?
+  requestedUserAgent String?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// ==================== ASSISTANT (Phase 7) ====================
+
+model AssistantConversation {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  title          String?
+  // Soft-archive: hide from default list but retain for compliance.
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     AssistantMessage[]
+
+  @@index([organizationId, userId, archivedAt])
+  @@map("assistant_conversations")
+}
+
+model AssistantMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  // 'user' | 'assistant' | 'system' | 'tool_call' | 'tool_result'
+  role           String
+  content        String
+  // The intent the classifier returned (null for assistant-only/system rows).
+  intentSlug     String?
+  // Extracted entities {amounts:[], dates:[], unitNumbers:[], rawText:string}
+  entities       Json?
+  // Actions the assistant actually executed (read-only API calls etc.)
+  actions        Json?
+  // The provider that produced an assistant message: 'mock' | 'anthropic' | 'rule'.
+  // Useful for cost attribution + replay debugging.
+  provider       String?
+  // Tokens used / cost approximation, for the assistant's response only.
+  tokensIn       Int?
+  tokensOut      Int?
+  createdAt      DateTime @default(now())
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("assistant_messages")
+}
+
+// ==================== ANOMALY DETECTION (Phase 7.6) ====================
+
+model AnomalyDetection {
+  id             String    @id @default(cuid())
+  organizationId String
+  // 'arrears_spike' | 'vendor_invoice_deviation' | 'duplicate_payment' | 'cash_flow_shortfall' | 'rapid_balance_decline'
+  type           String
+  // 'info' | 'warning' | 'critical'
+  severity       String    @default("warning")
+  entityType     String? // e.g. 'Vendor' | 'Unit' | 'BankAccount'
+  entityId       String?
+  // Free-form human-readable summary.
+  description    String
+  // Numeric values supporting the detection (current, baseline, delta, threshold).
+  metrics        Json      @default("{}")
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  dismissedAt    DateTime?
+  dismissedBy    String?
+  dismissedReason String?
+  // Idempotency key so a nightly job doesn't double-write the same anomaly.
+  // Format: type:entityId:bucketKey (e.g. 'arrears_spike:org_xyz:2026-05').
+  signature      String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, signature])
+  @@index([organizationId, dismissedAt, severity])
+  @@map("anomaly_detections")
+}
+
+// ==================== FX RATES (Phase 8.2) ====================
+
+model ExchangeRate {
+  id             String   @id @default(cuid())
+  // null = global rate (e.g. nightly Open Exchange Rates fetch). When an
+  // organization has a manual override, that row carries the orgId. The
+  // resolver picks the most-specific (org-scoped beats global) for the day.
+  organizationId String?
+  fromCurrency   String
+  toCurrency     String
+  rate           Decimal  @db.Decimal(18, 8)
+  // The date this rate is "as of" (UTC date, not timestamp). One rate per
+  // (org, pair, asOfDate); duplicates collapse to latest insert.
+  asOfDate       DateTime
+  // 'manual' | 'oxr' | 'mock' | 'ecb' — provenance for audit + cost attribution.
+  source         String   @default("manual")
+  notes          String?
+  enteredBy      String?  // userId for manual entries
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, fromCurrency, toCurrency, asOfDate])
+  @@index([fromCurrency, toCurrency, asOfDate])
+  @@map("exchange_rates")
+}
+
+// ==================== PRIVACY / POPIA / GDPR (Phase 8.3) ====================
+
+model DataExportRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String? // set when the user requests just one org's data
+  // 'pending' | 'ready' | 'expired' | 'failed'
+  status         String   @default("pending")
+  // R2 / S3 path once generated (placeholder URL today; real storage in Phase 1.5)
+  fileUrl        String?
+  fileSize       Int?
+  sha256         String?
+  // Reasonable expiry for the download — POPIA suggests 30 days
+  expiresAt      DateTime?
+  completedAt    DateTime?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@map("data_export_requests")
+}
+
+model ErasureRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String?
+  // 'submitted' | 'reviewing' | 'approved' | 'rejected' | 'completed' | 'cancelled'
+  status         String   @default("submitted")
+  reason         String?
+  // 30-day waiting window per POPIA before execution
+  scheduledFor   DateTime
+  completedAt    DateTime?
+  reviewedBy     String?
+  rejectedReason String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, status])
+  @@index([scheduledFor, status])
+  @@map("erasure_requests")
+}
+
+model ConsentRecord {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String?
+  // 'marketing_email' | 'marketing_sms' | 'whatsapp_bot' | 'analytics' | ...
+  consentType    String
+  // 'given' | 'withdrawn'
+  state          String
+  ipAddress      String?
+  userAgent      String?
+  // Optional version of the privacy policy / TOS the user consented to.
+  policyVersion  String?
+  occurredAt     DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consentType, occurredAt])
+  @@map("consent_records")
+}
+
+// ==================== PHASE 9.2: PLATFORM API ====================
+//
+// API keys give integrators a way to call the REST API without spinning up a
+// user session. Each key is scoped to one organization and carries a list of
+// permission slugs (mirrors the CustomRole permission alphabet). The plaintext
+// is only shown at creation; we persist the sha256 hash and a short prefix so
+// admins can identify the key in the UI ("hoa_live_a1b2c3...").
+model ApiKey {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  // First 12 chars of the plaintext for UI display (e.g. "hoa_live_a1b").
+  prefix          String
+  // sha256 hex of the full plaintext.
+  hashedKey       String   @unique
+  permissions     String[] @default([])
+  // Empty array means "no rate-limit override" — falls back to default.
+  rateLimitPerMin Int?
+  isActive        Boolean  @default(true)
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  lastUsedIp      String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  revokedAt       DateTime?
+  revokedReason   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@map("api_keys")
+}
+
+// A webhook endpoint is an HTTPS URL the org wants HOA.africa to POST to when
+// specific events occur. The secret is shown once at creation; we store the
+// hash. The dispatcher uses the secret to compute an HMAC-SHA256 signature
+// that the receiver verifies before trusting the payload.
+model WebhookEndpoint {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  url             String
+  // Hex-encoded random secret. Stored plaintext intentionally because the
+  // dispatcher needs it for signing on every send. Treat as sensitive — never
+  // log, never return on GET.
+  secret          String
+  // Subscribed event slugs (e.g. ["payment.received", "gate_pass.created"]).
+  // Empty array = match everything (use sparingly).
+  events          String[] @default([])
+  description     String?
+  isActive        Boolean  @default(true)
+  // Counter of consecutive 5xx responses; flipped to inactive once it hits
+  // disableAfterFailures so we stop hammering a broken endpoint.
+  consecutiveFailures Int  @default(0)
+  disableAfterFailures Int @default(20)
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastDeliveryAt  DateTime?
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId, isActive])
+  @@map("webhook_endpoints")
+}
+
+// One row per dispatch attempt (including retries). We keep a generous history
+// for debugging but trim aggressively in a cron once it exceeds 10k rows per org.
+model WebhookDelivery {
+  id              String   @id @default(cuid())
+  organizationId  String
+  endpointId      String
+  event           String
+  // The payload as actually shipped. Includes id, type, occurredAt, data.
+  payload         Json
+  // The HMAC-SHA256 signature included in the request header.
+  signature       String
+  status          String   @default("pending") // pending | success | failed | dead
+  attempt         Int      @default(1)
+  maxAttempts     Int      @default(5)
+  // Next attempt time when status=pending. Exponential backoff.
+  nextAttemptAt   DateTime?
+  // HTTP response details from the most recent attempt.
+  responseStatus  Int?
+  responseBody    String?  // capped at 4kb
+  errorMessage    String?
+  deliveredAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  endpoint     WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@map("webhook_deliveries")
+}
+
+// ==================== PHASE 1.1: RESIDENT REQUESTS ====================
+// PRD §6.3.2. The triage queue residents reach for everything that isn't a
+// payment or a complaint: maintenance, access, parking, noise, general.
+// Lifecycle: submitted → triaged → in_progress → (waiting_resident ⇄ in_progress) → resolved → closed.
+// `cancelled` is a terminal sink reachable from any non-terminal state.
+
+model RequestCategory {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  // Default priority applied when a resident files in this category.
+  defaultPriority String   @default("normal") // low | normal | high | urgent
+  // Hours from `submittedAt` we aim to hit `resolved`. `null` = no SLA target.
+  slaResolveHours Int?
+  // Roles whose members are eligible auto-assignees when this category lands.
+  // The triage step picks one (round-robin / least-loaded) from these roles.
+  assignToRoles   String[] @default([])
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requests     Request[]
+
+  @@unique([organizationId, name])
+  @@map("request_categories")
+}
+
+model Request {
+  id              String   @id @default(cuid())
+  organizationId  String
+  // Unit is required for resident submissions (scoping anchor). Admin-created
+  // "general estate" requests can omit it.
+  unitId          String?
+  submittedByUserId String
+  categoryId      String
+  subject         String
+  body            String
+  status          String   @default("submitted")
+  priority        String   @default("normal")
+  // [{ url, filename, contentType, size }] — metadata-only until Phase 1.5.
+  attachments     Json     @default("[]")
+
+  assignedToUserId String?
+  assignedAt       DateTime?
+
+  // Computed at submit time from category.slaResolveHours; recomputed on category change.
+  dueAt           DateTime?
+
+  triagedAt       DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  cancelledAt     DateTime?
+
+  resolutionNotes String?
+  cancelledReason String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unit         Unit?            @relation(fields: [unitId], references: [id])
+  category     RequestCategory  @relation(fields: [categoryId], references: [id])
+  comments     RequestComment[]
+  events       RequestEvent[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, assignedToUserId, status])
+  @@index([unitId])
+  @@index([organizationId, dueAt])
+  @@map("requests")
+}
+
+model RequestComment {
+  id           String   @id @default(cuid())
+  requestId    String
+  authorUserId String
+  body         String
+  // `isInternal=true` comments are admin-side only — residents never see them.
+  // Scoping enforced at the service layer for both list + detail.
+  isInternal   Boolean  @default(false)
+  attachments  Json     @default("[]")
+  createdAt    DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("request_comments")
+}
+
+// Per-request immutable timeline. Status transitions, assignments, priority
+// changes, comments, attachments — everything is reflected here for the UI
+// drill-down. The global AuditLog still gets a row for sensitive mutations.
+model RequestEvent {
+  id        String   @id @default(cuid())
+  requestId String
+  type      String   // status_change | assigned | priority_change | comment | attachment_added | category_change
+  actorId   String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("request_events")
+}
+
+// ==================== PHASE 1.2: RECURRING + LATE FEES + PAYMENT PLANS ====================
+
+// A schedule that issues an invoice to a set of units on a cadence.
+//
+// `frequency` keys: monthly | quarterly | annual.  `billingDayOfMonth`
+// applies to all three (clamped to month length for short months).
+// `unitFilter.estateIds` or `unitFilter.tagIn` restricts the target set;
+// empty = every unit in the org.
+//
+// Period de-dup: `Invoice.periodKey` uniqueness on (parentScheduleId, unitId, periodKey)
+// guarantees a re-run for the same month is a no-op.
+model RecurringInvoiceSchedule {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  frequency       String   // monthly | quarterly | annual
+  billingDayOfMonth Int    @default(1)
+  // Days from invoice issue to dueDate.
+  dueDays         Int      @default(30)
+  // Either a flat amount or per-unit line items (JSON).
+  amount          Decimal? @db.Decimal(12, 2)
+  currency        String   @default("ZAR")
+  lineItems       Json     @default("[]") // [{ description, amount, quantity? }]
+  notes           String?
+  unitFilter      Json     @default("{}") // { estateIds?: string[], tagIn?: string[] }
+  isActive        Boolean  @default(true)
+  // Cron-driven bookkeeping
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  runs         RecurringScheduleRun[]
+
+  @@index([organizationId, isActive, nextRunAt])
+  @@map("recurring_invoice_schedules")
+}
+
+// One row per run-invocation. Captures what we generated for audit + debugging
+// (e.g. "ran monthly Maint May 2026 → 142 invoices, 3 skipped duplicates").
+model RecurringScheduleRun {
+  id               String   @id @default(cuid())
+  scheduleId       String
+  organizationId   String
+  periodKey        String
+  triggeredBy      String   // userId or "cron"
+  createdInvoices  Int      @default(0)
+  skippedDuplicates Int     @default(0)
+  errorMessage     String?
+  runAt            DateTime @default(now())
+
+  schedule RecurringInvoiceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId, runAt])
+  @@map("recurring_schedule_runs")
+}
+
+// Per-org config. Singleton via @@unique on organizationId.
+// `tiers` is a JSON array sorted by ageDays asc; first matching tier whose
+// ageDays threshold the invoice has crossed wins.
+//
+// Example tier: { ageDays: 7, kind: "percent", value: 5, cap: 500 }
+// → after 7 days overdue, add 5% of the original amount, capped at 500.
+// `kind` is "percent" | "flat".
+model LateFeeConfig {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  isActive        Boolean  @default(false)
+  // Days after dueDate to wait before the first tier kicks in.
+  graceDays       Int      @default(0)
+  tiers           Json     @default("[]")
+  // Optional GL account to post the late-fee revenue into. When null, falls
+  // through to the org's default income account.
+  glAccountId     String?
+  notes           String?
+  lastSweepAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("late_fee_configs")
+}
+
+// A payment plan rolls one or more overdue invoices into a series of
+// installments. Each installment generates a child Invoice on its dueDate so
+// reconciliation + arrears reports stay consistent.
+model PaymentPlan {
+  id              String   @id @default(cuid())
+  organizationId  String
+  unitId          String
+  // Original invoices being consolidated. Stored as JSON for an append-only
+  // record — the source invoices keep their own row in the DB.
+  sourceInvoiceIds Json    @default("[]")
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  currency        String   @default("ZAR")
+  installmentCount Int
+  // Cadence between installments: weekly | biweekly | monthly.
+  cadence         String   @default("monthly")
+  startDate       DateTime
+  status          String   @default("pending") // pending | active | completed | defaulted | cancelled
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  cancelledAt     DateTime?
+  defaultedAt     DateTime?
+  completedAt     DateTime?
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  installments PaymentPlanInstallment[]
+
+  @@index([organizationId, status])
+  @@index([unitId])
+  @@map("payment_plans")
+}
+
+model PaymentPlanInstallment {
+  id           String   @id @default(cuid())
+  paymentPlanId String
+  // 1-indexed sequence inside the plan.
+  sequence     Int
+  amount       Decimal  @db.Decimal(12, 2)
+  dueDate      DateTime
+  status       String   @default("pending") // pending | invoiced | paid | overdue
+  invoicedAt   DateTime?
+  paidAt       DateTime?
+
+  paymentPlan PaymentPlan @relation(fields: [paymentPlanId], references: [id], onDelete: Cascade)
+  invoice     Invoice?
+
+  @@unique([paymentPlanId, sequence])
+  @@index([dueDate, status])
+  @@map("payment_plan_installments")
+}
+
+// ==================== PHASE 1.3: PAYSTACK ====================
+// A PaymentIntent tracks the resident-facing checkout link the API requested
+// from Paystack (or any other processor). One invoice can spawn many intents
+// (resident clicked Pay 3 times); we de-dup successful payments by Paystack
+// reference, not by intent — multiple intents may legitimately exist while
+// only one transaction succeeds.
+//
+// `provider` is the processor slug ("paystack", future: "flutterwave", "stripe").
+// Webhook reconciliation looks up by (provider, providerReference).
+
+model PaymentIntent {
+  id               String   @id @default(cuid())
+  organizationId   String
+  invoiceId        String
+  initiatedByUserId String
+  provider         String   // paystack | flutterwave | mock
+  // The Paystack `reference` we sent on init (we generate it so we control
+  // uniqueness). Stored unique to prevent double-init for the same intent.
+  providerReference String  @unique
+  amount           Decimal  @db.Decimal(12, 2)
+  currency         String   @default("ZAR")
+  // The hosted-checkout URL the resident is redirected to.
+  authorizationUrl String?
+  // Lifecycle: pending → success | failed | expired | abandoned.
+  status           String   @default("pending")
+  // Full provider payload, scrubbed of sensitive fields, for support.
+  providerMetadata Json?
+  // Set when the webhook lands and matches.
+  completedAt      DateTime?
+  failureReason    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice      Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, status])
+  @@index([organizationId, status])
+  @@map("payment_intents")
+}
+
+// ==================== PHASE 2.2: TRANSACTIONAL EMAIL ====================
+// Every outbound transactional email gets a row. The queue worker picks up
+// `status='pending'` rows and dispatches via Resend (or a mock provider in dev).
+// Resend webhooks update `status`, `deliveredAt`, `openedAt`, `clickedAt`.
+//
+// Idempotency: a unique constraint on (organizationId, templateKey, entityType,
+// entityId, recipientEmail) prevents duplicate sends for the same event
+// (e.g. an invoice issued twice in the same minute won't double-send).
+//
+// `templateKey` is the React Email template slug; e.g. `invoice_issued`,
+// `payment_received`, `request_resolved`, `magic_link`, `gate_pass_shared`.
+
+model EmailDelivery {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  templateKey     String
+  recipientEmail  String
+  recipientName   String?
+  recipientUserId String?
+  // Subject + rendered HTML are captured at enqueue time so the worker
+  // doesn't need to re-render (also useful for the admin "view sent email" UI).
+  subject         String
+  // Render output capped at 1MB; longer payloads get truncated with a marker.
+  html            String
+  // For deduplication. Combination of template + entity uniquely identifies
+  // the event source.
+  entityType      String?
+  entityId        String?
+  // Bag for whatever the template needed (resident name, amount, etc).
+  // Useful for debugging and for the resend-this-email button.
+  templateData    Json?
+
+  // Lifecycle
+  status          String   @default("pending") // pending | sent | failed | bounced | complained
+  provider        String?  // resend | mock
+  providerMessageId String?
+  attempt         Int      @default(0)
+  maxAttempts     Int      @default(5)
+  nextAttemptAt   DateTime?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, templateKey, entityType, entityId, recipientEmail])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, status])
+  @@map("email_deliveries")
+}
+
+// ==================== PHASE 7.5: EMAIL INTELLIGENCE ====================
+//
+// An InboundEmail captures every payload our inbound webhook (Resend Inbound,
+// SendGrid Parse, Mailgun routes, or SMTP-to-HTTP relay) hands us. The
+// EmailIntelligenceService then:
+//   1. Routes to the right organization via the To: address (per-org alias)
+//   2. Classifies intent + extracts entities via the LlmProvider
+//   3. Optionally auto-applies a known intent (e.g. vendor invoice → Payables)
+//   4. Drafts a reply for human-in-the-loop approval
+//
+// We keep the raw payload (subject + body + attachments) so the admin can
+// review what the model saw if a routing decision looks wrong.
+//
+// Idempotency: providerMessageId is unique so a webhook retry doesn't double-
+// route. Skipping reprocessing is a feature, not a bug — the admin can
+// manually re-run via the controller.
+
+model InboundEmail {
+  id                String   @id @default(cuid())
+  organizationId    String?
+  // External message id from the provider (Resend, etc.) for dedup + traceability.
+  providerMessageId String?  @unique
+  // Mailbox we routed in on (e.g. requests@org-foo.hoa.africa) — used to derive org.
+  toAddress         String
+  fromAddress       String
+  fromName          String?
+  subject           String
+  // Stored as text — capped at MAX_BODY in service.
+  bodyText          String?
+  bodyHtml          String?
+  // Inbound attachments: [{ url, filename, contentType, size }]. R2 lands later;
+  // for now we accept the provider's hosted URL.
+  attachments       Json     @default("[]")
+  // The classifier output (intent slug + confidence + entities).
+  intentSlug        String?
+  intentConfidence  Float?
+  entities          Json?
+  // Lifecycle: received → classified → routed | drafted | applied | replied | escalated | ignored
+  status            String   @default("received")
+  // When the service auto-actions an intent (e.g. creates a Request), this
+  // points at the target entity for review.
+  routedEntityType  String?
+  routedEntityId    String?
+  // If we created a draft reply for the human, this is its EmailDelivery id.
+  draftReplyId      String?
+  // Set when an admin approves + sends the draft.
+  sentReplyAt       DateTime?
+  // Optional notes from the human reviewer.
+  reviewerNotes     String?
+  // Threading: providers send `references` / `in-reply-to`. We persist for
+  // later thread reconstruction.
+  inReplyTo         String?
+  references        String?
+  errorMessage      String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events       InboundEmailEvent[]
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
+  @@map("inbound_emails")
+}
+
+model InboundEmailEvent {
+  id              String   @id @default(cuid())
+  inboundEmailId  String
+  type            String   // received | classified | routed | drafted | replied | escalated | ignored | error
+  actorId         String?  // null when system-driven
+  payload         Json?
+  createdAt       DateTime @default(now())
+
+  inboundEmail InboundEmail @relation(fields: [inboundEmailId], references: [id], onDelete: Cascade)
+
+  @@index([inboundEmailId, createdAt])
+  @@map("inbound_email_events")
+}
+
+
+// ==================== BOOKKEEPING ENGAGEMENT TIER ====================
+// Phase: paid add-on where HOA.africa-vetted accountants do the books on
+// behalf of an HOA. One engagement per org; tier (basic | standard | premium)
+// determines scope and monthly fee. Status flows:
+//   requested -> active (platform activates + assigns accountant)
+//   active <-> paused
+//   active|paused -> cancelled
+// Cancelled engagements are kept for audit; a new engagement can be created
+// after cancellation (it overwrites the unique row on the org).
+
+model BookkeepingEngagement {
+  id                 String   @id @default(cuid())
+  organizationId     String   @unique
+  tier               String   // basic | standard | premium
+  status             String   @default("requested") // requested | active | paused | cancelled
+  monthlyFee         Decimal  @db.Decimal(12, 2)
+  currency           String   @default("ZAR")
+  // The platform accountant working this engagement (User with external_accountant role).
+  accountantUserId   String?
+  startedAt          DateTime?
+  endedAt            DateTime?
+  pausedAt           DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  notes              String?
+  requestedBy        String   // userId of the HOA admin who requested
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  events       BookkeepingEngagementEvent[]
+
+  @@index([status])
+  @@map("bookkeeping_engagements")
+}
+
+model BookkeepingEngagementEvent {
+  id           String   @id @default(cuid())
+  engagementId String
+  // requested | tier_changed | activated | accountant_assigned | paused | resumed | cancelled | note_added
+  type         String
+  actorId      String
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  engagement BookkeepingEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+
+  @@index([engagementId, createdAt])
+  @@map("bookkeeping_engagement_events")
+}
+
+
+
+// ==================== PLATFORM BILLING (Paystack subscriptions) ====================
+// Phase: HOA.africa charges each HOA a monthly subscription. Distinct from
+// the per-resident `Invoice` flow — that pays the HOA. These pay us.
+//
+// Lifecycle:
+//   pending (subscription requested, awaiting first charge)
+//     -> active           (first charge succeeded)
+//     -> past_due         (charge failed; we enter a grace period)
+//     -> active           (retry success)
+//     -> suspended        (grace period elapsed; org loses non-essential features)
+//   active | past_due | suspended -> cancelled
+
+model PlatformPlan {
+  id              String   @id @default(cuid())
+  code            String   @unique          // starter | growth | pro | enterprise
+  name            String
+  description     String?
+  monthlyFeeZAR   Decimal  @db.Decimal(12, 2)
+  // Paystack plan_code (`PLN_xxx`) created on Paystack. We seed via API at
+  // boot if missing so the resolver always has a code to subscribe to.
+  paystackPlanCode String? @unique
+  // Soft caps used to gate the HOA app (units, residents, broadcasts/mo, etc.).
+  features        Json     @default("{}")
+  isActive        Boolean  @default(true)
+  displayOrder    Int      @default(100)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions PlatformSubscription[]
+
+  @@map("platform_plans")
+}
+
+model PlatformSubscription {
+  id                       String   @id @default(cuid())
+  organizationId           String   @unique
+  planId                   String
+  status                   String   @default("pending") // pending | active | past_due | suspended | cancelled
+  paystackCustomerCode     String?
+  paystackSubscriptionCode String?  @unique
+  // We track the email/auth used to set up the subscription so Paystack
+  // recognises the customer on re-subscribe + grace-period retries.
+  customerEmail            String
+  currency                 String   @default("ZAR")
+  currentPeriodStart       DateTime?
+  currentPeriodEnd         DateTime?
+  nextBillingAt            DateTime?
+  lastInvoiceAt            DateTime?
+  // When status enters past_due we set gracePeriodEndsAt = now + 7d. If still
+  // past_due at that point, the cron flips to suspended.
+  gracePeriodEndsAt        DateTime?
+  suspendedAt              DateTime?
+  cancelledAt              DateTime?
+  cancellationReason       String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         PlatformPlan        @relation(fields: [planId], references: [id])
+  invoices     PlatformInvoice[]
+
+  @@index([status])
+  @@map("platform_subscriptions")
+}
+
+model PlatformInvoice {
+  id                  String   @id @default(cuid())
+  subscriptionId      String
+  organizationId      String
+  paystackInvoiceCode String?  @unique
+  paystackTransactionRef String?
+  amount              Decimal  @db.Decimal(12, 2)
+  currency            String   @default("ZAR")
+  status              String   // pending | success | failed
+  dueDate             DateTime?
+  paidAt              DateTime?
+  failureReason       String?
+  rawPayload          Json?
+  createdAt           DateTime @default(now())
+
+  subscription PlatformSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("platform_invoices")
+}
+
+
+
+// ==================== STORAGE (Phase 1.5 — Railway Volumes / local-disk pluggable) ====================
+// Phase 1.5: a `StoredFile` is a pointer to a blob on the volume. We store the
+// metadata + a *server-relative* storage key (e.g. `org_xxx/avatars/abc.png`)
+// and serve via signed URLs from a dedicated download endpoint — never expose
+// the absolute disk path. Swapping to S3/R2 later is a `StorageDriver` change
+// only; consumers keep the same id.
+
+model StoredFile {
+  id              String   @id @default(cuid())
+  organizationId  String?  // null = platform-level (e.g. system avatars)
+  uploaderUserId  String?  // null when system-generated
+  storageKey      String   @unique
+  // Logical bucket — used by guards to decide read/write rules.
+  // Values: org_logo | user_avatar | document | violation_photo | vendor_invoice | resale_attachment | broadcast_attachment | misc
+  kind            String
+  filename        String   // sanitised original filename for content-disposition
+  mimeType        String
+  size            Int      // bytes
+  sha256          String   // hex digest, dedup + integrity check
+  // Optional public-read flag — false by default; signed-url downloads otherwise.
+  isPublic        Boolean  @default(false)
+  // Relation pointers — populated by callers for cleanup-on-delete cascades.
+  // No FKs here so the same StoredFile can be re-purposed (avatar -> archive)
+  // without referential moves.
+  refType         String?  // e.g. "Violation", "VendorInvoice", "User"
+  refId           String?
+  // Set by service when uploader marks the file final after multi-part flows.
+  status          String   @default("ready") // pending | ready | quarantined | deleted
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, kind])
+  @@index([refType, refId])
+  @@index([sha256])
+  @@map("stored_files")
+}
+
+
+
+// ==================== NOTIFICATION PREFERENCES (Phase 10.3) ====================
+// One row per (user, topic) — the channel flags are columns so a single
+// upsert hits both rows. Topic is open-ended ("invoices", "violations",
+// "votes", "system") — callers should derive their topic key from the
+// notification `type` constants.
+
+model NotificationPreference {
+  id       String   @id @default(cuid())
+  userId   String
+  topic    String
+  email    Boolean  @default(true)
+  sms      Boolean  @default(false)
+  push     Boolean  @default(true)
+  whatsapp Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topic])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+

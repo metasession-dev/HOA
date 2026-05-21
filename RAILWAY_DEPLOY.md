@@ -1,26 +1,31 @@
 # Railway deployment — operator runbook
 
 This is the end-to-end runbook for standing up HOA.africa on Railway in
-project `d436a63d-be9f-49dc-92a7-fd3215684a5f`. It pairs with
-`scripts/setup-railway.sh`, which bootstraps every env var the script
-can generate or wire by reference. Anything API-key-shaped you supply
-manually at the end.
+project `132485f6-967c-4586-a477-85c955fba43b`. All four apps live in a
+single GitHub monorepo at <https://github.com/metasession-dev/HOA>; each
+gets its own Railway service that builds from its subfolder.
+
+It pairs with `scripts/setup-railway.ps1` (Windows) and
+`scripts/setup-railway.sh` (POSIX), which bootstrap every env var the
+script can generate or wire by reference. Anything API-key-shaped you
+supply manually at the end.
 
 The platform is four apps + two managed addons:
 
-| Service          | Repo                       | Build/Runtime               | Public hostname                                            |
+| Service          | Root directory in monorepo | Build/Runtime               | Public hostname                                            |
 | ---------------- | -------------------------- | --------------------------- | ---------------------------------------------------------- |
-| `hoa-api`        | HOA-API                    | NestJS (NIXPACKS → node)    | `<auto>.up.railway.app` → `/api/*`                         |
-| `hoa-enterprise` | HOA-ENTERPRISE             | Next.js standalone          | `<auto>.up.railway.app`                                    |
-| `hoa-residents`  | HOA-RESIDENTS              | Next.js standalone (PWA)    | `<auto>.up.railway.app`                                    |
-| `hoa-marketing`  | HOA-MARKETING              | Vite SPA via `serve -s`     | `<auto>.up.railway.app`                                    |
-| `Postgres`       | Railway template           | Managed PG 16               | private (consumed via `${{ Postgres.DATABASE_URL }}`)      |
-| `Redis`          | Railway template           | Managed Redis 7             | private (consumed via `${{ Redis.REDIS_URL }}`)            |
+| `hoa-api`        | `HOA-API/`                 | NestJS (NIXPACKS → node)    | `<auto>.up.railway.app` → `/api/*`                         |
+| `hoa-enterprise` | `HOA-ENTERPRISE/`          | Next.js standalone          | `<auto>.up.railway.app`                                    |
+| `hoa-residents`  | `HOA-RESIDENTS/`           | Next.js standalone (PWA)    | `<auto>.up.railway.app`                                    |
+| `hoa-marketing`  | `HOA-MARKETING/`           | Vite SPA via `serve -s`     | `<auto>.up.railway.app`                                    |
+| `Postgres`       | (Railway template)         | Managed PG 16               | private (consumed via `${{ Postgres.DATABASE_URL }}`)      |
+| `Redis`          | (Railway template)         | Managed Redis 7             | private (consumed via `${{ Redis.REDIS_URL }}`)            |
 
-Each app has a `railway.json` checked into its root that locks the
-build + start command + healthcheck. Railway's Nixpacks builder reads
-`package.json` engines + scripts and produces a Node container; no
-Dockerfiles needed.
+Each app has a `railway.json` inside its subfolder that locks the
+build + start command + healthcheck and includes a `watchPatterns`
+glob so only changes inside that subfolder trigger a rebuild of that
+service. Railway's Nixpacks builder reads `package.json` engines +
+scripts and produces a Node container; no Dockerfiles needed.
 
 ## 1. Prerequisites
 
@@ -40,19 +45,21 @@ the bash variant.
 ## 2. Run the setup script
 
 Two interchangeable entry points — pick whichever matches your shell.
-Both produce the same Railway state and are equally idempotent.
+Both produce the same Railway state and are equally idempotent. The
+monorepo (`metasession-dev/HOA`) is the default; the params below are
+only needed if you forked the repo to a different owner/name.
 
 **Windows PowerShell (5.1 or 7+):**
 
 ```powershell
-# Optional: wire each service to its GitHub repo so deploys auto-trigger
-# on push. Without this, services are created empty and the operator
-# wires the source in Step 4 below (one-click in the Railway UI).
-$env:GITHUB_OWNER = 'kolagrey'      # ← your GitHub user/org
-
 .\scripts\setup-railway.ps1
-# …or pass as a parameter instead of an env var:
-.\scripts\setup-railway.ps1 -GithubOwner kolagrey
+
+# Override the default owner/repo if you forked elsewhere:
+.\scripts\setup-railway.ps1 -GithubOwner acme -Repo HOA-fork
+# …or via env vars:
+$env:GITHUB_OWNER = 'acme'
+$env:GITHUB_REPO  = 'HOA-fork'
+.\scripts\setup-railway.ps1
 ```
 
 If PowerShell refuses to execute the script with an "execution policy"
@@ -66,9 +73,10 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 **bash (Git Bash on Windows, macOS, Linux, or WSL):**
 
 ```bash
-export GITHUB_OWNER=kolagrey        # ← your GitHub user/org
-
 bash scripts/setup-railway.sh
+
+# Override defaults if your fork lives elsewhere:
+GITHUB_OWNER=acme GITHUB_REPO=HOA-fork bash scripts/setup-railway.sh
 ```
 
 The bash variant additionally requires `openssl` on PATH (Git for
@@ -77,16 +85,21 @@ Windows ships one). Inside WSL: `sudo apt install nodejs npm openssl`.
 What it does, in order — every step is idempotent and safe to re-run:
 
 1. Verifies you're logged in (`railway whoami`) and links the checkout
-   to project `d436a63d-be9f-49dc-92a7-fd3215684a5f`.
+   to project `132485f6-967c-4586-a477-85c955fba43b`.
 2. **Provisions database addons** if missing:
    - `Postgres` (canonical Railway name; referenced as `${{ Postgres.DATABASE_URL }}`)
    - `Redis`    (canonical Railway name; referenced as `${{ Redis.REDIS_URL }}`)
-3. **Creates the four app services** if missing: `hoa-api`,
-   `hoa-enterprise`, `hoa-residents`, `hoa-marketing`. When
-   `GITHUB_OWNER` is exported, each service is wired to its GitHub repo
-   on creation so Railway auto-deploys on push.
-4. Generates locally with `openssl rand`, applied only when the
-   corresponding variable is currently unset on the API service:
+3. **Creates the four app services** if missing — `hoa-api`,
+   `hoa-enterprise`, `hoa-residents`, `hoa-marketing` — each wired to
+   the same monorepo at `metasession-dev/HOA` with the appropriate
+   Root Directory. The script attempts the v4 `--root-directory` flag
+   on `railway add` first; if that's not honoured, it falls back to
+   setting `RAILWAY_ROOT_DIRECTORY` as a build-time variable on each
+   service. If neither approach takes effect, the dashboard step is
+   listed in the summary at the end of the run.
+4. Generates secrets locally (PowerShell uses `System.Security.Cryptography`;
+   bash uses `openssl rand`), applied only when the corresponding
+   variable is currently unset on the API service:
    - `JWT_SECRET` (64 hex chars)
    - `APP_ENCRYPTION_KEY` (32-byte AES-256 key, base64)
    - `STORAGE_URL_SECRET` (signed-URL HMAC secret)
@@ -101,20 +114,6 @@ What it does, in order — every step is idempotent and safe to re-run:
    consumer.
 7. Prints the list of API-key vars you must still set by hand.
 
-Per-service repo overrides — useful if a repo name doesn't match the
-default `${GITHUB_OWNER}/HOA-<NAME>` pattern. Both shells read the same
-env vars:
-
-```bash
-# bash
-export HOA_API_REPO=acme/api-backend
-export HOA_ENTERPRISE_REPO=acme/admin-console
-
-# PowerShell
-$env:HOA_API_REPO = 'acme/api-backend'
-$env:HOA_ENTERPRISE_REPO = 'acme/admin-console'
-```
-
 ## 3. Attach a Volume to `hoa-api`
 
 The Railway CLI doesn't manage volumes yet, so this is the one
@@ -125,15 +124,27 @@ post-script step that stays in the UI:
 script sets `STORAGE_ROOT=/data/storage`; without the volume, file
 uploads fail loudly at runtime.
 
-## 4. Connect GitHub sources (only if GITHUB_OWNER was unset)
+## 4. Verify per-service Root Directory
 
-Skip this section if you exported `GITHUB_OWNER` before running the
-script — repos are already wired.
+Open each app service in the Railway dashboard → *Settings → Source*
+and confirm:
 
-Otherwise, for each app service: *Settings → Source → Connect Repo*
-and pick the corresponding repository. Railway auto-detects the
-`railway.json` in the repo root and uses its build + start commands.
-No further build config needed.
+| Service          | Repo                          | Root Directory       |
+| ---------------- | ----------------------------- | -------------------- |
+| `hoa-api`        | `metasession-dev/HOA`         | `HOA-API/`           |
+| `hoa-enterprise` | `metasession-dev/HOA`         | `HOA-ENTERPRISE/`    |
+| `hoa-residents`  | `metasession-dev/HOA`         | `HOA-RESIDENTS/`     |
+| `hoa-marketing`  | `metasession-dev/HOA`         | `HOA-MARKETING/`     |
+
+If the setup script's `--root-directory` attempt succeeded these are
+already filled in. If they're blank, fill them in manually — Railway
+needs to know which subfolder each service builds from. (The script
+also sets `RAILWAY_ROOT_DIRECTORY` as a fallback, but the UI value
+takes precedence; either being correct is sufficient.)
+
+Without this step Railway would try to build from the repo root and
+fail with "no `package.json` found" or, if it picked up the wrong one,
+build the wrong app.
 
 ## 5. Set the manual API keys
 

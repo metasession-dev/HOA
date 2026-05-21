@@ -1,0 +1,105 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type BroadcastGQL {
+  channels: [String!]!
+  failureCount: Float!
+  id: ID!
+  optOutCount: Float!
+  resolvedRecipients: Float!
+  scheduledAt: String
+  sentAt: String
+  status: String!
+  subject: String!
+  successCount: Float!
+}
+
+type EstateGQL {
+  address: String
+  id: ID!
+  name: String!
+  totalUnits: Float!
+}
+
+type InvoiceGQL {
+  amount: String!
+  createdAt: String!
+  currency: String!
+  dueDate: String!
+  id: ID!
+  invoiceNumber: String!
+  paidAt: String
+  sentAt: String
+  status: String!
+  type: String!
+  unitId: ID!
+}
+
+type InvoicesPageGQL {
+  data: [InvoiceGQL!]!
+  meta: PageInfoGQL!
+}
+
+type OrganizationGQL {
+  country: String!
+  createdAt: String!
+  currency: String!
+  id: ID!
+  language: String!
+  name: String!
+  slug: String!
+  timezone: String!
+}
+
+type PageInfoGQL {
+  limit: Float!
+  page: Float!
+  total: Float!
+  totalPages: Float!
+}
+
+type PaymentGQL {
+  amount: String!
+  currency: String!
+  id: ID!
+  invoiceId: ID!
+  method: String!
+  processedAt: String
+  processorReference: String
+  status: String!
+}
+
+type Query {
+  broadcasts: [BroadcastGQL!]!
+  estates: [EstateGQL!]!
+  invoice(id: String!): InvoiceGQL
+  invoices(limit: Int, page: Int, status: String, unitId: String): InvoicesPageGQL!
+  organization: OrganizationGQL
+  payments(invoiceId: String): [PaymentGQL!]!
+  requests(status: String): [RequestGQL!]!
+  units(estateId: String): [UnitGQL!]!
+}
+
+type RequestGQL {
+  body: String!
+  categoryId: ID!
+  createdAt: String!
+  dueAt: String
+  id: ID!
+  priority: String!
+  resolvedAt: String
+  status: String!
+  subject: String!
+  unitId: ID
+}
+
+type UnitGQL {
+  block: String
+  estateId: ID!
+  floor: Float
+  id: ID!
+  tags: [String!]!
+  type: String!
+  unitNumber: String!
+}
