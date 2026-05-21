@@ -41,3 +41,10 @@ coverage/
 
 # Docker
 docker-compose.override.yml
+
+# TypeScript incremental build cache. Must NOT be checked in — Railway's
+# Railpack builder mounts a cache volume at /app/tsconfig.tsbuildinfo,
+# and if a real file exists at that path the bind-mount fails with
+# "not a directory" and the deploy aborts.
+*.tsbuildinfo
+next-env.d.ts
