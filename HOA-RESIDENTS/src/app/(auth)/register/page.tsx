@@ -44,7 +44,7 @@ export default function RegisterPage() {
             <Link href="/login">I already have an account · Sign in</Link>
           </Button>
           <Button asChild variant="ghost" className="w-full">
-            <a href="mailto:support@hoa.africa?subject=Resident%20access%20request">
+            <a href="mailto:dev@metasession.co?subject=Resident%20access%20request">
               Email HOA.africa support
             </a>
           </Button>

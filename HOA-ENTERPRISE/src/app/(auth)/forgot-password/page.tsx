@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <p className="relative z-10 text-caption text-white/55">
-          Need help? <a href="mailto:support@hoa.africa" className="underline">support@hoa.africa</a>
+          Need help? <a href="mailto:dev@metasession.co" className="underline">dev@metasession.co</a>
         </p>
       </aside>
 

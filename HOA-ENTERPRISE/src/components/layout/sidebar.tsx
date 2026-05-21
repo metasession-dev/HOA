@@ -239,7 +239,7 @@ export function Sidebar() {
       {!collapsed && (
         <div className="border-t border-sidebar-border p-4">
           <p className="text-caption text-muted-foreground">
-            Need help? Reach the team at <span className="text-ember-orange">support@hoa.africa</span>
+            Need help? Reach the team at <span className="text-ember-orange">dev@metasession.co</span>
           </p>
         </div>
       )}
