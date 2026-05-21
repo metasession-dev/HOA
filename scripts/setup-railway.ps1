@@ -351,14 +351,23 @@ Confirm-AppService $ENT_SERVICE $MONOREPO $ENT_ROOT
 Confirm-AppService $RES_SERVICE $MONOREPO $RES_ROOT
 Confirm-AppService $MKT_SERVICE $MONOREPO $MKT_ROOT
 
-# Make RAILWAY_ROOT_DIRECTORY a no-op rerun guarantee: services already
-# created on a prior pass need this set regardless of how they were
-# initially wired, otherwise Railway would try to build from the repo
-# root and fail. Setting is idempotent (upsert).
-Set-RailwayVar $API_SERVICE 'RAILWAY_ROOT_DIRECTORY' $API_ROOT
-Set-RailwayVar $ENT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $ENT_ROOT
-Set-RailwayVar $RES_SERVICE 'RAILWAY_ROOT_DIRECTORY' $RES_ROOT
-Set-RailwayVar $MKT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $MKT_ROOT
+# The CLI's `railway add --repo` only sometimes wires the GitHub source
+# on v4 — when it silently drops the flag, services land sourceless and
+# `git push` doesn't auto-deploy. Hand off to the GraphQL wiring script
+# which is much more reliable: it talks directly to backboard.railway.com
+# and runs the same mutations the dashboard's "Connect Repo" + Root
+# Directory fields trigger. Idempotent — safe to call every run.
+$wireScript = Join-Path $PSScriptRoot 'wire-railway-github.ps1'
+if (Test-Path $wireScript) {
+    Write-Step "Wiring GitHub source via Railway GraphQL API…"
+    & $wireScript -ProjectId $PROJECT_ID -Repo $MONOREPO -Branch 'main'
+} else {
+    Write-Warn "wire-railway-github.ps1 not found alongside this script; falling back to RAILWAY_ROOT_DIRECTORY env vars."
+    Set-RailwayVar $API_SERVICE 'RAILWAY_ROOT_DIRECTORY' $API_ROOT
+    Set-RailwayVar $ENT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $ENT_ROOT
+    Set-RailwayVar $RES_SERVICE 'RAILWAY_ROOT_DIRECTORY' $RES_ROOT
+    Set-RailwayVar $MKT_SERVICE 'RAILWAY_ROOT_DIRECTORY' $MKT_ROOT
+}
 
 # ---------- generate candidate secrets ----------
 Write-Step "Generating candidate secrets (only applied if currently unset)…"
