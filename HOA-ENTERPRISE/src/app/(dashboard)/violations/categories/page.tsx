@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Plus, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getOrgCurrency, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ export default function ViolationCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', defaultFine: '', fineCurrency: 'ZAR', graceDays: 7 });
+  const [form, setForm] = useState({ name: '', description: '', defaultFine: '', graceDays: 7 });
   const [busy, setBusy] = useState(false);
 
   const load = () => {
@@ -32,7 +33,6 @@ export default function ViolationCategoriesPage() {
       name: c.name,
       description: c.description || '',
       defaultFine: c.defaultFine ? String(c.defaultFine) : '',
-      fineCurrency: c.fineCurrency || 'ZAR',
       graceDays: c.graceDays || 7,
     });
     setShowCreate(true);
@@ -46,7 +46,8 @@ export default function ViolationCategoriesPage() {
         name: form.name,
         description: form.description || undefined,
         defaultFine: form.defaultFine ? parseFloat(form.defaultFine) : undefined,
-        fineCurrency: form.fineCurrency,
+        // Fines always use the org's settings currency — no per-category override.
+        fineCurrency: getOrgCurrency(),
         graceDays: Number(form.graceDays),
       };
       if (editing) {
@@ -58,7 +59,7 @@ export default function ViolationCategoriesPage() {
       }
       setShowCreate(false);
       setEditing(null);
-      setForm({ name: '', description: '', defaultFine: '', fineCurrency: 'ZAR', graceDays: 7 });
+      setForm({ name: '', description: '', defaultFine: '', graceDays: 7 });
       load();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Save failed', description: err.message });
@@ -78,7 +79,7 @@ export default function ViolationCategoriesPage() {
           <p className="mt-1 text-body text-muted-foreground">Define your CC&amp;R breach categories and default fines.</p>
         </div>
         {!showCreate && (
-          <Button onClick={() => { setEditing(null); setForm({ name: '', description: '', defaultFine: '', fineCurrency: 'ZAR', graceDays: 7 }); setShowCreate(true); }}>
+          <Button onClick={() => { setEditing(null); setForm({ name: '', description: '', defaultFine: '', graceDays: 7 }); setShowCreate(true); }}>
             <Plus className="mr-1.5 h-4 w-4" />New category
           </Button>
         )}
@@ -97,14 +98,10 @@ export default function ViolationCategoriesPage() {
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="defaultFine">Default fine</Label>
+                  <Label htmlFor="defaultFine">Default fine ({getOrgCurrency()})</Label>
                   <Input id="defaultFine" type="number" step="0.01" min="0" value={form.defaultFine} onChange={(e) => setForm({ ...form, defaultFine: e.target.value })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Input id="currency" value={form.fineCurrency} onChange={(e) => setForm({ ...form, fineCurrency: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="graceDays">Grace days</Label>
@@ -136,7 +133,7 @@ export default function ViolationCategoriesPage() {
                     <p className="text-body font-medium text-charcoal-primary">{c.name}</p>
                     {c.description && <p className="text-caption text-muted-foreground">{c.description}</p>}
                     <div className="mt-1 flex items-center gap-1.5 text-caption text-muted-foreground">
-                      {c.defaultFine && <Badge variant="muted">Default fine: {c.fineCurrency} {Number(c.defaultFine).toFixed(2)}</Badge>}
+                      {c.defaultFine && <Badge variant="muted">Default fine: {formatCurrency(Number(c.defaultFine))}</Badge>}
                       <Badge variant="muted">{c.graceDays}d grace</Badge>
                     </div>
                   </div>

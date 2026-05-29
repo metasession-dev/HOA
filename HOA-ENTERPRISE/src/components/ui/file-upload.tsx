@@ -202,14 +202,25 @@ export function FileUpload({
             >
               <div className="flex items-center gap-2 min-w-0">
                 {f.contentType.startsWith('image/') ? (
-                  <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <a
+                    href={resolveFileUrl(f.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0"
+                    title="Open preview"
+                  >
+                    <img
+                      src={resolveFileUrl(f.url)}
+                      alt={f.filename}
+                      className="h-10 w-10 rounded object-cover ring-1 ring-stone-surface"
+                    />
+                  </a>
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <a
-                  href={f.url.startsWith('http')
-                    ? f.url
-                    : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${f.url}`}
+                  href={resolveFileUrl(f.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="truncate text-graphite hover:text-ember-orange"
@@ -295,6 +306,13 @@ export function FileUpload({
       )}
     </div>
   );
+}
+
+/** Resolve a (possibly relative) file URL against the API origin for display. */
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
 }
 
 function humanSize(bytes: number): string {

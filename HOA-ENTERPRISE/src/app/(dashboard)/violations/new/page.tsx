@@ -34,7 +34,12 @@ export default function NewViolationPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.get<any>('/estates').then((r) => setEstates(r.data || []));
+    // An enterprise has a single estate — default to it; no estate picker.
+    api.get<any>('/estates').then((r) => {
+      const list = r.data || [];
+      setEstates(list);
+      if (list[0]?.id) setEstateId(list[0].id);
+    });
     api.get<any>('/violations/categories').then((r) => setCategories(r.data || []));
   }, []);
 
@@ -95,21 +100,12 @@ export default function NewViolationPage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <Card>
           <CardContent className="space-y-4 p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="estate">Estate</Label>
-                <select id="estate" className={selectClass} value={estateId} onChange={(e) => setEstateId(e.target.value)} required>
-                  <option value="">Select estate…</option>
-                  {estates.map((est: any) => <option key={est.id} value={est.id}>{est.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="unit">Unit</Label>
-                <select id="unit" className={selectClass} value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.target.value })} required disabled={!estateId}>
-                  <option value="">{estateId ? 'Select unit…' : 'Pick an estate first'}</option>
-                  {units.map((u: any) => <option key={u.id} value={u.id}>Unit {u.unitNumber}</option>)}
-                </select>
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="unit">Unit</Label>
+              <select id="unit" className={selectClass} value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.target.value })} required disabled={!estateId}>
+                <option value="">{units.length ? 'Select unit…' : 'Loading units…'}</option>
+                {units.map((u: any) => <option key={u.id} value={u.id}>Unit {u.unitNumber}{u.block ? ` · Block ${u.block}` : ''}</option>)}
+              </select>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">

@@ -25,6 +25,12 @@ export class PhotoMetadataDto {
 
   @IsOptional()
   size?: number;
+
+  // The uploader (FileUpload) includes the StoredFile id so we can clean up
+  // the blob later. Allowed (optional) so whitelist validation doesn't reject it.
+  @IsOptional()
+  @IsString()
+  storedFileId?: string;
 }
 
 export class CreateViolationDto {

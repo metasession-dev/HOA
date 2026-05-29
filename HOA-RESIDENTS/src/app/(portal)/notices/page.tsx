@@ -14,7 +14,16 @@ export default function NoticesPage() {
   useEffect(() => {
     api
       .get<any>('/communications/broadcasts')
-      .then((res) => setNotices(res.data || []))
+      .then((res) => {
+        const list = [...(res.data || [])];
+        // Latest first — order by when the notice was sent (falling back to
+        // created), so a recently-sent older draft still shows at the top.
+        list.sort(
+          (a, b) =>
+            new Date(b.sentAt || b.createdAt).getTime() - new Date(a.sentAt || a.createdAt).getTime(),
+        );
+        setNotices(list);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
