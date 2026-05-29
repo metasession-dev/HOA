@@ -14,6 +14,12 @@ class CreateBroadcastLegacyDto {
   @IsString() @MaxLength(200) subject: string;
   @IsString() @MaxLength(50_000) body: string;
   @IsOptional() @IsIn(['email', 'sms', 'whatsapp', 'push', 'in_app']) channel?: string;
+  // The admin UI posts a `channels` array (one or more of the supported
+  // channels). Kept alongside the singular `channel` for backward compat;
+  // the service reads `data.channels` and falls back to ['email'].
+  @IsOptional() @IsArray() @IsString({ each: true })
+  @IsIn(['email', 'sms', 'whatsapp', 'push', 'in_app'], { each: true })
+  channels?: string[];
   @IsOptional() @IsString() @MaxLength(40) audience?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) unitIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) estateIds?: string[];

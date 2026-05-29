@@ -66,10 +66,14 @@ export default function EstatesPage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add estate
-          </Button>
+          {/* An enterprise has a single estate — the one it signed up with.
+              The "Add estate" action only appears until that estate exists. */}
+          {!loading && estates.length === 0 && (
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add estate
+            </Button>
+          )}
         </div>
       </header>
 

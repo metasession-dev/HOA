@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { IsBoolean, IsDateString, IsEmail, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { PeopleService } from './people.service';
 import { CurrentUser, Roles } from '../common/decorators';
 import { PaginationDto, successResponse } from '../common/dto';
@@ -14,6 +14,7 @@ class CreatePersonDto {
   @IsOptional() @IsEmail() @MaxLength(255) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsIn(PERSON_TYPES) type?: (typeof PERSON_TYPES)[number];
+  @IsOptional() @IsString() @MaxLength(1000) photoUrl?: string;
 }
 
 class UpdatePersonDto {
@@ -22,6 +23,7 @@ class UpdatePersonDto {
   @IsOptional() @IsEmail() @MaxLength(255) email?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsIn(PERSON_TYPES) type?: (typeof PERSON_TYPES)[number];
+  @IsOptional() @IsString() @MaxLength(1000) photoUrl?: string;
 }
 
 class AssignToUnitDto {
@@ -29,6 +31,7 @@ class AssignToUnitDto {
   @IsIn(OCCUPANCY_ROLES) role: (typeof OCCUPANCY_ROLES)[number];
   @IsDateString() startDate: string;
   @IsOptional() @IsBoolean() isPrimaryContact?: boolean;
+  @IsOptional() @IsInt() @Min(1) householdSize?: number;
 }
 
 @ApiTags('People')
@@ -59,6 +62,12 @@ export class PeopleController {
   async update(@Param('id') id: string, @CurrentUser('organizationId') orgId: string, @Body() data: UpdatePersonDto) {
     const person = await this.service.update(id, orgId, data);
     return successResponse(person);
+  }
+
+  @Get(':id/activity')
+  async activity(@Param('id') id: string, @CurrentUser('organizationId') orgId: string) {
+    const activity = await this.service.getActivity(id, orgId);
+    return successResponse(activity);
   }
 
   @Post(':id/occupancies')

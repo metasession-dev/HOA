@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Building2, Users, FileText, CreditCard,
+  LayoutDashboard, Building2, Home, Users, FileText, CreditCard,
   BookOpen, BarChart3, MessageSquare, FolderOpen, Settings,
   KeyRound, ScanLine, ShieldAlert, Vote, ClipboardList,
   Receipt, Truck, Wallet, PieChart, Landmark,
@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 const adminNav = [
   { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { title: 'Estates', href: '/admin/estates', icon: Building2 },
+  { title: 'Units', href: '/admin/units', icon: Home },
   { title: 'People', href: '/admin/people', icon: Users },
   { title: 'Team', href: '/admin/team', icon: Users },
   { title: 'Anomalies', href: '/admin/anomalies', icon: AlertTriangle },

@@ -25,8 +25,11 @@ function toIsoLocal(input: string) {
 
 export default function NewPassPage() {
   const router = useRouter();
-  const [estates, setEstates] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
+  // A resident may only create passes for units they actively occupy. We load
+  // exactly those from /me/units and derive the estate + unit pickers from it —
+  // the resident never sees estates/units they don't belong to. (The API
+  // enforces the same rule server-side.)
+  const [myUnits, setMyUnits] = useState<any[]>([]);
   const [estateId, setEstateId] = useState('');
   const [type, setType] = useState<string>('single_visit');
   const [form, setForm] = useState({
@@ -46,21 +49,35 @@ export default function NewPassPage() {
 
   useEffect(() => {
     api
-      .get<any>('/estates')
-      .then((res) => setEstates(res.data || []))
+      .get<any>('/me/units')
+      .then((res) => {
+        const rows = res.data || [];
+        setMyUnits(rows);
+        // Auto-select when the resident belongs to exactly one estate / unit so
+        // the common case is a single tap.
+        const estateIds = Array.from(new Set(rows.map((r: any) => r.unit?.estate?.id).filter(Boolean)));
+        if (estateIds.length === 1) setEstateId(estateIds[0] as string);
+        if (rows.length === 1 && rows[0]?.unit?.id) {
+          setForm((f) => ({ ...f, unitId: rows[0].unit.id }));
+        }
+      })
       .catch(console.error);
   }, []);
 
-  useEffect(() => {
-    if (estateId) {
-      api
-        .get<any>(`/estates/${estateId}/units`)
-        .then((res) => setUnits(res.data || []))
-        .catch(console.error);
-    } else {
-      setUnits([]);
-    }
-  }, [estateId]);
+  // Distinct estates the resident belongs to, derived from their occupancies.
+  const estates = Array.from(
+    new Map(
+      myUnits
+        .map((r) => r.unit?.estate)
+        .filter(Boolean)
+        .map((e: any) => [e.id, e]),
+    ).values(),
+  );
+  // Units the resident occupies within the chosen estate.
+  const units = myUnits
+    .filter((r) => !estateId || r.unit?.estate?.id === estateId)
+    .map((r) => r.unit)
+    .filter(Boolean);
 
   const toggleDay = (d: string) => {
     setRecurringDays(recurringDays.includes(d) ? recurringDays.filter((x) => x !== d) : [...recurringDays, d]);
@@ -193,7 +210,10 @@ export default function NewPassPage() {
                   id="estate"
                   className={selectClass}
                   value={estateId}
-                  onChange={(e) => setEstateId(e.target.value)}
+                  onChange={(e) => {
+                    setEstateId(e.target.value);
+                    setForm((f) => ({ ...f, unitId: '' }));
+                  }}
                   required
                 >
                   <option value="">Select estate…</option>

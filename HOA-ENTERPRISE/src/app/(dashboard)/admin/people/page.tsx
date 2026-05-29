@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ViewToggle, useViewMode } from '@/components/ui/view-toggle';
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { Users } from 'lucide-react';
 
 /** Display label + badge tint for the Person.type values. */
@@ -48,6 +49,7 @@ export default function PeoplePage() {
   const [form, setForm] = useState<{ firstName: string; lastName: string; email: string; phone: string; type: 'owner' | 'tenant' | 'stakeholder' }>({
     firstName: '', lastName: '', email: '', phone: '', type: 'owner',
   });
+  const [photo, setPhoto] = useState<UploadedFile[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'owner' | 'tenant' | 'stakeholder'>('all');
 
@@ -83,7 +85,7 @@ export default function PeoplePage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await api.post<any>('/people', form);
+      const res = await api.post<any>('/people', { ...form, photoUrl: photo[0]?.url });
       // Prepend the new row instead of refetching the whole list — the
       // refetch is what caused the page to *feel* like it reloaded after a
       // create: the drawer's close animation overlapped with a GET that
@@ -106,6 +108,7 @@ export default function PeoplePage() {
       toast({ variant: 'success', title: 'Person added', description: `${form.firstName} ${form.lastName}` });
       setShowCreate(false);
       setForm({ firstName: '', lastName: '', email: '', phone: '', type: 'owner' });
+      setPhoto([]);
     } catch (err: any) {
       toast({ variant: 'error', title: 'Could not add person', description: err.message });
     } finally {
@@ -126,6 +129,12 @@ export default function PeoplePage() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle value={view} onChange={setView} />
+          <Link href="/admin/team/invites/resident">
+            <Button variant="secondary">
+              <Mail className="mr-1.5 h-4 w-4" />
+              Invite resident
+            </Button>
+          </Link>
           <Button onClick={() => setShowCreate(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
             Add person
@@ -350,6 +359,17 @@ export default function PeoplePage() {
                 <p className="text-caption text-muted-foreground">
                   Used for visitor pass SMS and gate notifications when enabled.
                 </p>
+              </div>
+              <div className="space-y-1.5">
+                <FileUpload
+                  label="Photo (optional)"
+                  helpText="A headshot shown on the person's profile and occupant cards."
+                  kind="user_avatar"
+                  maxFiles={1}
+                  accept={['image/png', 'image/jpeg', 'image/webp']}
+                  value={photo}
+                  onChange={setPhoto}
+                />
               </div>
             </DrawerBody>
             <DrawerFooter>

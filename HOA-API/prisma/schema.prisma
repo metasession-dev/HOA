@@ -201,6 +201,9 @@ model Unit {
   estateId     String
   unitNumber   String
   block        String?
+  // Some estates lay out their units along named streets / lanes / closes
+  // rather than (or in addition to) blocks. Optional free-text label.
+  street       String?
   floor        Int?
   type         String   @default("apartment")
   areaSqm      Float?
@@ -209,13 +212,18 @@ model Unit {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  estate             Estate              @relation(fields: [estateId], references: [id], onDelete: Cascade)
-  occupancies        UnitOccupancy[]
-  invoices           Invoice[]
-  gatePasses         GatePass[]
-  violations         Violation[]
-  resaleCertificates ResaleCertificate[]
-  requests           Request[]
+  estate              Estate               @relation(fields: [estateId], references: [id], onDelete: Cascade)
+  occupancies         UnitOccupancy[]
+  // Ownership chain — the persistent title history. Distinct from occupancy:
+  // an owner may not live in the unit (rented out), and the active occupant
+  // may be a tenant. See UnitOwnership.
+  ownerships          UnitOwnership[]
+  additionalOccupants AdditionalOccupant[]
+  invoices            Invoice[]
+  gatePasses          GatePass[]
+  violations          Violation[]
+  resaleCertificates  ResaleCertificate[]
+  requests            Request[]
 
   @@unique([estateId, unitNumber])
   @@map("units")
@@ -231,6 +239,9 @@ model Person {
   lastName          String
   email             String?
   phone             String?
+  // Optional headshot for the person record (StoredFile download URL or any
+  // hosted image). Surfaced on the person detail + occupant cards.
+  photoUrl          String?
   preferredLanguage String   @default("en")
   preferredCurrency String?
   // Role on the platform — orthogonal to UnitOccupancy.role (which is
@@ -244,6 +255,7 @@ model Person {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   occupancies  UnitOccupancy[]
+  ownerships   UnitOwnership[]
   invites      Invite[]
 
   @@index([userId])
@@ -251,20 +263,89 @@ model Person {
   @@map("people")
 }
 
+// Who physically LIVES in a unit. Distinct from ownership (see UnitOwnership):
+//   role = "owner"  → owner-occupier (the owner lives in their own unit)
+//   role = "tenant" → a renter living in the unit
+// The "active occupant" is the active occupancy row — which may be the owner
+// or a tenant. When a tenant moves out the row is ended (isActive=false) and a
+// new one is created for the next occupant; occupancy history is transient and
+// belongs to the occupant, never carried onto a new owner.
 model UnitOccupancy {
   id               String    @id @default(cuid())
   unitId           String
   personId         String
-  role             String // owner, tenant
+  role             String // owner (owner-occupier) | tenant
   startDate        DateTime
   endDate          DateTime?
   isActive         Boolean   @default(true)
   isPrimaryContact Boolean   @default(false)
+  // Optional household size for the occupant's household (main occupant + any
+  // additional occupants). Lets admins record "family of 4" without listing
+  // every member individually.
+  householdSize    Int?
 
   unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
+  @@index([unitId, isActive])
   @@map("unit_occupancies")
+}
+
+// The TITLE / ownership chain of a unit, independent of who occupies it.
+// Every unit must have exactly one active owner. When a property is sold or
+// transferred, the existing ownership is ended (endDate + isActive=false) and a
+// new ownership row is opened for the new owner — preserving full ownership
+// history on the unit. This history stays with the enterprise + owner; it is
+// never attached to a tenant (unless that tenant is also the owner, in which
+// case they have both an ownership and an occupancy row).
+model UnitOwnership {
+  id                String    @id @default(cuid())
+  unitId            String
+  personId          String
+  startDate         DateTime  @default(now())
+  endDate           DateTime?
+  isActive          Boolean   @default(true)
+  // How the owner acquired the unit — for the transfer audit trail.
+  acquisitionMethod String    @default("purchase") // initial | purchase | transfer | inheritance | gift | other
+  // Optional sale/transfer price captured at acquisition (org currency).
+  purchasePrice     Decimal?  @db.Decimal(14, 2)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, isActive])
+  @@index([personId])
+  @@map("unit_ownerships")
+}
+
+// Additional household members living with the main occupant — family members,
+// dependents, domestic staff. Lightweight records (no login, not Person rows)
+// listing name, gender, relationship and age group. Tied to the unit; ended
+// (isActive=false) when the household moves out.
+model AdditionalOccupant {
+  id           String   @id @default(cuid())
+  unitId       String
+  firstName    String
+  lastName     String?
+  // male | female | other | undisclosed
+  gender       String?
+  // spouse | partner | child | parent | sibling | relative | domestic_staff | other
+  relationship String?
+  // infant | child | teenager | adult | senior
+  ageGroup     String?
+  photoUrl     String?
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, isActive])
+  @@map("additional_occupants")
 }
 
 // ==================== FINANCIAL ====================

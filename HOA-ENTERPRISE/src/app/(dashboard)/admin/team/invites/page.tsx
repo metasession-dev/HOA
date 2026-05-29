@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Plus, Filter, RotateCcw, X, Copy } from 'lucide-react';
+import { ChevronLeft, Home, Briefcase, Filter, RotateCcw, X, Copy } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -86,9 +86,10 @@ export default function InvitesListPage() {
           <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Invites</h1>
           <p className="mt-1 text-body text-muted-foreground">Pending and historical invitations to your team.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/admin/team/invites/bulk"><Button variant="secondary">Bulk import</Button></Link>
-          <Link href="/admin/team/invites/new"><Button><Plus className="mr-1.5 h-4 w-4" />New invite</Button></Link>
+          <Link href="/admin/team/invites/resident"><Button variant="secondary"><Home className="mr-1.5 h-4 w-4" />Invite resident</Button></Link>
+          <Link href="/admin/team/invites/new"><Button><Briefcase className="mr-1.5 h-4 w-4" />Invite team member</Button></Link>
         </div>
       </header>
 
