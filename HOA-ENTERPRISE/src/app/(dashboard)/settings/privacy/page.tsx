@@ -141,7 +141,7 @@ export default function PrivacyPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-40" />
         <Skeleton className="h-40" />
@@ -150,7 +150,7 @@ export default function PrivacyPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Privacy & your data</h1>
         <p className="mt-1 text-body text-muted-foreground">

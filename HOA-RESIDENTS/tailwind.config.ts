@@ -136,6 +136,14 @@ const config: Config = {
           from: { transform: 'translateY(8px)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
         },
+        // Centered-dialog entrance. The translate(-50%, …) is baked into the
+        // keyframe so it doesn't override the dialog's -translate-x/y-1/2
+        // centering mid-animation (which caused the dialog to flash off-centre
+        // for a frame before snapping into place).
+        'dialog-in': {
+          from: { opacity: '0', transform: 'translate(-50%, -48%) scale(0.97)' },
+          to: { opacity: '1', transform: 'translate(-50%, -50%) scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -144,6 +152,7 @@ const config: Config = {
         'slide-in-right': 'slide-in-right 0.3s cubic-bezier(0.19, 1, 0.22, 1)',
         'slide-out-right': 'slide-out-right 0.2s cubic-bezier(0.19, 1, 0.22, 1)',
         'slide-up': 'slide-up 0.2s cubic-bezier(0.19, 1, 0.22, 1)',
+        'dialog-in': 'dialog-in 0.2s cubic-bezier(0.19, 1, 0.22, 1)',
       },
       transitionTimingFunction: {
         spring: 'cubic-bezier(0.19, 1, 0.22, 1)',

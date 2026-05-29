@@ -135,8 +135,8 @@ export class CommunicationsController {
 
   @Roles('communications_manager', 'hoa_admin', 'super_admin')
   @Post('broadcasts/:id/send')
-  async sendLegacy(@Param('id') id: string) {
-    const broadcast = await this.service.send(id);
+  async sendLegacy(@Param('id') id: string, @CurrentUser('organizationId') orgId: string) {
+    const broadcast = await this.service.send(id, orgId);
     return successResponse(broadcast);
   }
 

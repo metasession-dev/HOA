@@ -186,7 +186,7 @@ export class RequestsService {
   async list(
     orgId: string,
     actor: Actor,
-    query: { status?: string; categoryId?: string; assignedToUserId?: string; priority?: string; overdue?: string; unitId?: string; page?: string; limit?: string },
+    query: { status?: string; categoryId?: string; assignedToUserId?: string; priority?: string; overdue?: string; unitId?: string; search?: string; from?: string; to?: string; page?: string; limit?: string },
   ) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
@@ -200,6 +200,35 @@ export class RequestsService {
     if (query.overdue === 'true') {
       where.dueAt = { lt: new Date() };
       where.status = { notIn: ['resolved', 'closed', 'cancelled'] };
+    }
+    // Free-text search across subject + body. Use AND-wrapped OR so it composes
+    // with the resident-scoping OR that scopeRequestWhere() adds below (a bare
+    // top-level `where.OR` would be overwritten there, silently dropping search).
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { OR: [
+          { subject: { contains: q, mode: 'insensitive' } },
+          { body: { contains: q, mode: 'insensitive' } },
+        ] },
+      ];
+    }
+    // Filed-date range (inclusive). `to` is pushed to end-of-day.
+    if (query.from || query.to) {
+      const createdAt: any = {};
+      if (query.from) {
+        const f = new Date(query.from);
+        if (!Number.isNaN(f.getTime())) createdAt.gte = f;
+      }
+      if (query.to) {
+        const t = new Date(query.to);
+        if (!Number.isNaN(t.getTime())) {
+          t.setHours(23, 59, 59, 999);
+          createdAt.lte = t;
+        }
+      }
+      if (Object.keys(createdAt).length) where.createdAt = createdAt;
     }
     where = scopeRequestWhere(where, actor);
 

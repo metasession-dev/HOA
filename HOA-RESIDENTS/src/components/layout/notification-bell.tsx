@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 type Notification = {
   id: string;
@@ -21,15 +22,37 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Ids we've already surfaced — used to toast only genuinely-new notifications
+  // that arrive while the app is open (not the existing ones on first load).
+  const seenIds = useRef<Set<string>>(new Set());
+  const firstLoad = useRef(true);
 
   const load = () => {
-    api.get<any>('/notifications?limit=10').then((r) => setItems(r.data || [])).catch(() => {});
+    api
+      .get<any>('/notifications?limit=10')
+      .then((r) => {
+        const list: Notification[] = r.data || [];
+        setItems(list);
+        // Anything unread we haven't seen before is "new since last poll".
+        const fresh = list.filter((n) => !n.readAt && !seenIds.current.has(n.id));
+        if (!firstLoad.current && fresh.length > 0) {
+          const newest = fresh[0]; // list is newest-first
+          toast({
+            title: fresh.length > 1 ? `${fresh.length} new notifications` : newest.title,
+            description: fresh.length > 1 ? newest.title : newest.body,
+          });
+        }
+        list.forEach((n) => seenIds.current.add(n.id));
+        firstLoad.current = false;
+      })
+      .catch(() => {});
     api.get<any>('/notifications/unread-count').then((r) => setUnread(r.data?.count || 0)).catch(() => {});
   };
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 60_000);
+    // Poll fairly often so an in-app toast feels timely when a notice lands.
+    const id = setInterval(load, 30_000);
     return () => clearInterval(id);
   }, []);
 

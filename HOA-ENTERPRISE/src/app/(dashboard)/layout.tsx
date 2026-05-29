@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { OrgSettingsProvider } from '@/providers/org-settings-provider';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -10,6 +10,10 @@ import { Topbar } from '@/components/layout/topbar';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  // Mobile off-canvas nav state. Closes automatically on route change.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => { setMobileNavOpen(false); }, [pathname]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -30,9 +34,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <OrgSettingsProvider>
       <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Topbar />
+        <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <Topbar onMenuClick={() => setMobileNavOpen(true)} />
           {/*
            * Single source of truth for page chrome: uniform p-6 across every
            * dashboard route. Pages render directly into this main (no per-page

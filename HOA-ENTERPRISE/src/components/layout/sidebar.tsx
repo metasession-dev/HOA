@@ -19,7 +19,6 @@ import { useEffect, useMemo, useState } from 'react';
 
 const adminNav = [
   { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { title: 'Estates', href: '/admin/estates', icon: Building2 },
   { title: 'Units', href: '/admin/units', icon: Home },
   { title: 'People', href: '/admin/people', icon: Users },
   { title: 'Team', href: '/admin/team', icon: Users },
@@ -39,7 +38,6 @@ const financeNav = [
   { title: 'Budgets', href: '/finance/budgets', icon: PieChart },
   { title: 'Banking', href: '/finance/banking', icon: Landmark },
   { title: 'Chart of Accounts', href: '/finance/gl', icon: BookOpen },
-  { title: 'Exchange rates', href: '/finance/fx', icon: Banknote },
   { title: 'Reports', href: '/finance/reports', icon: BarChart3 },
 ];
 
@@ -48,7 +46,6 @@ const operationsNav = [
   { title: 'Communications', href: '/communications', icon: MessageSquare },
   { title: 'Gate passes', href: '/passes', icon: KeyRound },
   { title: 'Violations', href: '/violations', icon: ShieldAlert },
-  { title: 'Resale documents', href: '/resale', icon: FileText },
   { title: 'Documents', href: '/documents', icon: FolderOpen },
   { title: 'Privacy & data', href: '/settings/privacy', icon: Lock },
   { title: 'Settings', href: '/settings', icon: Settings },
@@ -71,7 +68,7 @@ const integrationsNav = [
 
 type NavItem = { title: string; href: string; icon: typeof LayoutDashboard };
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean; onClose?: () => void } = {}) {
   const pathname = usePathname();
   const { primaryRole, organizationName } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
@@ -171,6 +168,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => onClose?.()}
                 className={cn(
                   'group relative flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm transition-colors duration-200',
                   isActive
@@ -200,12 +198,24 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className={cn(
-        'flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-spring',
-        collapsed ? 'w-16' : 'w-64',
+    <>
+      {/* Mobile backdrop — tap to dismiss the drawer. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-midnight/30 backdrop-blur-[1px] lg:hidden"
+          onClick={onClose}
+          aria-hidden
+        />
       )}
-    >
+      <aside
+        className={cn(
+          'flex flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-spring',
+          // Mobile: fixed off-canvas drawer that slides in/out.
+          'fixed inset-y-0 left-0 z-50 w-64 lg:static lg:z-auto lg:translate-x-0 lg:transition-all',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          collapsed ? 'lg:w-16' : 'lg:w-64',
+        )}
+      >
       <div className={cn('flex items-center h-16 px-4', collapsed ? 'justify-center' : 'gap-3')}>
         {/* HOA.africa brand mark — green house + Africa silhouette with nodes. */}
         <img src="/icons/logo.png" alt="HOA.africa" className="h-9 w-9 shrink-0" />
@@ -220,7 +230,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0"
+          className="hidden h-8 w-8 shrink-0 lg:inline-flex"
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? 'Expand' : 'Collapse'}
         >
@@ -244,6 +254,7 @@ export function Sidebar() {
           </p>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

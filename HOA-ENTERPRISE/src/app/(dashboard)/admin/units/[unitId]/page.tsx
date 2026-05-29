@@ -167,7 +167,7 @@ export default function UnitDetailPage() {
             {unit.estate?.name && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
-                <Link href={`/admin/estates/${unit.estate.id}`} className="hover:text-graphite">{unit.estate.name}</Link>
+                <span>{unit.estate.name}</span>
                 {unit.estate.address && <span className="text-muted-foreground/80">· {unit.estate.address}</span>}
               </span>
             )}

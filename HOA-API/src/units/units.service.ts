@@ -49,7 +49,7 @@ export class UnitsService {
             where: { isActive: true },
             include: { person: { select: { id: true, firstName: true, lastName: true, type: true } } },
           },
-          _count: { select: { invoices: true, additionalOccupants: true } },
+          _count: { select: { invoices: true } },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -60,9 +60,11 @@ export class UnitsService {
     return paginatedResponse(data, total, page, limit);
   }
 
-  async findByEstate(estateId: string, query: PaginationDto) {
+  async findByEstate(estateId: string, query: PaginationDto, orgId?: string) {
     const { page = 1, limit = 50, search } = query;
-    const where: any = { estateId };
+    // When an orgId is supplied (all HTTP callers do), scope by it so an
+    // estate id from another org can't be used to read its units.
+    const where: any = { estateId, ...(orgId ? { estate: { organizationId: orgId } } : {}) };
     if (search) {
       where.OR = [
         { unitNumber: { contains: search, mode: 'insensitive' } },

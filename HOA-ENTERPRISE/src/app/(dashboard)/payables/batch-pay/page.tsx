@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Banknote, Check } from 'lucide-react';
 import { api } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ export default function BatchPayPage() {
     if (!prefix.trim()) return toast({ variant: 'error', title: 'Reference prefix required' });
     const ok = await confirm({
       title: `Pay ${selected.size} invoice(s)?`,
-      description: `Total: R ${total.toFixed(2)}. References will be ${prefix}-001, ${prefix}-002, …`,
+      description: `Total: ${formatCurrency(total)}. References will be ${prefix}-001, ${prefix}-002, …`,
       confirmText: 'Run batch',
     });
     if (!ok) return;
@@ -57,7 +57,7 @@ export default function BatchPayPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <Link href="/payables" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Payables
       </Link>
@@ -75,7 +75,7 @@ export default function BatchPayPage() {
           </div>
           <div className="flex flex-col items-end justify-end">
             <p className="text-caption text-muted-foreground">{selected.size} selected</p>
-            <p className="text-heading-sm font-display tabular-nums text-charcoal-primary">R {total.toFixed(2)}</p>
+            <p className="text-heading-sm font-display tabular-nums text-charcoal-primary">{formatCurrency(total)}</p>
           </div>
         </div>
       </CardContent></Card>

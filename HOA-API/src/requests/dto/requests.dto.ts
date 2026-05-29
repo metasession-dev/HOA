@@ -223,6 +223,21 @@ export class ListRequestsQueryDto {
   @IsString()
   unitId?: string;
 
+  @ApiPropertyOptional({ description: 'Free-text search across subject + body.' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filed on/after this ISO date (inclusive).' })
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Filed on/before this ISO date (inclusive).' })
+  @IsOptional()
+  @IsString()
+  to?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

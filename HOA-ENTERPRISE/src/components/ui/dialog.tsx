@@ -18,7 +18,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       'fixed inset-0 z-50 bg-midnight/30 backdrop-blur-[2px]',
-      'data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-in data-[state=closed]:opacity-0',
+      'data-[state=open]:animate-fade-in data-[state=closed]:opacity-0',
       className,
     )}
     {...props}
@@ -37,7 +37,9 @@ const DialogContent = React.forwardRef<
       className={cn(
         'fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4',
         'rounded-card-lg bg-card p-8 shadow-inset-stone shadow-soft',
-        'data-[state=open]:animate-slide-up',
+        // Use the centering-aware entrance so the box doesn't flash off-centre
+        // for a frame before snapping into place.
+        'data-[state=open]:animate-dialog-in',
         className,
       )}
       {...props}

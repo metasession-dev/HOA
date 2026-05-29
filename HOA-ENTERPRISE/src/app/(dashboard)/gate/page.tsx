@@ -137,7 +137,7 @@ export default function GateConsolePage() {
   const valid = pass?.validity?.valid;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-icon bg-midnight">
           <ScanLine className="h-6 w-6 text-white" />

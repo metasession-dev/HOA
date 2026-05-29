@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Inbox, AlertTriangle, Filter, Clock } from 'lucide-react';
+import { Inbox, AlertTriangle, Filter, Clock, Search, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +47,9 @@ export default function AdminRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<typeof STATUSES[number]>('submitted');
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [search, setSearch] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [summary, setSummary] = useState<{ openCount: number; overdueCount: number; byPriority: Record<string, number> } | null>(null);
 
   const load = () => {
@@ -51,12 +57,29 @@ export default function AdminRequestsPage() {
     const qs = new URLSearchParams();
     if (status && status !== 'all') qs.set('status', status);
     if (overdueOnly) qs.set('overdue', 'true');
+    if (search.trim()) qs.set('search', search.trim());
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    qs.set('limit', '100');
     Promise.all([
       api.get<any>(`/requests?${qs.toString()}`).then((r) => setItems(r.data || [])),
       api.get<any>('/requests/analytics/overdue').then((r) => setSummary(r.data)).catch(() => setSummary(null)),
     ]).catch(console.error).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [status, overdueOnly]);
+  // Re-fetch on status/overdue/date changes immediately; debounce free-text search.
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [status, overdueOnly, from, to]);
+  const searchMounted = useRef(false);
+  useEffect(() => {
+    // Skip the first run — the effect above already loads on mount; this avoids
+    // a duplicate request pair when the page opens.
+    if (!searchMounted.current) { searchMounted.current = true; return; }
+    const t = setTimeout(() => load(), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const hasFilters = !!search.trim() || !!from || !!to || overdueOnly;
+  const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setOverdueOnly(false); };
 
   return (
     <div className="space-y-6">
@@ -96,6 +119,32 @@ export default function AdminRequestsPage() {
         >
           Overdue only
         </button>
+      </div>
+
+      {/* Search + filed-date range. */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search subject or description…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-caption text-muted-foreground">Filed from</Label>
+          <Input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="w-[150px]" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-caption text-muted-foreground">Filed to</Label>
+          <Input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="w-[150px]" />
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="mr-1 h-3.5 w-3.5" />Clear
+          </Button>
+        )}
       </div>
 
       <Card>

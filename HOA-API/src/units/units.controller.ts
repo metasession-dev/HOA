@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import {
   IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested,
@@ -6,7 +6,17 @@ import {
 import { Type } from 'class-transformer';
 import { UnitsService } from './units.service';
 import { CurrentUser, Roles } from '../common/decorators';
+import { isResidentRole } from '../common/scope.util';
 import { PaginationDto, successResponse } from '../common/dto';
+
+// Units management is a staff surface. Residents (owners/tenants) use
+// /me/units for their own units — they must not be able to enumerate the
+// estate roster (names, occupancy, household PII) via these endpoints.
+function assertStaff(role: string) {
+  if (isResidentRole(role)) {
+    throw new ForbiddenException('Not available to residents');
+  }
+}
 
 const UNIT_TYPES = ['apartment', 'townhouse', 'house', 'duplex', 'commercial'] as const;
 const ACQUISITION_METHODS = ['initial', 'purchase', 'transfer', 'inheritance', 'gift', 'other'] as const;
@@ -72,21 +82,32 @@ export class UnitsController {
   @Get('units')
   async findAll(
     @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('role') role: string,
     @Query() query: PaginationDto & { estateId?: string },
   ) {
+    assertStaff(role);
     return this.service.findAllForOrg(orgId, query);
   }
 
   @Get('estates/:estateId/units')
-  async findByEstate(@Param('estateId') estateId: string, @Query() query: PaginationDto) {
-    return this.service.findByEstate(estateId, query);
+  async findByEstate(
+    @Param('estateId') estateId: string,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('role') role: string,
+    @Query() query: PaginationDto,
+  ) {
+    assertStaff(role);
+    // Org-scope by estate so an estate id from another org can't be enumerated.
+    return this.service.findByEstate(estateId, query, orgId);
   }
 
   @Get('units/:id')
   async findById(
     @Param('id') id: string,
     @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('role') role: string,
   ) {
+    assertStaff(role);
     const unit = await this.service.findById(id, orgId);
     return successResponse(unit);
   }
@@ -146,7 +167,9 @@ export class UnitsController {
   async listAdditional(
     @Param('id') id: string,
     @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('role') role: string,
   ) {
+    assertStaff(role);
     return successResponse(await this.service.listAdditionalOccupants(id, orgId));
   }
 

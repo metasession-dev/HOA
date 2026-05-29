@@ -1,24 +1,36 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/layout/notification-bell';
 import { RoleSwitcher } from '@/components/layout/role-switcher';
 import { getInitials } from '@/lib/utils';
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { user, logout, primaryRole } = useAuth();
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-stone-surface bg-background px-6">
+    <header className="flex h-16 items-center justify-between border-b border-stone-surface bg-background px-4 sm:px-6">
       <div className="flex items-center gap-2">
+        {/* Hamburger — opens the off-canvas nav on mobile; hidden on desktop
+            where the sidebar is always visible. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden -ml-1"
+          onClick={onMenuClick}
+          title="Menu"
+          aria-label="Open navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
         <span className="font-display text-heading-sm text-charcoal-primary">HOA.africa</span>
         <span className="hidden text-caption text-muted-foreground sm:inline">Enterprise console</span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Role switcher: appears only when the user holds >1 active role.
             Clicking through to a resident role hands off the token to the
             resident PWA via URL fragment. */}

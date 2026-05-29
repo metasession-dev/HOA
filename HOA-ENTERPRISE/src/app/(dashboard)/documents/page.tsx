@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { FolderOpen, FileText, Upload, Trash2, Loader2, Download } from 'lucide-react';
+import { FolderOpen, FileText, Upload, Trash2, Loader2, Download, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,15 @@ export default function DocumentsPage() {
   const [picked, setPicked] = useState<{ file: File; size: number; mime: string } | null>(null);
   const [name, setName] = useState('');
   const [folder, setFolder] = useState('/');
+  const [search, setSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? documents.filter((d) =>
+        [d.name, d.path, d.mimeType].filter(Boolean).some((v: string) => v.toLowerCase().includes(q)),
+      )
+    : documents;
 
   const fetchDocs = () => {
     api
@@ -184,6 +192,21 @@ export default function DocumentsPage() {
         </Button>
       </header>
 
+      {!loading && documents.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search by name, folder or type…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <Badge variant="muted">{filtered.length} of {documents.length}</Badge>
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-20" />)}
@@ -196,9 +219,16 @@ export default function DocumentsPage() {
           description="Upload HOA rules, meeting minutes, contracts and resident handouts. Each file gets a private signed URL — residents only see files you publish to them."
           action={{ label: 'Upload first document', onClick: () => setShowUpload(true) }}
         />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          variant="card"
+          icon={Search}
+          title="No matches"
+          description={`Nothing matches "${search}". Try a different term or clear the search.`}
+        />
       ) : (
         <div className="grid gap-3">
-          {documents.map((doc: any) => (
+          {filtered.map((doc: any) => (
             <Card key={doc.id}>
               <CardContent className="flex items-center justify-between gap-3 p-4">
                 <div className="flex min-w-0 items-center gap-3">

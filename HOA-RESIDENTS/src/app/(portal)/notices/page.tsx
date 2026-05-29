@@ -1,17 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, Mail, MessageSquare, BellRing } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const channelIcons: Record<string, typeof Mail> = {
-  email: Mail,
-  sms: MessageSquare,
-  push: BellRing,
-};
 
 export default function NoticesPage() {
   const [notices, setNotices] = useState<any[]>([]);
@@ -61,22 +55,6 @@ export default function NoticesPage() {
                     {formatDate(n.sentAt || n.createdAt)}
                   </span>
                 </div>
-                {n.channels && n.channels.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {n.channels.map((ch: string) => {
-                      const Icon = channelIcons[ch] || Mail;
-                      return (
-                        <span
-                          key={ch}
-                          className="inline-flex items-center gap-1 rounded-full bg-stone-surface px-2 py-0.5 text-[11px] text-graphite"
-                        >
-                          <Icon className="h-3 w-3" />
-                          {ch}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
                 <p className="mt-3 text-body text-graphite whitespace-pre-wrap leading-relaxed">{n.body}</p>
               </CardContent>
             </Card>

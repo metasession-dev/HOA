@@ -60,11 +60,11 @@ export default function BoardPackPage() {
     }
   };
 
-  if (loading) return <div className="mx-auto max-w-3xl space-y-4 p-4"><Skeleton className="h-12" /><Skeleton className="h-96" /></div>;
+  if (loading) return <div className="space-y-4 p-4"><Skeleton className="h-12" /><Skeleton className="h-96" /></div>;
   if (!data) return <p className="p-10 text-center">No data</p>;
 
   return (
-    <div className="mx-auto max-w-3xl p-4 sm:p-8 space-y-8">
+    <div className="p-4 sm:p-8 space-y-8">
       <header className="flex items-center justify-between gap-3">
         <Link href="/finance/reports" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
           <ChevronLeft className="h-3 w-3" />Reports

@@ -6,10 +6,12 @@ import Link from 'next/link';
 import { ChevronLeft, Plus, Split, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { useOrgSettings } from '@/providers/org-settings-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 
 type LineRow = { glAccountId: string; amounts: number[]; notes: string };
@@ -20,6 +22,7 @@ const blankLine = (): LineRow => ({ glAccountId: '', amounts: Array(12).fill(0),
 
 export default function NewBudgetPage() {
   const router = useRouter();
+  const { org } = useOrgSettings();
   const [name, setName] = useState('');
   const [fiscalYear, setFiscalYear] = useState(new Date().getUTCFullYear());
   const [fundId, setFundId] = useState('');
@@ -56,6 +59,11 @@ export default function NewBudgetPage() {
 
   const lineTotal = (l: LineRow) => l.amounts.reduce((s, a) => s + a, 0);
   const grandTotal = lines.reduce((s, l) => s + lineTotal(l), 0);
+
+  // GL accounts already chosen on other rows — disabled in each row's dropdown
+  // so the same account can't be picked twice (the server enforces a unique
+  // (budget, glAccount) pair; catching it here keeps the UX clean).
+  const usedGlIds = new Set(lines.map((l) => l.glAccountId).filter(Boolean));
 
   /**
    * Spreads the row's current total evenly across all 12 months. We use the
@@ -141,13 +149,16 @@ export default function NewBudgetPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       <Link href="/finance/budgets" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Budgets
       </Link>
-      <header>
-        <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">New budget</h1>
-        <p className="mt-1 text-body text-muted-foreground">12 months per GL account. Activate when approved; only one active budget per fiscal year + fund.</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">New budget</h1>
+          <p className="mt-1 text-body text-muted-foreground">12 months per GL account. Activate when approved; only one active budget per fiscal year + fund.</p>
+        </div>
+        <Badge variant="muted">Amounts in {org.currency}</Badge>
       </header>
 
       <form onSubmit={submit}>
@@ -183,6 +194,13 @@ export default function NewBudgetPage() {
                 </Button>
               </div>
             </div>
+            {glAccounts.length === 0 && (
+              <p className="rounded-lg bg-warning/10 px-3 py-2 text-caption text-graphite">
+                No income or expense accounts found. Add them in{' '}
+                <Link href="/finance/gl" className="font-medium text-ember-orange hover:underline">Chart of Accounts</Link>{' '}
+                before creating a budget.
+              </p>
+            )}
             <div className="overflow-x-auto rounded-lg bg-stone-surface/50">
               <table className="w-full text-xs">
                 <thead>
@@ -204,13 +222,17 @@ export default function NewBudgetPage() {
                           <select value={l.glAccountId} onChange={(e) => updateLine(i, { glAccountId: e.target.value })}
                             className="w-full h-8 rounded bg-card px-2 text-xs shadow-inset-stone focus-visible:outline-none">
                             <option value="">— select —</option>
-                            {glAccounts.map((g) => <option key={g.id} value={g.id}>{g.code} · {g.name}</option>)}
+                            {glAccounts.map((g) => (
+                              <option key={g.id} value={g.id} disabled={usedGlIds.has(g.id) && g.id !== l.glAccountId}>
+                                {g.code} · {g.name}{usedGlIds.has(g.id) && g.id !== l.glAccountId ? ' (used)' : ''}
+                              </option>
+                            ))}
                           </select>
                         </td>
                         {l.amounts.map((amt, m) => (
                           <td key={m} className="px-0.5 py-1">
-                            <Input type="number" step={0.01} value={amt}
-                              onChange={(e) => updateLineAmount(i, m, Number(e.target.value))}
+                            <Input type="number" step={0.01} min={0} value={amt === 0 ? '' : amt} placeholder="0"
+                              onChange={(e) => updateLineAmount(i, m, e.target.value === '' ? 0 : Number(e.target.value))}
                               className="h-8 px-1 text-xs text-right tabular-nums" />
                           </td>
                         ))}

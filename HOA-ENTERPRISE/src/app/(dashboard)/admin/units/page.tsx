@@ -68,15 +68,40 @@ export default function UnitsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
 
-  const fetchAll = () => {
+  const fetchAll = async () => {
     setLoading(true);
-    Promise.all([
-      api.get<any>('/units?limit=1000').then((r) => setUnits(r.data || [])),
-      api.get<any>('/people?limit=1000').then((r) => setPeople(r.data || [])),
-      api.get<any>('/estates').then((r) => setEstates(r.data || [])),
-    ])
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [peopleRes, estatesRes] = await Promise.all([
+        api.get<any>('/people?limit=1000').catch(() => ({ data: [] })),
+        api.get<any>('/estates').catch(() => ({ data: [] })),
+      ]);
+      setPeople(peopleRes.data || []);
+      const ests = estatesRes.data || [];
+      setEstates(ests);
+
+      // Primary source is the org-level units endpoint. If it's unavailable or
+      // returns nothing (e.g. an older API, or an org-scoping edge case), fall
+      // back to aggregating units per estate — the same source the estate view
+      // used — so any previously-created units still appear.
+      let list: any[] = [];
+      try {
+        const r = await api.get<any>('/units?limit=1000');
+        list = r.data || [];
+      } catch {
+        list = [];
+      }
+      if (list.length === 0 && ests.length > 0) {
+        const perEstate = await Promise.all(
+          ests.map((e: any) =>
+            api.get<any>(`/estates/${e.id}/units?limit=1000`).then((r) => r.data || []).catch(() => []),
+          ),
+        );
+        list = perEstate.flat();
+      }
+      setUnits(list);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchAll(); }, []);
