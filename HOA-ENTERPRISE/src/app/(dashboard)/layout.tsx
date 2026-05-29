@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { OrgSettingsProvider } from '@/providers/org-settings-provider';
 import { Sidebar } from '@/components/layout/sidebar';
+import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -43,8 +44,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
            * max-w wrappers) so the content uses the full width of the viewport
            * minus the sidebar.
            */}
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-6 pb-24 lg:pb-6">{children}</main>
         </div>
+        <BottomNav onMore={() => setMobileNavOpen(true)} />
       </div>
     </OrgSettingsProvider>
   );

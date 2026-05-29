@@ -15,6 +15,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FinanceModule } from './finance/finance.module';
 import { CommunicationsModule } from './communications/communications.module';
+import { MeetingsModule } from './meetings/meetings.module';
 import { DocumentsModule } from './documents/documents.module';
 import { AuditModule } from './audit/audit.module';
 import { PassesModule } from './passes/passes.module';
@@ -72,6 +73,7 @@ import { HealthController } from './health.controller';
     PaymentsModule,
     FinanceModule,
     CommunicationsModule,
+    MeetingsModule,
     DocumentsModule,
     AuditModule,
     PassesModule,

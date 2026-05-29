@@ -185,11 +185,11 @@ export default function BankAccountDetail() {
     }
   };
 
-  if (loading) return <div className="mx-auto max-w-5xl space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
   if (!account) return <Card><CardContent className="p-10 text-center"><p>Not found.</p></CardContent></Card>;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <Link href="/finance/banking" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Banking
       </Link>

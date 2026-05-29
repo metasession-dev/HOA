@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Header,
   NotFoundException,
@@ -118,9 +119,11 @@ export class FilesController {
   }
 
   /**
-   * Signed-URL download. Public (no JWT) — the signature *is* the auth.
-   * The endpoint resolves the file, verifies expiry+HMAC, then streams bytes
-   * with content-disposition matching the stored filename.
+   * Download. Public (no JWT). Two modes:
+   *   • Private files — a valid HMAC signature (exp+sig) *is* the auth.
+   *   • Public files  — may be fetched WITHOUT a signature, giving a stable,
+   *     non-expiring URL suitable for <img src> (avatars, org logos). This is
+   *     what lets a stored `photoUrl` keep rendering past the 5-min sig TTL.
    */
   @Public()
   @Get(':id/download')
@@ -130,13 +133,18 @@ export class FilesController {
     @Query('sig') sig: string,
     @Res() res: Response,
   ) {
-    this.storage.verifySignedUrl(id, exp, sig);
     const file = await this.storage.getForSignedDownload(id);
+    if (sig && exp) {
+      this.storage.verifySignedUrl(id, exp, sig);
+    } else if (!file.isPublic) {
+      throw new ForbiddenException('This file requires a signed URL');
+    }
     const data = await this.storage.read(file.storageKey);
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Length', String(file.size));
     res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
-    res.setHeader('Cache-Control', 'private, max-age=300');
+    // Public assets (avatars/logos) can be cached harder; private stay private.
+    res.setHeader('Cache-Control', file.isPublic ? 'public, max-age=86400' : 'private, max-age=300');
     res.send(data);
   }
 

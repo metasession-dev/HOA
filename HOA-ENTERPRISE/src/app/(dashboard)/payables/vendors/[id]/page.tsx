@@ -56,11 +56,11 @@ export default function VendorDetailPage() {
     } finally { setBusy(false); }
   };
 
-  if (loading) return <div className="mx-auto max-w-3xl space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
   if (!v) return <Card><CardContent className="p-10 text-center"><p>Not found.</p></CardContent></Card>;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link href="/payables/vendors" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Vendors
       </Link>

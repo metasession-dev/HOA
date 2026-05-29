@@ -59,7 +59,7 @@ export default function AdminPassDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-96" />
       </div>
@@ -79,7 +79,7 @@ export default function AdminPassDetailPage() {
   const formatted = `${pass.code.slice(0, 4)}-${pass.code.slice(4)}`;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link
         href="/passes"
         className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite transition-colors"

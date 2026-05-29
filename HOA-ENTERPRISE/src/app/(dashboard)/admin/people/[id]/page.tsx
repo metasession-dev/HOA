@@ -105,7 +105,9 @@ export default function PersonDetailPage() {
       <header className="flex flex-wrap items-start gap-4">
         {person.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={person.photoUrl} alt={`${person.firstName} ${person.lastName}`}
+          <img
+            src={person.photoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL || ''}${person.photoUrl}` : person.photoUrl}
+            alt={`${person.firstName} ${person.lastName}`}
             className="h-16 w-16 shrink-0 rounded-full object-cover" />
         ) : (
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-stone-surface text-heading-sm font-medium text-graphite">

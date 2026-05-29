@@ -81,7 +81,7 @@ export default function NewSurveyPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <Link href="/surveys" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Surveys
       </Link>

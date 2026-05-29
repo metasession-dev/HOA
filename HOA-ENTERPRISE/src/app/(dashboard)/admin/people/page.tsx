@@ -201,9 +201,15 @@ export default function PeoplePage() {
               <Card>
                 <CardContent className="p-5">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-surface text-[13px] font-medium text-graphite">
-                    {getInitials(person.firstName, person.lastName)}
-                  </div>
+                  {person.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={person.photoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL || ''}${person.photoUrl}` : person.photoUrl}
+                      alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-surface text-[13px] font-medium text-graphite">
+                      {getInitials(person.firstName, person.lastName)}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-heading-sm font-medium text-charcoal-primary truncate">

@@ -125,7 +125,7 @@ export default function ApprovalRulesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <Link href="/payables" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Payables
       </Link>

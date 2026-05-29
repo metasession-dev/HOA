@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LogOut, Menu } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/layout/notification-bell';
@@ -14,18 +14,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-stone-surface bg-background px-4 sm:px-6">
       <div className="flex items-center gap-2">
-        {/* Hamburger — opens the off-canvas nav on mobile; hidden on desktop
-            where the sidebar is always visible. */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden -ml-1"
-          onClick={onMenuClick}
-          title="Menu"
-          aria-label="Open navigation"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
         <span className="font-display text-heading-sm text-charcoal-primary">HOA.africa</span>
         <span className="hidden text-caption text-muted-foreground sm:inline">Enterprise console</span>
       </div>

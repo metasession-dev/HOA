@@ -9,7 +9,7 @@ import {
   Receipt, Truck, Wallet, PieChart, Landmark,
   Sparkles, AlertTriangle, Banknote, Lock,
   KeySquare, Webhook, Inbox,
-  Repeat, Hourglass, Workflow,
+  Repeat, Hourglass, Workflow, CalendarDays,
   ChevronLeft, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,7 @@ const operationsNav = [
 
 const governanceNav = [
   { title: 'Board view', href: '/board', icon: LayoutDashboard },
+  { title: 'Meetings', href: '/meetings', icon: CalendarDays },
   { title: 'Votes', href: '/votes', icon: Vote },
   { title: 'Surveys', href: '/surveys', icon: ClipboardList },
 ];

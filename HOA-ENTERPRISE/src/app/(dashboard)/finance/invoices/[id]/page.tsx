@@ -77,7 +77,7 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="space-y-6">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-64" />
         <Skeleton className="h-40" />
@@ -100,7 +100,7 @@ export default function InvoiceDetailPage() {
   const outstanding = Number(invoice.amount) - totalPaid;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link
         href="/finance/invoices"
         className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite transition-colors"

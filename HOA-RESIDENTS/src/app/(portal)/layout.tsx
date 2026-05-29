@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { OrgSettingsProvider } from '@/providers/org-settings-provider';
 import { Sidebar } from '@/components/layout/sidebar';
+import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
 import { InstallBanner } from '@/components/install-banner';
 import { OnboardingTour } from '@/components/onboarding-tour';
@@ -35,9 +36,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar />
-          {/* Uniform p-6 across resident portal — matches admin app. */}
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          {/* Uniform p-6; extra bottom padding on mobile so content clears the
+              fixed bottom tab bar. */}
+          <main className="flex-1 overflow-y-auto p-6 pb-24 lg:pb-6">{children}</main>
         </div>
+        <BottomNav />
         <InstallBanner />
         <OnboardingTour />
       </div>

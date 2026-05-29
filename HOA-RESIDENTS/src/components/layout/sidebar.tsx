@@ -8,7 +8,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-const mainNav = [
+export const mainNav = [
   { title: 'Dashboard', href: '/', icon: Home },
   { title: 'Invoices', href: '/invoices', icon: Receipt },
   { title: 'Gate passes', href: '/passes', icon: KeyRound },
@@ -27,7 +27,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-spring',
+        // Desktop only — on mobile the bottom tab bar replaces the sidebar.
+        'hidden lg:flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-spring',
         collapsed ? 'w-16' : 'w-64',
       )}
     >

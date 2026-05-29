@@ -109,7 +109,7 @@ export default function VendorInvoiceDetail() {
     } finally { setBusy(false); }
   };
 
-  if (loading) return <div className="mx-auto max-w-3xl space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
   if (!inv) return <Card><CardContent className="p-10 text-center"><p>Not found.</p></CardContent></Card>;
 
   const canApprove = inv.status === 'pending_approval';
@@ -119,7 +119,7 @@ export default function VendorInvoiceDetail() {
   const attachments = Array.isArray(inv.attachments) ? inv.attachments : [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link href="/payables" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Payables
       </Link>

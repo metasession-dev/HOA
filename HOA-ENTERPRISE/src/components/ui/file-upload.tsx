@@ -81,9 +81,16 @@ export function FileUpload({
     const tempId = `up-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setInFlight((cur) => [...cur, { id: tempId, file, progress: 0 }]);
 
+    // Avatars and org logos are displayed via plain <img src> long after the
+    // short-lived signed URL would expire, so we store them as public files and
+    // reference a stable, signature-less URL. Everything else stays private
+    // (signed URLs).
+    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo';
+
     const fd = new FormData();
     fd.append('file', file);
     fd.append('kind', kind);
+    if (isPublicKind) fd.append('isPublic', 'true');
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
@@ -104,8 +111,12 @@ export function FileUpload({
         try {
           const json = JSON.parse(xhr.responseText);
           const data = json.data ?? json;
+          // For public assets, build a stable absolute URL (no expiring sig) so
+          // it renders indefinitely in <img>. Private files keep the signed URL
+          // exactly as before (callers handle those).
+          const stableUrl = `${apiBase}/api/files/${data.id}/download`;
           const uploaded: UploadedFile = {
-            url: data.downloadUrl,
+            url: isPublicKind ? stableUrl : data.downloadUrl,
             filename: file.name,
             contentType: file.type || guessType(file.name),
             size: data.size ?? file.size,

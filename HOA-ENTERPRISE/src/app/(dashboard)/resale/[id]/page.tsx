@@ -125,7 +125,7 @@ export default function ResaleDetailPage() {
     toast({ variant: 'success', title: 'Link copied' });
   };
 
-  if (loading) return <div className="mx-auto max-w-3xl space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>;
   if (!r) return <Card><CardContent className="p-10 text-center"><p>Not found.</p></CardContent></Card>;
 
   const snap = r.financialStatusJson as any;
@@ -135,7 +135,7 @@ export default function ResaleDetailPage() {
   const isIssued = r.status === 'issued';
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Link href="/resale" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
         <ChevronLeft className="h-3 w-3" />Resale
       </Link>
