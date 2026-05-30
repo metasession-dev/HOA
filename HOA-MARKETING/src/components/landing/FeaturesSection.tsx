@@ -1,55 +1,79 @@
-import { 
-  CreditCard, 
-  Wallet, 
-  UserCheck, 
-  FileText, 
-  Shield, 
+import {
+  Home,
+  Receipt,
+  Wallet,
+  Building2,
+  Gavel,
+  Vote,
+  ShieldAlert,
+  KeyRound,
+  Megaphone,
+  Sparkles,
   BarChart3,
-  Zap,
-  Bell
+  Lock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const features = [
   {
-    icon: CreditCard,
-    title: "Bills & Payments",
-    description: "Manage utility bills, HOA fees, and service charges with automated reminders and seamless payment processing.",
+    icon: Home,
+    title: "Units & residents",
+    description: "A living register of every unit, its owner, tenants and additional occupants — with full ownership history and bulk import.",
+  },
+  {
+    icon: Receipt,
+    title: "Levies & invoicing",
+    description: "Recurring or one-off invoices, automatic late fees, multi-currency, and one-tap online payments. Residents are emailed the moment an invoice goes out.",
   },
   {
     icon: Wallet,
-    title: "Digital Wallet",
-    description: "Prepaid wallet system for quick payments. Top up once, pay for all services with a single tap.",
+    title: "Payables & approvals",
+    description: "Capture vendor invoices, route them through rule-based approval chains, and settle them in batch payment runs with a full audit trail.",
   },
   {
-    icon: UserCheck,
-    title: "Visitor Management",
-    description: "Digital gate passes with QR codes. Approve visitors instantly and track all entries in real-time.",
+    icon: Building2,
+    title: "Vendor self-service portal",
+    description: "Invite vendors to submit their own invoices and receipts, then track approval and payment status live — no back-and-forth calls.",
   },
   {
-    icon: FileText,
-    title: "Transaction History",
-    description: "Complete audit trail of all activities. Export reports to PDF, Excel, or CSV for your records.",
+    icon: Gavel,
+    title: "Contract bidding & Exco voting",
+    description: "Publish tenders, collect vendor bids, shortlist, and award by a formal board vote — with every party notified at each step.",
   },
   {
-    icon: Shield,
-    title: "Role-Based Access",
-    description: "Granular permissions for admins. Super Admin, Moderator, and Viewer roles with secure access control.",
+    icon: Vote,
+    title: "Meetings, votes & surveys",
+    description: "Calendar & Zoom meeting invites, quorum-aware ballots and special resolutions, and AI-assisted surveys for resident feedback.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "Violations & compliance",
+    description: "Log violations with photo evidence, issue notices, handle appeals, and keep the affected unit informed automatically.",
+  },
+  {
+    icon: KeyRound,
+    title: "Visitor & gate passes",
+    description: "QR-coded gate passes, kiosk check-in, and an instant alert to the resident the moment their visitor is scanned through.",
+  },
+  {
+    icon: Megaphone,
+    title: "Broadcasts & notifications",
+    description: "Reach residents by email, in-app bell, and web push — targeted by segment, with delivery and read tracking.",
+  },
+  {
+    icon: Sparkles,
+    title: "Built-in AI assistant",
+    description: "Ask plain-language questions about arrears, occupancy, or finances — answered from your live data, always in your settings currency.",
   },
   {
     icon: BarChart3,
-    title: "Usage Analytics",
-    description: "Track utility consumption with visual charts. Identify trends and optimize your community's resources.",
+    title: "Finance & board-ready reports",
+    description: "Budgets, funds, bank reconciliation, chart of accounts, and one-click board packs — exportable, multi-currency, audit-ready.",
   },
   {
-    icon: Zap,
-    title: "Instant Approvals",
-    description: "Streamlined workflows for resident registrations and visitor passes. No more waiting in line.",
-  },
-  {
-    icon: Bell,
-    title: "Smart Notifications",
-    description: "Email alerts for due dates, approvals, and important updates. Never miss a deadline again.",
+    icon: Lock,
+    title: "Roles, security & compliance",
+    description: "Granular role-based access, MFA, complete audit logging, and POPIA / GDPR-aligned privacy and data controls.",
   },
 ];
 
@@ -85,7 +109,7 @@ const FeaturesSection = () => {
             transition={{ duration: 0.5 }}
             className="inline-block text-primary font-semibold mb-4"
           >
-            FEATURES
+            EVERYTHING IN ONE PLACE
           </motion.span>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -94,7 +118,7 @@ const FeaturesSection = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-3xl md:text-4xl font-bold text-foreground mb-4"
           >
-            Everything Your Community Needs
+            Run your entire estate from one platform
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -103,8 +127,9 @@ const FeaturesSection = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-muted-foreground text-lg"
           >
-            A comprehensive toolkit designed to simplify HOA operations and enhance 
-            the resident experience.
+            From levies and vendor payments to contract tenders, governance votes,
+            and visitor access — HOA.africa brings every workflow your community
+            needs into one beautifully simple system.
           </motion.p>
         </div>
 

@@ -47,8 +47,9 @@ const HeroSection = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto"
           >
-            Streamline utilities, payments, visitor access, and community management 
-            with one powerful platform designed for residential communities.
+            Levies and payments, vendor invoicing, contract bidding, governance
+            votes, and visitor access — one powerful platform for the communities
+            and estates of Africa.
           </motion.p>
 
           {/* CTA Buttons */}
