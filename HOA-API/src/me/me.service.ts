@@ -41,7 +41,7 @@ export class MeService {
       where: { id: userId },
       select: {
         id: true, email: true, firstName: true, lastName: true, phone: true,
-        avatarUrl: true, emailVerified: true, createdAt: true,
+        avatarUrl: true, language: true, emailVerified: true, createdAt: true,
         userRoles: {
           select: {
             role: { select: { name: true, displayName: true } },
@@ -57,13 +57,14 @@ export class MeService {
 
   async updateProfile(
     userId: string,
-    data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null },
+    data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null; language?: string },
   ) {
     const trimmed = {
       firstName: data.firstName?.trim(),
       lastName: data.lastName?.trim(),
       phone: data.phone === undefined ? undefined : data.phone?.trim() || null,
       avatarUrl: data.avatarUrl === undefined ? undefined : data.avatarUrl || null,
+      language: data.language === undefined ? undefined : data.language,
     };
     if (trimmed.firstName !== undefined && trimmed.firstName.length === 0) {
       throw new BadRequestException('firstName cannot be empty');
@@ -79,7 +80,7 @@ export class MeService {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: trimmed,
-      select: { id: true, email: true, firstName: true, lastName: true, phone: true, avatarUrl: true },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true, avatarUrl: true, language: true },
     });
     // Keep the linked Person row in sync — the resident PWA + admin both read
     // contact details from Person, not User, in invoice / pass / request flows.

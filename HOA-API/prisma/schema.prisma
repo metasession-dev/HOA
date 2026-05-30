@@ -17,6 +17,9 @@ model User {
   lastName      String
   phone         String?
   avatarUrl     String?
+  // Per-user display language for the console (separate from the org-wide
+  // communication language). BCP-47 short code, e.g. en / fr / pt / sw.
+  language      String    @default("en")
   isActive      Boolean   @default(true)
   emailVerified DateTime?
   // Gate for HOA-ENTERPRISE login. Residents (owners / tenants) DON'T need

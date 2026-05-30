@@ -41,7 +41,7 @@ export class OrganizationsService {
    */
   async getOnboarding(orgId: string) {
     const [org, units, teamRoles, teamInvites, residentInvites, residentUsers, invoices] = await Promise.all([
-      this.prisma.organization.findUnique({ where: { id: orgId }, select: { logoUrl: true } }),
+      this.prisma.organization.findUnique({ where: { id: orgId }, select: { logoUrl: true, accentColor: true, brandingTagline: true } }),
       this.prisma.unit.count({ where: { estate: { organizationId: orgId } } }),
       this.prisma.userRole.count({ where: { organizationId: orgId, role: { name: { notIn: ['owner', 'tenant', 'vendor'] } } } }),
       this.prisma.invite.count({ where: { organizationId: orgId, kind: 'team_member' } }),
@@ -51,7 +51,7 @@ export class OrganizationsService {
     ]);
 
     const steps = {
-      branding: !!org?.logoUrl,
+      branding: !!(org?.logoUrl || org?.accentColor || org?.brandingTagline),
       units: units > 0,
       team: teamRoles > 1 || teamInvites > 0,
       residents: residentInvites > 0 || residentUsers > 0,

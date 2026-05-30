@@ -26,6 +26,8 @@ class UpdateProfileDto {
   phone?: string;
   @IsOptional() @IsString() @MaxLength(500)
   avatarUrl?: string;
+  @IsOptional() @IsIn(['en', 'fr', 'pt', 'sw', 'af', 'zu'])
+  language?: string;
 }
 
 class ChangePasswordDto {

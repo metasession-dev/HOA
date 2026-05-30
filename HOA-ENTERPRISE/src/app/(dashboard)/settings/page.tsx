@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { useOrgSettings } from '@/providers/org-settings-provider';
@@ -22,13 +23,44 @@ const selectClass = cn(
 export default function SettingsPage() {
   const [org, setOrg] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [logoFiles, setLogoFiles] = useState<UploadedFile[]>([]);
+  const [savingBranding, setSavingBranding] = useState(false);
   const { locale, setLocale } = useI18n();
   const { reload: reloadOrgSettings } = useOrgSettings();
   const { refreshUser } = useAuth();
 
   useEffect(() => {
-    api.get<any>('/organizations/current').then((res) => setOrg(res.data)).catch(console.error);
+    api.get<any>('/organizations/current').then((res) => {
+      setOrg(res.data);
+      if (res.data?.logoUrl) {
+        setLogoFiles([{ url: res.data.logoUrl, filename: 'Current logo', contentType: 'image/png' }]);
+      }
+    }).catch(console.error);
   }, []);
+
+  const handleSaveBranding = async () => {
+    setSavingBranding(true);
+    try {
+      await api.put('/organizations/current/branding', {
+        logoUrl: logoFiles[0]?.url ?? null,
+        accentColor: org.accentColor || null,
+        brandingTagline: org.brandingTagline?.trim() || null,
+      });
+      await reloadOrgSettings();
+      toast({ variant: 'success', title: 'Branding saved' });
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Save failed', description: err.message });
+    } finally {
+      setSavingBranding(false);
+    }
+  };
+
+  const changeDisplayLanguage = (l: string) => {
+    setLocale(l as any);
+    // Persist to the user's profile too, so the choice follows their account.
+    api.put('/me/profile', { language: l }).catch(() => {});
+    toast({ variant: 'success', title: 'Display language updated' });
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +184,7 @@ export default function SettingsPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="language">Language</Label>
+                <Label htmlFor="language">Default communication language</Label>
                 <select
                   id="language"
                   className={selectClass}
@@ -166,6 +198,7 @@ export default function SettingsPage() {
                   <option value="af">Afrikaans</option>
                   <option value="zu">isiZulu</option>
                 </select>
+                <p className="text-caption text-muted-foreground">Used for resident emails &amp; notices.</p>
               </div>
             </div>
 
@@ -179,6 +212,63 @@ export default function SettingsPage() {
       </form>
 
       <Card>
+        <CardContent className="space-y-5 p-6">
+          <div>
+            <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">Branding</h3>
+            <p className="text-caption text-muted-foreground">
+              Your logo, accent colour and tagline appear across the resident app, login screens and emails.
+            </p>
+          </div>
+
+          <FileUpload
+            value={logoFiles}
+            onChange={setLogoFiles}
+            kind="org_logo"
+            maxFiles={1}
+            label="Logo"
+            helpText="A square PNG or JPG works best."
+            accept={['image/png', 'image/jpeg', 'image/webp']}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="accent">Accent colour</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="accent"
+                  type="color"
+                  value={org.accentColor || '#2f6f4f'}
+                  onChange={(e) => setOrg({ ...org, accentColor: e.target.value })}
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-stone-surface bg-card"
+                />
+                <Input
+                  value={org.accentColor || ''}
+                  onChange={(e) => setOrg({ ...org, accentColor: e.target.value })}
+                  placeholder="#2F6F4F"
+                  className="max-w-[160px]"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tagline">Tagline</Label>
+              <Input
+                id="tagline"
+                value={org.brandingTagline || ''}
+                onChange={(e) => setOrg({ ...org, brandingTagline: e.target.value })}
+                placeholder="e.g. A community that cares"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button type="button" onClick={handleSaveBranding} disabled={savingBranding}>
+              {savingBranding ? 'Saving…' : 'Save branding'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="space-y-3 p-6">
           <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">My display language</h3>
           <p className="text-caption text-muted-foreground">
@@ -190,7 +280,7 @@ export default function SettingsPage() {
               id="userLocale"
               className={selectClass}
               value={locale}
-              onChange={(e) => setLocale(e.target.value as any)}
+              onChange={(e) => changeDisplayLanguage(e.target.value)}
             >
               <option value="en">English</option>
               <option value="fr">Français</option>
