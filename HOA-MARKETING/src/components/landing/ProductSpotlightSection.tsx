@@ -96,7 +96,7 @@ const DashboardMock = () => (
     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Acacia Park Estate</p>
     <h4 className="mb-3 text-sm font-semibold text-foreground">Good morning, Thandi.</h4>
     <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-      <StatTile label="Outstanding" value="R 482,300" tone="accent" />
+      <StatTile label="Outstanding" value="₦ 4,820,000" tone="accent" />
       <StatTile label="Collected · Apr" value="91%" />
       <StatTile label="Open passes" value="12" />
       <StatTile label="Bids to review" value="3" />
@@ -136,9 +136,9 @@ const VendorPortalMock = () => (
     </div>
     <div className="overflow-hidden rounded-xl border border-border">
       {[
-        { n: "VINV-2026-00042", a: "R 18,400", tone: "success" as Tone, s: "Paid" },
-        { n: "VINV-2026-00041", a: "R 7,250", tone: "warning" as Tone, s: "In review" },
-        { n: "VINV-2026-00040", a: "R 12,900", tone: "primary" as Tone, s: "Received" },
+        { n: "VINV-2026-00042", a: "₦ 184,000", tone: "success" as Tone, s: "Paid" },
+        { n: "VINV-2026-00041", a: "₦ 72,500", tone: "warning" as Tone, s: "In review" },
+        { n: "VINV-2026-00040", a: "₦ 129,000", tone: "primary" as Tone, s: "Received" },
       ].map((r, i) => (
         <div key={r.n} className={`flex items-center justify-between px-3 py-2.5 ${i > 0 ? "border-t border-border" : ""}`}>
           <span className="font-mono text-[11px] text-foreground">{r.n}</span>
@@ -173,9 +173,9 @@ const ContractsMock = () => (
     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Bids</p>
     <div className="space-y-1.5">
       {[
-        { v: "Acacia Landscaping", a: "R 142,000", tone: "warning" as Tone, s: "Shortlisted" },
-        { v: "GreenScape Co", a: "R 156,500", tone: "muted" as Tone, s: "Submitted" },
-        { v: "Verdant Grounds", a: "R 138,900", tone: "warning" as Tone, s: "Shortlisted" },
+        { v: "Acacia Landscaping", a: "₦ 1,420,000", tone: "warning" as Tone, s: "Shortlisted" },
+        { v: "GreenScape Co", a: "₦ 1,565,000", tone: "muted" as Tone, s: "Submitted" },
+        { v: "Verdant Grounds", a: "₦ 1,389,000", tone: "warning" as Tone, s: "Shortlisted" },
       ].map((r) => (
         <div key={r.v} className="flex items-center justify-between rounded-lg border border-border bg-background/50 px-3 py-2">
           <span className="text-[11px] font-medium text-foreground">{r.v}</span>
