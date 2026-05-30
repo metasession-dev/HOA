@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole } from '../common/scope.util';
 import { CreateSurveyDto, SubmitSurveyResponseDto } from './dto/votes.dto';
+import { createLlmProvider } from '../assistant/llm/provider';
 
 const SURVEY_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],
@@ -12,6 +13,149 @@ const SURVEY_TRANSITIONS: Record<string, string[]> = {
 @Injectable()
 export class SurveysService {
   constructor(private prisma: PrismaService) {}
+
+  // ============ Templates ============
+
+  /** Curated starting points — pre-built survey drafts admins can adapt. */
+  templates() {
+    const T = (name: string, description: string, title: string, sdesc: string, questions: any[]) => ({
+      id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name,
+      description,
+      survey: { title, description: sdesc, anonymous: true, questions: this.normalizeQuestions(questions) },
+    });
+    return [
+      T('Resident satisfaction', 'Annual happiness & service-quality check', 'Annual Resident Satisfaction Survey',
+        'Help us understand what’s working and what to improve across the estate.', [
+          { type: 'rating', label: 'Overall, how satisfied are you living here?', ratingMax: 5, required: true },
+          { type: 'rating', label: 'How satisfied are you with security?', ratingMax: 5 },
+          { type: 'rating', label: 'How satisfied are you with cleanliness & maintenance?', ratingMax: 5 },
+          { type: 'mc', label: 'Which area should we prioritise next?', options: ['Security', 'Maintenance', 'Parking', 'Green spaces', 'Amenities'] },
+          { type: 'text', label: 'What one change would most improve estate life?' },
+        ]),
+      T('Security & safety', 'Gauge safety perceptions and gaps', 'Security & Safety Review',
+        'Your input helps us keep the estate safe.', [
+          { type: 'rating', label: 'How safe do you feel in the estate?', ratingMax: 5, required: true },
+          { type: 'mc', label: 'Have you had a security concern in the last 6 months?', options: ['No', 'Yes — minor', 'Yes — serious'] },
+          { type: 'mc', label: 'Which would improve security most?', options: ['More patrols', 'Better lighting', 'Access control', 'CCTV coverage', 'Visitor management'] },
+          { type: 'text', label: 'Any specific area or incident we should know about?' },
+        ]),
+      T('Amenities feedback', 'Usage and improvement ideas for shared facilities', 'Amenities & Facilities Feedback',
+        'Tell us how you use our shared spaces.', [
+          { type: 'mc', label: 'Which amenities do you use most?', options: ['Clubhouse', 'Pool', 'Gym', 'Park / play area', 'Braai area'] },
+          { type: 'rating', label: 'How would you rate the condition of our amenities?', ratingMax: 5 },
+          { type: 'mc', label: 'What new amenity would you value most?', options: ['Co-working space', 'Dog park', 'EV charging', 'Playground upgrade', 'None'] },
+          { type: 'text', label: 'Any amenity that needs attention?' },
+        ]),
+      T('Levy & budget', 'Collect sentiment on proposed levy / budget changes', 'Levy & Budget Feedback',
+        'We value your view on the proposed budget.', [
+          { type: 'rating', label: 'How clearly do you understand how levies are spent?', ratingMax: 5 },
+          { type: 'mc', label: 'How do you feel about the proposed levy adjustment?', options: ['Support', 'Neutral', 'Oppose', 'Need more info'] },
+          { type: 'text', label: 'Where should the HOA focus its spending?' },
+        ]),
+      T('Community events', 'Plan events residents actually want', 'Community Events Interest',
+        'Help us plan events the community enjoys.', [
+          { type: 'mc', label: 'Which events interest you?', options: ['Family day', 'Market day', 'Fitness / wellness', 'Kids activities', 'Festive celebration'] },
+          { type: 'mc', label: 'When do events suit you best?', options: ['Weekday evening', 'Saturday', 'Sunday'] },
+          { type: 'text', label: 'Any event idea you’d like to see?' },
+        ]),
+    ];
+  }
+
+  // ============ AI generation ============
+
+  /**
+   * Generate a survey draft from a free-text prompt using the configured LLM
+   * (Anthropic/OpenAI when a key is set, otherwise a sensible offline draft).
+   * Returns an UNSAVED draft the admin reviews + edits before saving.
+   */
+  async generateDraft(orgId: string, dto: { prompt?: string; questionCount?: number }) {
+    const prompt = (dto?.prompt || '').toString().trim();
+    if (!prompt) throw new BadRequestException('prompt is required');
+    const n = Math.min(15, Math.max(3, Number(dto.questionCount) || 6));
+    const provider = createLlmProvider();
+    const sys =
+      'You design clear, unbiased surveys for a residential estate / homeowners association. ' +
+      'Respond with ONLY a JSON object: {"title": string, "description": string, "questions": ' +
+      '[{"type": "mc"|"rating"|"text", "label": string, "options"?: string[], "ratingMax"?: number, "required"?: boolean}]}. ' +
+      `Produce about ${n} questions. Use "rating" (1–5) for satisfaction/agreement, "mc" with 3–6 concise options for choices, ` +
+      'and "text" for open feedback. Keep each label under 140 characters. No commentary outside the JSON.';
+    const user = `Create a resident survey about: ${prompt}`;
+    try {
+      const res = await provider.generate(
+        [{ role: 'system', content: sys }, { role: 'user', content: user }],
+        { temperature: 0.7, maxTokens: 1500 },
+      );
+      const parsed = this.safeParseSurvey(res.content);
+      if (parsed) {
+        return {
+          title: String(parsed.title || `Survey: ${prompt}`).slice(0, 200),
+          description: String(parsed.description || '').slice(0, 4000),
+          anonymous: true,
+          questions: this.normalizeQuestions(parsed.questions),
+          generatedBy: provider.name,
+        };
+      }
+    } catch {
+      // fall through to offline draft
+    }
+    return this.fallbackSurvey(prompt);
+  }
+
+  private safeParseSurvey(content: string): any | null {
+    if (!content) return null;
+    try {
+      const start = content.indexOf('{');
+      const end = content.lastIndexOf('}');
+      if (start < 0 || end <= start) return null;
+      const obj = JSON.parse(content.slice(start, end + 1));
+      if (obj && Array.isArray(obj.questions)) return obj;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
+  private fallbackSurvey(prompt: string) {
+    const topic = prompt.slice(0, 80);
+    return {
+      title: `Survey: ${topic}`,
+      description: `We'd value your feedback on ${topic}.`,
+      anonymous: true,
+      generatedBy: 'offline',
+      questions: this.normalizeQuestions([
+        { type: 'rating', label: `Overall, how would you rate ${topic}?`, ratingMax: 5, required: true },
+        { type: 'mc', label: 'How important is this to you?', options: ['Very important', 'Somewhat important', 'Neutral', 'Not important'] },
+        { type: 'mc', label: 'How satisfied are you currently?', options: ['Very satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very dissatisfied'] },
+        { type: 'text', label: 'What would you most like us to improve?' },
+      ]),
+    };
+  }
+
+  /** Coerce arbitrary question shapes (template or LLM) into valid survey questions. */
+  private normalizeQuestions(raw: any[]): any[] {
+    const out: any[] = [];
+    (raw || []).slice(0, 15).forEach((q: any, i: number) => {
+      const type = ['mc', 'rating', 'text'].includes(q?.type) ? q.type : 'text';
+      const label = String(q?.label ?? '').slice(0, 500).trim();
+      if (!label) return;
+      const base: any = { id: `q${i + 1}`, type, label, required: !!q?.required };
+      if (type === 'mc') {
+        const opts = (Array.isArray(q?.options) ? q.options : [])
+          .map((o: any, j: number) => ({
+            id: String.fromCharCode(97 + j),
+            label: String(typeof o === 'string' ? o : o?.label ?? '').slice(0, 200).trim(),
+          }))
+          .filter((o: any) => o.label)
+          .slice(0, 20);
+        if (opts.length < 2) base.type = 'text';
+        else base.options = opts;
+      }
+      if (base.type === 'rating') base.ratingMax = Math.min(10, Math.max(2, Number(q?.ratingMax) || 5));
+      out.push(base);
+    });
+    return out.length ? out : [{ id: 'q1', type: 'text', label: 'Your feedback', required: false }];
+  }
 
   async list(orgId: string, actor: Actor) {
     const baseWhere: any = { organizationId: orgId };

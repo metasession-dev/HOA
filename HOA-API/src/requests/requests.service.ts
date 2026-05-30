@@ -5,6 +5,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole, scopeRequestWhere, actorOccupiesUnit } from '../common/scope.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebhooksService } from '../platform/webhooks.service';
+import { MailService } from '../mail/mail.service';
 
 /**
  * Phase 1.1 Resident Requests.
@@ -85,7 +86,79 @@ export class RequestsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private webhooks: WebhooksService,
+    private mail: MailService,
   ) {}
+
+  // Staff roles that own the requests queue — always notified of new requests
+  // and resident replies, on top of the category's auto-assignee roles.
+  private readonly REQUEST_STAFF_ROLES = ['hoa_admin', 'super_admin', 'property_manager', 'communications_manager'];
+
+  /**
+   * Email a set of users a request-update message. Resident vs staff changes
+   * the deep link target app. Best-effort per recipient (one bad address won't
+   * sink the rest). `force` so each genuine update re-sends past dedup.
+   */
+  private async emailRequestUpdate(
+    orgId: string,
+    userIds: string[],
+    opts: { requestId: string; subject: string; status: string; message: string; audience: 'resident' | 'staff' },
+  ) {
+    if (userIds.length === 0) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds }, isActive: true },
+      select: { id: true, email: true, firstName: true },
+    });
+    const base = opts.audience === 'resident'
+      ? (process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002')
+      : (process.env.ENTERPRISE_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000');
+    const path = opts.audience === 'resident' ? `/requests/${opts.requestId}` : `/admin/requests/${opts.requestId}`;
+    for (const u of users) {
+      if (!u.email) continue;
+      try {
+        await this.mail.enqueue(
+          {
+            organizationId: orgId,
+            templateKey: 'request_update',
+            data: {
+              recipientFirstName: u.firstName || 'there',
+              subject: opts.subject,
+              status: opts.status,
+              message: opts.message,
+              detailUrl: `${base}${path}`,
+            },
+            to: u.email,
+            toUserId: u.id,
+            entityType: 'Request',
+            entityId: opts.requestId,
+          },
+          { force: true },
+        );
+      } catch {
+        // skip a bad address
+      }
+    }
+  }
+
+  /** Notify the responsible staff (admins, comms, + the assignee) about a request. */
+  private async notifyStaffOnRequest(orgId: string, req: any, title: string, body: string) {
+    const ids = new Set(await this.findAdminRecipients(orgId, this.REQUEST_STAFF_ROLES));
+    if (req.assignedToUserId) ids.add(req.assignedToUserId);
+    const recipientUserIds = [...ids];
+    if (recipientUserIds.length === 0) return;
+    await this.notifications.enqueueFor({
+      organizationId: orgId,
+      recipientUserIds,
+      type: 'request_update',
+      title,
+      body,
+      entityType: 'Request',
+      entityId: req.id,
+      actionUrl: `/admin/requests/${req.id}`,
+    });
+    await this.emailRequestUpdate(orgId, recipientUserIds, {
+      requestId: req.id, subject: req.subject, status: req.status, message: body, audience: 'staff',
+    });
+  }
 
   // ============ Categories ============
 
@@ -365,17 +438,24 @@ export class RequestsService {
   }
 
   private async notifyAdminsOnNewRequest(orgId: string, req: any) {
-    const recipientUserIds = await this.findAdminRecipients(orgId, req.category?.assignToRoles || []);
+    // Always loop in the responsible staff (admins + comms manager), plus any
+    // category auto-assignee roles. In-app + email.
+    const roles = Array.from(new Set([...(req.category?.assignToRoles || []), ...this.REQUEST_STAFF_ROLES]));
+    const recipientUserIds = await this.findAdminRecipients(orgId, roles);
     if (recipientUserIds.length === 0) return;
+    const body = `Category: ${req.category?.name || 'unknown'} · Priority: ${req.priority}`;
     await this.notifications.enqueueFor({
       organizationId: orgId,
       recipientUserIds,
       type: 'request_submitted',
       title: `New request: ${req.subject}`,
-      body: `Category: ${req.category?.name || 'unknown'}`,
+      body,
       entityType: 'Request',
       entityId: req.id,
       actionUrl: `/admin/requests/${req.id}`,
+    });
+    await this.emailRequestUpdate(orgId, recipientUserIds, {
+      requestId: req.id, subject: req.subject, status: req.status || 'submitted', message: body, audience: 'staff',
     });
   }
 
@@ -609,7 +689,7 @@ export class RequestsService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const comment = await this.prisma.$transaction(async (tx) => {
       const c = await tx.requestComment.create({
         data: {
           requestId,
@@ -657,6 +737,21 @@ export class RequestsService {
       });
       return c;
     });
+
+    // Notify the other side of a public reply (internal notes stay admin-only).
+    // Done after commit so the row is durable before we fan out.
+    if (!isInternal) {
+      const excerpt = dto.body.length > 160 ? `${dto.body.slice(0, 160)}…` : dto.body;
+      if (isResidentRole(actor.role)) {
+        // Resident replied → notify the responsible staff (+ assignee).
+        await this.notifyStaffOnRequest(orgId, existing, `Reply on: ${existing.subject}`, excerpt);
+      } else {
+        // Staff responded → notify the resident who raised it.
+        await this.notifyResidentOnUpdate(orgId, existing, 'New response on your request', excerpt);
+      }
+    }
+
+    return comment;
   }
 
   // ============ Analytics ============
@@ -739,15 +834,19 @@ export class RequestsService {
       for (const o of occs) if (o.person?.userId) recipients.add(o.person.userId);
     }
     if (recipients.size === 0) return;
+    const recipientUserIds = [...recipients];
     await this.notifications.enqueueFor({
       organizationId: orgId,
-      recipientUserIds: [...recipients],
+      recipientUserIds,
       type: 'request_update',
       title,
       body,
       entityType: 'Request',
       entityId: req.id,
       actionUrl: `/requests/${req.id}`,
+    });
+    await this.emailRequestUpdate(orgId, recipientUserIds, {
+      requestId: req.id, subject: req.subject, status: req.status, message: body, audience: 'resident',
     });
   }
 }

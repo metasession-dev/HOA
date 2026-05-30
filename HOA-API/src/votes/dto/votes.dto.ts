@@ -176,3 +176,15 @@ export class SubmitSurveyResponseDto {
   @IsArray()
   answers!: { questionId: string; value: string | number | string[] }[];
 }
+
+export class GenerateSurveyDto {
+  @IsString()
+  @MaxLength(1000)
+  prompt!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(3)
+  @Max(15)
+  questionCount?: number;
+}

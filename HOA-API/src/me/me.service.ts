@@ -89,6 +89,9 @@ export class MeService {
         firstName: trimmed.firstName,
         lastName: trimmed.lastName,
         phone: trimmed.phone,
+        // Keep the linked Person's photo in sync so the resident's uploaded
+        // avatar also shows in the admin People views.
+        photoUrl: trimmed.avatarUrl,
       },
     });
     return user;

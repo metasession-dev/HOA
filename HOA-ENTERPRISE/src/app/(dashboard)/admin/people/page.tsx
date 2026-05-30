@@ -127,7 +127,7 @@ export default function PeoplePage() {
             Owners, tenants and stakeholders linked to your units.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <ViewToggle value={view} onChange={setView} />
           <Link href="/admin/team/invites/resident">
             <Button variant="secondary">

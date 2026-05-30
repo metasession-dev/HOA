@@ -87,9 +87,14 @@ export function FileUpload({
     const tempId = `up-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setInFlight((cur) => [...cur, { id: tempId, file, progress: 0 }]);
 
+    // Avatars / logos are shown via plain <img> long after a signed URL would
+    // expire, so store them as public files with a stable, signature-less URL.
+    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo';
+
     const fd = new FormData();
     fd.append('file', file);
     fd.append('kind', kind);
+    if (isPublicKind) fd.append('isPublic', 'true');
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
@@ -110,8 +115,11 @@ export function FileUpload({
         try {
           const json = JSON.parse(xhr.responseText);
           const data = json.data ?? json;
+          // Public assets get a stable absolute URL (no expiring sig) so they
+          // render indefinitely in <img>. Private files keep the signed URL.
+          const stableUrl = `${apiBase}/api/files/${data.id}/download`;
           const uploaded: UploadedFile = {
-            url: data.downloadUrl,
+            url: isPublicKind ? stableUrl : data.downloadUrl,
             filename: file.name,
             contentType: file.type || guessType(file.name),
             size: data.size ?? file.size,
@@ -190,14 +198,15 @@ export function FileUpload({
             >
               <div className="flex items-center gap-2 min-w-0">
                 {f.contentType.startsWith('image/') ? (
-                  <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <a href={resolveFileUrl(f.url)} target="_blank" rel="noopener noreferrer" className="shrink-0" title="Open preview">
+                    <img src={resolveFileUrl(f.url)} alt={f.filename} className="h-10 w-10 rounded object-cover ring-1 ring-stone-surface" />
+                  </a>
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <a
-                  href={f.url.startsWith('http')
-                    ? f.url
-                    : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${f.url}`}
+                  href={resolveFileUrl(f.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="truncate text-graphite hover:text-ember-orange"
@@ -283,6 +292,13 @@ export function FileUpload({
       )}
     </div>
   );
+}
+
+/** Resolve a (possibly relative) file URL against the API origin for display. */
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
 }
 
 function humanSize(bytes: number): string {

@@ -11,6 +11,7 @@ import {
   GrantProxyDto,
   CreateSurveyDto,
   SubmitSurveyResponseDto,
+  GenerateSurveyDto,
 } from './dto/votes.dto';
 
 const ADMIN = ['hoa_admin', 'super_admin'] as const;
@@ -178,6 +179,22 @@ export class SurveysController {
     @CurrentUser('role') role: string,
   ) {
     return successResponse(await this.service.list(orgId, { userId, role }));
+  }
+
+  // Declared before ':id' so "templates" isn't captured as an id param.
+  @Get('templates')
+  @Roles(...ADMIN, ...COMMS, ...BOARD)
+  async templates() {
+    return successResponse(this.service.templates());
+  }
+
+  @Post('generate')
+  @Roles(...ADMIN, ...COMMS, ...BOARD)
+  async generate(
+    @CurrentUser('organizationId') orgId: string,
+    @Body() dto: GenerateSurveyDto,
+  ) {
+    return successResponse(await this.service.generateDraft(orgId, dto));
   }
 
   @Get(':id')
