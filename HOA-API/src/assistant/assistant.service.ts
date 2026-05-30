@@ -458,9 +458,11 @@ export class AssistantService {
     // Multi-line prompt — joined with \n so the model reads each rule as a
     // distinct instruction rather than one runon sentence. Stronger
     // tool-calling emphasis: factual questions MUST trigger a tool call.
+    const promptCurrency = await this.orgCurrency(actor.organizationId);
     const systemPrompt = [
       'You are an HOA management assistant for a community manager.',
       `The user's role is: ${actor.role}. The user's organizationId is: ${actor.organizationId}.`,
+      `Always express monetary amounts in the organization's currency code "${promptCurrency}". Never use ZAR/R (or any other currency) unless that IS the org currency.`,
       '',
       'TOOL USE:',
       '- You have read-only tools across Management, Finance, Operations, and Governance domains.',
@@ -652,20 +654,30 @@ export class AssistantService {
 
   // ----- Action implementations (read-only) -----
 
+  /** The org's configured currency code — chat must never hard-code ZAR. */
+  private async orgCurrency(orgId: string): Promise<string> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { currency: true },
+    });
+    return org?.currency || 'ZAR';
+  }
+
   private async actionCheckBalance(actor: Actor) {
+    const currency = await this.orgCurrency(actor.organizationId);
     const persons = await this.prisma.person.findMany({
       where: { userId: actor.userId, organizationId: actor.organizationId },
       select: { id: true },
     });
     if (persons.length === 0) {
-      return { currency: 'ZAR', outstanding: 0, invoiceCount: 0 };
+      return { currency, outstanding: 0, invoiceCount: 0 };
     }
     const occupancies = await this.prisma.unitOccupancy.findMany({
       where: { personId: { in: persons.map((p) => p.id) }, isActive: true },
       select: { unitId: true },
     });
     const unitIds = occupancies.map((o) => o.unitId);
-    if (unitIds.length === 0) return { currency: 'ZAR', outstanding: 0, invoiceCount: 0 };
+    if (unitIds.length === 0) return { currency, outstanding: 0, invoiceCount: 0 };
 
     const [invSum, paySum] = await Promise.all([
       this.prisma.invoice.aggregate({ where: { unitId: { in: unitIds } }, _sum: { amount: true } }),
@@ -676,7 +688,7 @@ export class AssistantService {
     const invoiceCount = await this.prisma.invoice.count({
       where: { unitId: { in: unitIds }, status: { in: ['sent', 'partial', 'overdue'] } },
     });
-    return { currency: 'ZAR', outstanding: Number(outstanding.toFixed(2)), invoiceCount };
+    return { currency, outstanding: Number(outstanding.toFixed(2)), invoiceCount };
   }
 
   private async actionListInvoices(actor: Actor) {
@@ -718,6 +730,7 @@ export class AssistantService {
   }
 
   private async actionCheckArrears(actor: Actor) {
+    const currency = await this.orgCurrency(actor.organizationId);
     // Phase 7 review #11: replaced N+1 (one aggregate per invoice) with a
     // single groupBy + in-memory join. Same semantics, dramatically less DB
     // pressure when an org has thousands of overdue invoices.
@@ -753,7 +766,7 @@ export class AssistantService {
     }
     const units = Array.from(perUnit.values()).sort((a, b) => b.balance.comparedTo(a.balance));
     return {
-      currency: 'ZAR',
+      currency,
       totalArrears: Number(totalArrears.toFixed(2)),
       unitsInArrears: units.length,
       worstUnit: units[0] ? { unitNumber: units[0].unitNumber, balance: Number(units[0].balance.toFixed(2)) } : null,
