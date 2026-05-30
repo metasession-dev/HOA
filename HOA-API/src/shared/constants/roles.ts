@@ -11,6 +11,7 @@ export const SystemRoles = {
   EXTERNAL_ACCOUNTANT: 'external_accountant',
   OWNER: 'owner',
   TENANT: 'tenant',
+  VENDOR: 'vendor',
 } as const;
 
 export type SystemRole = (typeof SystemRoles)[keyof typeof SystemRoles];
@@ -28,6 +29,7 @@ export const RoleDisplayNames: Record<SystemRole, string> = {
   [SystemRoles.EXTERNAL_ACCOUNTANT]: 'External Accountant',
   [SystemRoles.OWNER]: 'Owner',
   [SystemRoles.TENANT]: 'Tenant',
+  [SystemRoles.VENDOR]: 'Vendor',
 };
 
 export const AdminRoles: SystemRole[] = [
@@ -54,3 +56,7 @@ export const ResidentRoles: SystemRole[] = [
   SystemRoles.OWNER,
   SystemRoles.TENANT,
 ];
+
+// Vendors are external suppliers with a self-service portal login (no resident
+// or admin scope). They only ever see their own vendor profile + invoices.
+export const VendorRoles: SystemRole[] = [SystemRoles.VENDOR];

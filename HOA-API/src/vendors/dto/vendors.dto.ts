@@ -139,6 +139,29 @@ export class CreateVendorInvoiceDto {
   @IsOptional() @IsBoolean() currencyOverride?: boolean;
 }
 
+/**
+ * Vendor-portal self-submission. Same shape as CreateVendorInvoiceDto but the
+ * vendorId is resolved server-side from the logged-in vendor, and vendors can't
+ * pick a GL account or override duplicate detection.
+ */
+export class SubmitVendorInvoiceDto {
+  @IsOptional() @IsString() @MaxLength(80) vendorInvoiceNo?: string;
+  @IsNumber() @Min(0.01) amount: number;
+  @IsOptional() @IsString() @MaxLength(8) currency?: string;
+  @IsOptional() @IsNumber() @Min(0) vatAmount?: number;
+  @IsDateString() issueDate: string;
+  @IsDateString() dueDate: string;
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => LineItemDto)
+  lineItems?: LineItemDto[];
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => InvoiceAttachmentDto)
+  attachments?: InvoiceAttachmentDto[];
+
+  @IsOptional() @IsString() @MaxLength(2000) notes?: string;
+  @IsOptional() @IsBoolean() currencyOverride?: boolean;
+}
+
 export class UpdateVendorInvoiceDto {
   @IsOptional() @IsString() @MaxLength(80) vendorInvoiceNo?: string;
   @IsOptional() @IsNumber() @Min(0.01) amount?: number;

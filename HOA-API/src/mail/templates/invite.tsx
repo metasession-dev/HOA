@@ -18,11 +18,12 @@ export type InviteData = {
   roleDisplayName: string;
   redeemUrl: string;
   expiresAt: string; // ISO; we format human-readable below
-  kind: 'team_member' | 'resident';
+  kind: 'team_member' | 'resident' | 'vendor';
 };
 
 export function Invite({ data }: { data: InviteData }) {
   const isResident = data.kind === 'resident';
+  const isVendor = data.kind === 'vendor';
   const expires = new Date(data.expiresAt).toLocaleDateString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric',
   });
@@ -32,7 +33,9 @@ export function Invite({ data }: { data: InviteData }) {
       preheader={
         isResident
           ? `Join ${data.organizationName} on HOA.africa — set your password to get started`
-          : `Join the ${data.organizationName} admin team on HOA.africa`
+          : isVendor
+            ? `${data.organizationName} invited you to their vendor portal on HOA.africa`
+            : `Join the ${data.organizationName} admin team on HOA.africa`
       }
     >
       <Text style={heading}>
@@ -48,10 +51,12 @@ export function Invite({ data }: { data: InviteData }) {
       <Text style={bodyTextStyle}>
         {isResident
           ? 'Set a password to view your unit details, levies, gate passes and notices.'
-          : 'Set a password to access the admin console and start managing the HOA.'}
+          : isVendor
+            ? 'Set a password to access the vendor portal, where you can submit invoices and track their approval and payment status.'
+            : 'Set a password to access the admin console and start managing the HOA.'}
       </Text>
       <Button href={data.redeemUrl} style={buttonStyle}>
-        {isResident ? 'Set up my resident account' : 'Set up my admin account'}
+        {isResident ? 'Set up my resident account' : isVendor ? 'Set up my vendor account' : 'Set up my admin account'}
       </Button>
       <Text style={{ ...subStyle, marginTop: 16 }}>
         This invitation expires on <strong>{expires}</strong>. If you weren't expecting it, you can ignore this email.
@@ -69,4 +74,6 @@ export function Invite({ data }: { data: InviteData }) {
 export const inviteSubject = (data: InviteData) =>
   data.kind === 'resident'
     ? `Welcome to ${data.organizationName} — set your password`
-    : `You're invited to join ${data.organizationName} on HOA.africa`;
+    : data.kind === 'vendor'
+      ? `${data.organizationName} invited you to their vendor portal`
+      : `You're invited to join ${data.organizationName} on HOA.africa`;

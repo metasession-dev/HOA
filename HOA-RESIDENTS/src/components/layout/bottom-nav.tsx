@@ -10,9 +10,10 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mainNav } from './sidebar';
+import { navForRole } from './sidebar';
+import { useAuth } from '@/providers/auth-provider';
 
-// The four quick-access tabs (rest live under "More").
+// The four quick-access tabs for residents (rest live under "More").
 const PRIMARY_HREFS = ['/', '/invoices', '/passes', '/notices'];
 
 function useIsActive() {
@@ -24,15 +25,19 @@ function useIsActive() {
 export function BottomNav() {
   const isActive = useIsActive();
   const pathname = usePathname();
+  const { primaryRole } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the sheet whenever the route changes.
   useEffect(() => { setMoreOpen(false); }, [pathname]);
 
-  const primary = PRIMARY_HREFS
-    .map((h) => mainNav.find((i) => i.href === h))
-    .filter(Boolean) as typeof mainNav;
-  const moreItems = mainNav.filter((i) => !PRIMARY_HREFS.includes(i.href));
+  const nav = navForRole(primaryRole);
+  // Vendors have a small nav — show all of it as primary tabs (no "More").
+  const primaryHrefs = primaryRole === 'vendor' ? nav.map((i) => i.href) : PRIMARY_HREFS;
+  const primary = primaryHrefs
+    .map((h) => nav.find((i) => i.href === h))
+    .filter(Boolean) as typeof nav;
+  const moreItems = nav.filter((i) => !primaryHrefs.includes(i.href));
   const moreActive = moreItems.some((i) => isActive(i.href));
 
   return (
@@ -89,15 +94,17 @@ export function BottomNav() {
             </Link>
           );
         })}
-        <button
-          type="button"
-          onClick={() => setMoreOpen(true)}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2"
-          aria-label="More"
-        >
-          <MoreHorizontal className={cn('h-5 w-5', moreActive ? 'text-ember-orange' : 'text-graphite/70')} />
-          <span className={cn('text-[10px] leading-tight', moreActive ? 'font-medium text-charcoal-primary' : 'text-muted-foreground')}>More</span>
-        </button>
+        {moreItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className="flex flex-1 flex-col items-center gap-0.5 py-2"
+            aria-label="More"
+          >
+            <MoreHorizontal className={cn('h-5 w-5', moreActive ? 'text-ember-orange' : 'text-graphite/70')} />
+            <span className={cn('text-[10px] leading-tight', moreActive ? 'font-medium text-charcoal-primary' : 'text-muted-foreground')}>More</span>
+          </button>
+        )}
       </nav>
     </>
   );

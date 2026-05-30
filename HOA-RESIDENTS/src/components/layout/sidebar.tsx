@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, FilePlus, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,25 @@ export const mainNav = [
   { title: 'Notices', href: '/notices', icon: Bell },
 ];
 
+// Vendors are external suppliers — they get their own focused portal, not the
+// resident destinations.
+export const vendorNav = [
+  { title: 'My invoices', href: '/vendor/invoices', icon: Receipt },
+  { title: 'Submit invoice', href: '/vendor/invoices/new', icon: FilePlus },
+  { title: 'Profile', href: '/profile', icon: User },
+];
+
+/** Pick the nav set for the active role. */
+export function navForRole(role: string | undefined | null) {
+  return role === 'vendor' ? vendorNav : mainNav;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
-  const { organizationName } = useAuth();
+  const { organizationName, primaryRole } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const nav = navForRole(primaryRole);
+  const portalLabel = primaryRole === 'vendor' ? 'Vendor portal' : 'Resident portal';
 
   return (
     <aside
@@ -40,7 +55,7 @@ export function Sidebar() {
             <p className="text-sm font-semibold text-charcoal-primary truncate leading-tight">
               {organizationName}
             </p>
-            <p className="text-caption text-muted-foreground">Resident portal</p>
+            <p className="text-caption text-muted-foreground">{portalLabel}</p>
           </div>
         )}
         <Button
@@ -60,7 +75,7 @@ export function Sidebar() {
             Your portal
           </h4>
         )}
-        {mainNav.map((item) => {
+        {nav.map((item) => {
           // Use a `/`-boundary check so `/passes` doesn't match `/passes-history`,
           // and exact match for the root. No competing children at this level.
           const isActive =

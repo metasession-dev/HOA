@@ -21,7 +21,7 @@ export const SYSTEM_ROLE_NAMES = [
   'super_admin', 'hoa_admin', 'property_manager', 'finance_officer',
   'exco_member', 'exco_chairperson', 'communications_manager',
   'gate_security', 'maintenance_coordinator', 'external_accountant',
-  'owner', 'tenant',
+  'owner', 'tenant', 'vendor',
 ] as const;
 
 // Invite kinds — pick one and the UI branches accordingly:
@@ -31,7 +31,9 @@ export const SYSTEM_ROLE_NAMES = [
 //                   personId is given, the invite is bound to that Person so
 //                   redemption can link the new User without creating a
 //                   duplicate Person row.
-export const INVITE_KINDS = ['team_member', 'resident'] as const;
+//   'vendor'      = external supplier getting a self-service portal login in the
+//                   resident PWA, linked to a Vendor record via vendorId.
+export const INVITE_KINDS = ['team_member', 'resident', 'vendor'] as const;
 export type InviteKind = typeof INVITE_KINDS[number];
 
 export class CreateInviteDto {
@@ -51,6 +53,8 @@ export class CreateInviteDto {
   @IsOptional() @IsIn(INVITE_KINDS) kind?: InviteKind;
   /** When kind = 'resident', the existing Person to bind the invite to. */
   @IsOptional() @IsString() personId?: string;
+  /** When kind = 'vendor', the Vendor record to link the new login to. */
+  @IsOptional() @IsString() vendorId?: string;
 
   /**
    * Whether the redeemed user should be granted access to the admin

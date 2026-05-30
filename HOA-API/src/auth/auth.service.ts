@@ -32,6 +32,7 @@ const ROLE_PRIORITY: Record<string, number> = {
   communications_manager: 50,
   gate_security: 60,
   stakeholder: 70,
+  vendor: 75,
   owner: 80,
   tenant: 90,
 };

@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Ban, Pause, Play, FileText } from 'lucide-react';
+import { ChevronLeft, Ban, Pause, Play, FileText, KeyRound, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate, getOrgCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 
@@ -25,13 +26,32 @@ export default function VendorDetailPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   const load = () => {
     setLoading(true);
     Promise.all([
-      api.get<any>(`/vendors/${id}`).then((r) => setV(r.data)),
+      api.get<any>(`/vendors/${id}`).then((r) => { setV(r.data); setInviteEmail(r.data?.email || ''); }),
       api.get<any>(`/vendor-invoices?vendorId=${id}`).then((r) => setInvoices(r.data || [])),
     ]).finally(() => setLoading(false));
+  };
+
+  const sendPortalInvite = async () => {
+    const email = (inviteEmail || v?.email || '').trim();
+    if (!email) {
+      toast({ variant: 'error', title: 'Email required', description: 'Enter the vendor’s email to send a portal invite.' });
+      return;
+    }
+    setInviting(true);
+    try {
+      await api.post('/team/invites', { email, kind: 'vendor', roleName: 'vendor', vendorId: id });
+      toast({ variant: 'success', title: 'Portal invite sent', description: `We emailed a sign-up link to ${email}.` });
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Could not send invite', description: err.message });
+    } finally {
+      setInviting(false);
+    }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
@@ -92,6 +112,38 @@ export default function VendorDetailPage() {
           {v.status === 'active' && <Button variant="secondary" disabled={busy} onClick={() => changeStatus('suspended', 'Suspend')}><Pause className="mr-1.5 h-3.5 w-3.5" />Suspend</Button>}
           {v.status !== 'blacklisted' && <Button variant="destructive" disabled={busy} onClick={() => changeStatus('blacklisted', 'Blacklist')}><Ban className="mr-1.5 h-3.5 w-3.5" />Blacklist</Button>}
         </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="space-y-3 p-6">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-graphite" />
+          <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">Vendor portal access</h3>
+        </div>
+        {v.userId ? (
+          <p className="flex items-center gap-2 text-sm text-graphite">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            This vendor can sign in to the vendor portal to submit invoices and track their status.
+          </p>
+        ) : (
+          <>
+            <p className="text-caption text-muted-foreground">
+              Invite this vendor to a self-service portal where they can submit invoices and track approval &amp; payment.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="vendor@example.com"
+                className="h-9 w-72"
+                type="email"
+              />
+              <Button variant="secondary" disabled={inviting} onClick={sendPortalInvite}>
+                <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                {inviting ? 'Sending…' : 'Send portal invite'}
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent></Card>
 
       <Card><CardContent className="p-6">

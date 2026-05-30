@@ -949,6 +949,8 @@ model SurveyResponse {
 model Vendor {
   id                 String   @id @default(cuid())
   organizationId     String
+  // Portal login: the User account linked to this vendor (set on invite redeem).
+  userId             String?  @unique
   name               String
   email              String?
   phone              String?
@@ -1350,6 +1352,9 @@ model Invite {
   // invite is for. On redemption we set this Person's userId to the new User
   // so the resident already has occupancies, invoices, etc. wired up.
   personId       String?
+  // When `kind = 'vendor'`, the Vendor record this invite links the new user
+  // to on redemption (sets Vendor.userId so they can use the vendor portal).
+  vendorId       String?
   // Whether the invited user should be granted access to the admin console.
   // Nullable so the redeem path can derive the right default from `kind`
   // when the inviter doesn't specify (team_member → true, resident → false).

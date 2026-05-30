@@ -76,6 +76,24 @@ export class InvitesService {
       throw new BadRequestException(
         'Team member invites cannot carry resident roles — set kind="resident" instead',
       );
+    } else if (kind === 'vendor') {
+      if (dto.roleName !== 'vendor') {
+        throw new BadRequestException('Vendor invites must use roleName="vendor"');
+      }
+      if (dto.customRoleId) {
+        throw new BadRequestException('Vendor invites cannot carry a custom role');
+      }
+      if (!dto.vendorId) {
+        throw new BadRequestException('Vendor invites require a vendorId');
+      }
+      const v = await this.prisma.vendor.findFirst({
+        where: { id: dto.vendorId, organizationId: orgId },
+        select: { id: true, userId: true },
+      });
+      if (!v) throw new BadRequestException('Invalid vendorId for this organization');
+      if (v.userId) throw new ConflictException('This vendor already has a portal login');
+    } else if (dto.roleName === 'vendor') {
+      throw new BadRequestException('The vendor role requires kind="vendor"');
     }
 
     // Validate personId if supplied: must belong to this org. For residents
@@ -130,6 +148,7 @@ export class InvitesService {
           customRoleId: dto.customRoleId,
           kind,
           personId: dto.personId ?? null,
+          vendorId: dto.vendorId ?? null,
           // Explicit choice OR derive from kind. Stored as the raw boolean
           // so a later "is the field set?" check at redeem-time can fall
           // back to the kind-based default without overriding an explicit
@@ -200,7 +219,7 @@ export class InvitesService {
     rawToken: string;
     actorId: string;
     orgId: string;
-    kind: 'team_member' | 'resident';
+    kind: 'team_member' | 'resident' | 'vendor';
     /** Bypass the EmailDelivery dedup index — used by resend to mint a new
      *  send after the token has been rotated. */
     force?: boolean;
@@ -392,7 +411,7 @@ export class InvitesService {
         rawToken,
         actorId: actor.userId,
         orgId,
-        kind: (updated.kind as 'team_member' | 'resident') ?? 'team_member',
+        kind: (updated.kind as 'team_member' | 'resident' | 'vendor') ?? 'team_member',
         force: true,
       });
     } catch (err: any) {
@@ -538,6 +557,22 @@ export class InvitesService {
         if (person && person.organizationId === invite.organizationId && !person.userId) {
           await tx.person.update({
             where: { id: person.id },
+            data: { userId: user.id },
+          });
+        }
+      }
+
+      // Vendor invite: link the new login to its Vendor record so the vendor
+      // portal resolves their profile + invoices. Never overwrite an existing
+      // link (takeover guard).
+      if (invite.kind === 'vendor' && invite.vendorId) {
+        const vendor = await tx.vendor.findUnique({
+          where: { id: invite.vendorId },
+          select: { id: true, organizationId: true, userId: true },
+        });
+        if (vendor && vendor.organizationId === invite.organizationId && !vendor.userId) {
+          await tx.vendor.update({
+            where: { id: vendor.id },
             data: { userId: user.id },
           });
         }
