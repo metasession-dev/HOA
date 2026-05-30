@@ -13,6 +13,7 @@ import {
   MaxLength,
   ArrayMinSize,
   ArrayMaxSize,
+  Allow,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -115,6 +116,16 @@ export class GrantProxyDto {
 
 // ============ Surveys ============
 
+export class SurveyOptionDto {
+  @IsString()
+  @MaxLength(60)
+  id!: string;
+
+  @IsString()
+  @MaxLength(200)
+  label!: string;
+}
+
 export class SurveyQuestionDto {
   @IsString()
   @MaxLength(40)
@@ -127,10 +138,14 @@ export class SurveyQuestionDto {
   @MaxLength(500)
   label!: string;
 
+  // MUST use @ValidateNested + @Type — otherwise ValidationPipe(whitelist:true)
+  // strips the nested {id,label} on every survey create (options become empty).
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
-  options?: { id: string; label: string }[];
+  @ValidateNested({ each: true })
+  @Type(() => SurveyOptionDto)
+  options?: SurveyOptionDto[];
 
   @IsOptional()
   @IsBoolean()
@@ -172,9 +187,24 @@ export class CreateSurveyDto {
   closesAt?: string;
 }
 
+export class SurveyAnswerDto {
+  @IsString()
+  @MaxLength(40)
+  questionId!: string;
+
+  // value may be string | number | string[]; @Allow keeps it through the
+  // whitelist without constraining the type.
+  @Allow()
+  value!: string | number | string[];
+}
+
 export class SubmitSurveyResponseDto {
+  // @ValidateNested + @Type required, else whitelist strips each answer's
+  // {questionId,value} to an empty object (responses recorded but unscorable).
   @IsArray()
-  answers!: { questionId: string; value: string | number | string[] }[];
+  @ValidateNested({ each: true })
+  @Type(() => SurveyAnswerDto)
+  answers!: SurveyAnswerDto[];
 }
 
 export class GenerateSurveyDto {
