@@ -60,8 +60,9 @@ export class InvoicesService {
 
   async create(orgId: string, userId: string, data: any) {
     const lineItems = data.lineItems || [];
+    // Line items carry unitPrice (per the DTO); total = Σ unitPrice × quantity.
     const amount = lineItems.reduce((sum: number, item: any) =>
-      sum + (item.amount * (item.quantity || 1)), 0);
+      sum + ((Number(item.unitPrice) || 0) * (Number(item.quantity) || 1)), 0);
 
     const count = await this.prisma.invoice.count({ where: { organizationId: orgId } });
     const invoiceNumber = `INV-${String(count + 1).padStart(5, '0')}`;
@@ -98,7 +99,7 @@ export class InvoicesService {
         organizationId: orgId,
         unitId: data.unitId,
         invoiceNumber,
-        type: data.type || 'recurring',
+        type: data.type || 'levy',
         amount: new Decimal(amount),
         currency: invoiceCcy,
         dueDate: new Date(data.dueDate),

@@ -40,14 +40,26 @@ const LINE_ITEM_PRESETS = [
   'Interest on arrears',
 ];
 
+// Turn NestJS/class-validator's technical message list (e.g.
+// "lineItems.0.unitPrice must be a number…") into something a person can act on.
+function friendlyInvoiceError(err: any): string {
+  const raw: string = err?.message || '';
+  if (/lineItems|unitPrice|should not exist|must be a number/i.test(raw)) {
+    return 'Please check each line item has a description, a quantity, and an amount greater than zero.';
+  }
+  if (/dueDate/i.test(raw)) return 'Please choose a valid due date.';
+  if (/unitId/i.test(raw)) return 'Please select a unit for this invoice.';
+  return raw || 'Something went wrong. Please try again.';
+}
+
 export default function NewInvoicePage() {
   const router = useRouter();
   const [units, setUnits] = useState<any[]>([]);
   // Single-estate-per-enterprise: the estate is resolved automatically, so the
   // form only asks for the unit.
   const [selectedEstateId, setSelectedEstateId] = useState('');
-  const [form, setForm] = useState({ unitId: '', dueDate: '', notes: '', type: 'recurring' });
-  const [lineItems, setLineItems] = useState([{ description: 'Monthly Levy', amount: 0, quantity: 1 }]);
+  const [form, setForm] = useState({ unitId: '', dueDate: '', notes: '', type: 'levy' });
+  const [lineItems, setLineItems] = useState([{ description: 'Monthly Levy', unitPrice: 0, quantity: 1 }]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -66,7 +78,7 @@ export default function NewInvoicePage() {
   }, [selectedEstateId]);
 
   const addLineItem = () =>
-    setLineItems([...lineItems, { description: '', amount: 0, quantity: 1 }]);
+    setLineItems([...lineItems, { description: '', unitPrice: 0, quantity: 1 }]);
   const removeLineItem = (idx: number) =>
     setLineItems(lineItems.filter((_, i) => i !== idx));
   const updateLineItem = (idx: number, field: string, value: any) => {
@@ -75,17 +87,36 @@ export default function NewInvoicePage() {
     setLineItems(updated);
   };
 
-  const total = lineItems.reduce((sum, item) => sum + item.amount * item.quantity, 0);
+  const total = lineItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    // Client-side guards give clearer feedback than a raw 400 from the API.
+    if (!form.unitId) {
+      toast({ variant: 'error', title: 'Select a unit', description: 'Choose the unit this invoice is for.' });
+      setLoading(false);
+      return;
+    }
+    const cleanItems = lineItems
+      .map((li) => ({ ...li, description: li.description.trim(), quantity: li.quantity || 1 }))
+      .filter((li) => li.description);
+    if (cleanItems.length === 0) {
+      toast({ variant: 'error', title: 'Add a line item', description: 'Every invoice needs at least one line item with a description.' });
+      setLoading(false);
+      return;
+    }
+    if (cleanItems.some((li) => !(li.unitPrice > 0))) {
+      toast({ variant: 'error', title: 'Check the amounts', description: 'Each line item needs an amount greater than zero.' });
+      setLoading(false);
+      return;
+    }
     try {
-      await api.post('/invoices', { ...form, lineItems });
+      await api.post('/invoices', { ...form, lineItems: cleanItems });
       toast({ variant: 'success', title: 'Invoice created' });
       router.push('/finance/invoices');
     } catch (err: any) {
-      toast({ variant: 'error', title: 'Could not create invoice', description: err.message });
+      toast({ variant: 'error', title: 'Could not create invoice', description: friendlyInvoiceError(err) });
     } finally {
       setLoading(false);
     }
@@ -156,10 +187,12 @@ export default function NewInvoicePage() {
                   value={form.type}
                   onChange={(e) => setForm({ ...form, type: e.target.value })}
                 >
-                  <option value="recurring">Recurring levy</option>
-                  <option value="one_time">One-time charge</option>
-                  <option value="fine">Fine</option>
+                  <option value="levy">Recurring levy</option>
                   <option value="special">Special levy</option>
+                  <option value="fine">Fine</option>
+                  <option value="utility">Utility</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
             </div>
@@ -204,8 +237,8 @@ export default function NewInvoicePage() {
                       type="number"
                       step="0.01"
                       placeholder="0.00"
-                      value={item.amount || ''}
-                      onChange={(e) => updateLineItem(idx, 'amount', parseFloat(e.target.value) || 0)}
+                      value={item.unitPrice || ''}
+                      onChange={(e) => updateLineItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
                       required
                     />
                   </div>
