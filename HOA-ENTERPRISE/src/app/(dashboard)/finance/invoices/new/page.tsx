@@ -18,17 +18,43 @@ const selectClass = cn(
   'focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40',
 );
 
+// Common HOA invoice line items offered as a dropdown. The field is still a
+// free-text input (via <datalist>), so any custom description is allowed.
+const LINE_ITEM_PRESETS = [
+  'Monthly levy',
+  'Special levy',
+  'Reserve fund contribution',
+  'Water charge',
+  'Electricity charge',
+  'Sewerage charge',
+  'Refuse / waste collection',
+  'Security levy',
+  'Maintenance fee',
+  'Garden / landscaping service',
+  'Insurance contribution',
+  'Administration fee',
+  'Clubhouse / facility booking',
+  'Access tag / card replacement',
+  'Fine / penalty',
+  'Late payment fee',
+  'Interest on arrears',
+];
+
 export default function NewInvoicePage() {
   const router = useRouter();
-  const [estates, setEstates] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
+  // Single-estate-per-enterprise: the estate is resolved automatically, so the
+  // form only asks for the unit.
   const [selectedEstateId, setSelectedEstateId] = useState('');
   const [form, setForm] = useState({ unitId: '', dueDate: '', notes: '', type: 'recurring' });
   const [lineItems, setLineItems] = useState([{ description: 'Monthly Levy', amount: 0, quantity: 1 }]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get<any>('/estates').then((res) => setEstates(res.data || []));
+    api.get<any>('/estates').then((res) => {
+      const first = (res.data || [])[0];
+      if (first) setSelectedEstateId(first.id);
+    });
   }, []);
 
   useEffect(() => {
@@ -90,45 +116,26 @@ export default function NewInvoicePage() {
             <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">
               Invoice details
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="estate">Estate</Label>
-                <select
-                  id="estate"
-                  className={selectClass}
-                  value={selectedEstateId}
-                  onChange={(e) => setSelectedEstateId(e.target.value)}
-                  required
-                >
-                  <option value="">Select estate…</option>
-                  {estates.map((e: any) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="unit">Unit</Label>
-                <select
-                  id="unit"
-                  className={selectClass}
-                  value={form.unitId}
-                  onChange={(e) => setForm({ ...form, unitId: e.target.value })}
-                  required
-                  disabled={!selectedEstateId}
-                >
-                  <option value="">
-                    {selectedEstateId ? 'Select unit…' : 'Pick an estate first'}
+            <div className="space-y-1.5">
+              <Label htmlFor="unit">Unit</Label>
+              <select
+                id="unit"
+                className={selectClass}
+                value={form.unitId}
+                onChange={(e) => setForm({ ...form, unitId: e.target.value })}
+                required
+                disabled={!selectedEstateId}
+              >
+                <option value="">
+                  {selectedEstateId ? 'Select unit…' : 'Loading units…'}
+                </option>
+                {units.map((u: any) => (
+                  <option key={u.id} value={u.id}>
+                    Unit {u.unitNumber}
+                    {u.block ? ` · Block ${u.block}` : ''}
                   </option>
-                  {units.map((u: any) => (
-                    <option key={u.id} value={u.id}>
-                      Unit {u.unitNumber}
-                      {u.block ? ` · Block ${u.block}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                ))}
+              </select>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -171,15 +178,23 @@ export default function NewInvoicePage() {
               </Button>
             </div>
 
+            <datalist id="invoice-line-items">
+              {LINE_ITEM_PRESETS.map((o) => (
+                <option key={o} value={o} />
+              ))}
+            </datalist>
+
             <div className="space-y-3">
               {lineItems.map((item, idx) => (
                 <div key={idx} className="grid gap-2 sm:grid-cols-12 items-end">
                   <div className="sm:col-span-6 space-y-1.5">
                     {idx === 0 && <Label>Description</Label>}
                     <Input
-                      placeholder="e.g. Monthly Levy — April"
+                      placeholder="Select or type a description…"
                       value={item.description}
                       onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
+                      list="invoice-line-items"
+                      autoComplete="off"
                       required
                     />
                   </div>
