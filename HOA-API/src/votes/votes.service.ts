@@ -24,6 +24,12 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 };
 
 const RESIDENT_BASE = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+const ENTERPRISE_BASE = process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005';
+
+// Board/exco users eligible to vote on `exco_only` polls (e.g. contract-bid
+// awards). These users have no resident Person record, so exco ballots are
+// keyed by userId (see castBallot).
+const EXCO_VOTER_ROLES = ['exco_member', 'exco_chairperson', 'hoa_admin', 'super_admin'];
 
 @Injectable()
 export class VotesService {
@@ -38,6 +44,14 @@ export class VotesService {
    * occupants. (Final eligibility is still enforced at ballot-cast time.)
    */
   private async voterUserIds(orgId: string, eligibilityRule: string): Promise<string[]> {
+    if (eligibilityRule === 'exco_only') {
+      // Exco / board users (no resident occupancy) — used for contract-bid awards.
+      const roles = await this.prisma.userRole.findMany({
+        where: { organizationId: orgId, role: { name: { in: EXCO_VOTER_ROLES } } },
+        select: { userId: true },
+      });
+      return Array.from(new Set(roles.map((r) => r.userId)));
+    }
     if (eligibilityRule === 'all_residents') {
       const occ = await this.prisma.unitOccupancy.findMany({
         where: { isActive: true, unit: { estate: { organizationId: orgId } }, person: { userId: { not: null } } },
@@ -373,6 +387,56 @@ export class VotesService {
     if (!v) throw new NotFoundException('Vote not found');
     if (v.status !== 'open') throw new ConflictException(`Vote not open (currently ${v.status})`);
     if (new Date() > v.closesAt) throw new ConflictException('Voting has closed');
+
+    // Exco-only votes (contract-bid awards) are cast by board USERS with no
+    // resident Person record. Key the ballot on the user id — voterPersonId has
+    // no FK, so this is safe — and gate the whole branch on the rule so the
+    // resident voting path below is completely untouched.
+    if (v.eligibilityRule === 'exco_only') {
+      if (dto.asProxyForPersonId) {
+        throw new ConflictException('Proxy voting is not available for exco votes');
+      }
+      const isExco = await this.prisma.userRole.findFirst({
+        where: { userId: actor.userId, organizationId: orgId, role: { name: { in: EXCO_VOTER_ROLES } } },
+        select: { id: true },
+      });
+      if (!isExco) throw new ForbiddenException('Only exco members can vote on this');
+
+      const validIds = new Set(((v.options as any[]) || []).map((o) => o.id));
+      for (const id of dto.selectedOptionIds) {
+        if (!validIds.has(id)) throw new BadRequestException(`Unknown option: ${id}`);
+      }
+      if (!v.allowMultiple && dto.selectedOptionIds.length !== 1) {
+        throw new BadRequestException('This vote allows a single option only');
+      }
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const ballot = await tx.ballot.create({
+            data: {
+              voteId,
+              castByUserId: actor.userId,
+              selectedOptionIds: dto.selectedOptionIds,
+              voterPersonId: actor.userId, // synthetic key; unique per (voteId, user)
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              organizationId: orgId,
+              actorId: actor.userId,
+              actorRole: actor.role,
+              action: 'ballot_cast',
+              entityType: 'Vote',
+              entityId: voteId,
+              changes: { ballotId: ballot.id, exco: true } as any,
+            },
+          });
+          return { id: ballot.id, anonymous: false, castAt: ballot.castAt };
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002') throw new ConflictException('You have already voted in this poll');
+        throw err;
+      }
+    }
 
     // Resolve the person whose vote this is
     let voterPersonId: string;

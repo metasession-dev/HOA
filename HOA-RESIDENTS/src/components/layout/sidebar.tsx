@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, FilePlus, User } from 'lucide-react';
+import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, FilePlus, User, Gavel } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ export const mainNav = [
 export const vendorNav = [
   { title: 'My invoices', href: '/vendor/invoices', icon: Receipt },
   { title: 'Submit invoice', href: '/vendor/invoices/new', icon: FilePlus },
+  { title: 'Tenders', href: '/vendor/tenders', icon: Gavel },
   { title: 'Profile', href: '/profile', icon: User },
 ];
 

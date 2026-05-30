@@ -23,6 +23,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ViolationsModule } from './violations/violations.module';
 import { VotesModule } from './votes/votes.module';
 import { VendorsModule } from './vendors/vendors.module';
+import { TendersModule } from './tenders/tenders.module';
 import { ResaleModule } from './resale/resale.module';
 import { BankingModule } from './banking/banking.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -81,6 +82,7 @@ import { HealthController } from './health.controller';
     ViolationsModule,
     VotesModule,
     VendorsModule,
+    TendersModule,
     ResaleModule,
     BankingModule,
     DashboardModule,

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Building2, Home, Users, FileText, CreditCard,
   BookOpen, BarChart3, MessageSquare, FolderOpen, Settings,
-  KeyRound, ScanLine, ShieldAlert, Vote, ClipboardList,
+  KeyRound, ScanLine, ShieldAlert, Vote, ClipboardList, Gavel,
   Receipt, Truck, Wallet, PieChart, Landmark,
   Sparkles, AlertTriangle, Banknote, Lock,
   KeySquare, Webhook, Inbox,
@@ -56,6 +56,7 @@ const governanceNav = [
   { title: 'Meetings', href: '/meetings', icon: CalendarDays },
   { title: 'Votes', href: '/votes', icon: Vote },
   { title: 'Surveys', href: '/surveys', icon: ClipboardList },
+  { title: 'Contracts', href: '/contracts', icon: Gavel },
 ];
 
 const gateNav = [

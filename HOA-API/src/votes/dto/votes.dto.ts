@@ -56,8 +56,8 @@ export class CreateVoteDto {
   anonymous?: boolean;
 
   @IsOptional()
-  @IsIn(['all_owners', 'paid_up_only', 'all_residents', 'tag_match'])
-  eligibilityRule?: 'all_owners' | 'paid_up_only' | 'all_residents' | 'tag_match';
+  @IsIn(['all_owners', 'paid_up_only', 'all_residents', 'tag_match', 'exco_only'])
+  eligibilityRule?: 'all_owners' | 'paid_up_only' | 'all_residents' | 'tag_match' | 'exco_only';
 
   @IsOptional()
   @IsObject()

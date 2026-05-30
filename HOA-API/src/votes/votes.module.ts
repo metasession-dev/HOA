@@ -10,5 +10,6 @@ import { IdempotencyInterceptor } from '../common/idempotency';
   imports: [NotificationsModule],
   controllers: [VotesController, SurveysController],
   providers: [VotesService, SurveysService, PrismaService, IdempotencyInterceptor],
+  exports: [VotesService],
 })
 export class VotesModule {}

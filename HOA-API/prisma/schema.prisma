@@ -904,6 +904,58 @@ model VoteProxy {
   @@map("vote_proxies")
 }
 
+// Contract bidding / procurement. A Tender is a contract opportunity vendors
+// bid on; the winner is chosen by an Exco vote (eligibilityRule='exco_only').
+model Tender {
+  id              String    @id @default(cuid())
+  organizationId  String
+  title           String
+  description     String
+  scopeOfWork     String?
+  category        String?
+  budgetMin       Decimal?  @db.Decimal(14, 2)
+  budgetMax       Decimal?  @db.Decimal(14, 2)
+  currency        String    @default("ZAR")
+  status          String    @default("draft") // draft | open | evaluating | awarded | cancelled
+  opensAt         DateTime?
+  closesAt        DateTime
+  attachments     Json      @default("[]") // [{url, filename, contentType, size}]
+  voteId          String?   // linked Exco award vote
+  awardedBidId    String?
+  awardedVendorId String?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  bids Bid[]
+
+  @@index([organizationId, status])
+  @@map("tenders")
+}
+
+model Bid {
+  id             String   @id @default(cuid())
+  tenderId       String
+  organizationId String
+  vendorId       String
+  amount         Decimal  @db.Decimal(14, 2)
+  currency       String   @default("ZAR")
+  proposal       String
+  attachments    Json     @default("[]")
+  status         String   @default("submitted") // submitted | shortlisted | awarded | rejected | withdrawn
+  submittedBy    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([tenderId, vendorId])
+  @@index([organizationId, status])
+  @@index([vendorId])
+  @@map("bids")
+}
+
 model Survey {
   id              String    @id @default(cuid())
   organizationId  String
@@ -973,6 +1025,7 @@ model Vendor {
   organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   defaultGlAccount GLAccount?      @relation(fields: [defaultGlAccountId], references: [id])
   invoices         VendorInvoice[]
+  bids             Bid[]
 
   @@unique([organizationId, name])
   @@index([organizationId, status])

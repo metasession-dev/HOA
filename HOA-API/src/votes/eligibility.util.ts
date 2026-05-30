@@ -106,6 +106,17 @@ export async function isPersonEligible(
  * org state. Used at open-time to snapshot quorum baseline.
  */
 export async function countEligiblePersons(prisma: PrismaService, vote: any): Promise<number> {
+  // Exco-only votes count board USERS (no resident occupancy), keyed by userId.
+  if (vote.eligibilityRule === 'exco_only') {
+    const roles = await prisma.userRole.findMany({
+      where: {
+        organizationId: vote.organizationId,
+        role: { name: { in: ['exco_member', 'exco_chairperson', 'hoa_admin', 'super_admin'] } },
+      },
+      select: { userId: true },
+    });
+    return new Set(roles.map((r) => r.userId)).size;
+  }
   // Materialise the eligibility check across all active owners/residents.
   const candidates = await prisma.unitOccupancy.findMany({
     where: { isActive: true, unit: { estate: { organizationId: vote.organizationId } } },
