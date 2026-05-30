@@ -306,6 +306,7 @@ export class ViolationsService {
     });
 
     if (recipientUserIds.length > 0) {
+      const residentBase = process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
       await this.notifications.enqueueFor({
         organizationId: orgId,
         recipientUserIds,
@@ -315,7 +316,14 @@ export class ViolationsService {
         entityType: 'Violation',
         entityId: id,
         actionUrl: `/violations/${id}`,
-        alsoBroadcast: { channels: ['email'], createdBy: actor.userId },
+        // Real transactional email (the announcement template) instead of a
+        // queued broadcast row that nothing dispatches.
+        alsoEmail: {
+          subject: `Violation notice: ${v.category.name}`,
+          message: v.description,
+          ctaLabel: 'View the notice',
+          ctaUrl: `${residentBase}/violations/${id}`,
+        },
       });
     }
 

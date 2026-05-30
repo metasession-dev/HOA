@@ -3,7 +3,10 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole } from '../common/scope.util';
 import { CreateSurveyDto, SubmitSurveyResponseDto } from './dto/votes.dto';
 import { createLlmProvider } from '../assistant/llm/provider';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
+
+const RESIDENT_BASE = process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
 
 const SURVEY_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],
@@ -13,7 +16,16 @@ const SURVEY_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class SurveysService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private notifications: NotificationsService) {}
+
+  /** Active residents (owners + tenants) of the org with a user account. */
+  private async residentUserIds(orgId: string): Promise<string[]> {
+    const occ = await this.prisma.unitOccupancy.findMany({
+      where: { isActive: true, unit: { estate: { organizationId: orgId } }, person: { userId: { not: null } } },
+      select: { person: { select: { userId: true } } },
+    });
+    return Array.from(new Set(occ.map((o) => o.person?.userId).filter((x): x is string => !!x)));
+  }
 
   // ============ Templates ============
 
@@ -236,8 +248,8 @@ export class SurveysService {
     if (!SURVEY_TRANSITIONS[s.status]?.includes(next)) {
       throw new ConflictException(`Cannot transition survey from ${s.status} to ${next}`);
     }
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.survey.update({ where: { id }, data: { status: next } });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.survey.update({ where: { id }, data: { status: next } });
       await tx.auditLog.create({
         data: {
           organizationId: orgId,
@@ -249,8 +261,33 @@ export class SurveysService {
           changes: { before: { status: s.status }, after: { status: next } } as any,
         },
       });
-      return updated;
+      return u;
     });
+
+    // When a survey opens, notify all residents (in-app + push + email).
+    if (next === 'open') {
+      const recipientUserIds = await this.residentUserIds(orgId);
+      if (recipientUserIds.length > 0) {
+        await this.notifications.enqueueFor({
+          organizationId: orgId,
+          recipientUserIds,
+          type: 'survey_opened',
+          title: `New survey: ${updated.title}`,
+          body: (updated.description || 'A new survey is open for your input.').slice(0, 280),
+          entityType: 'Survey',
+          entityId: updated.id,
+          actionUrl: `/surveys/${updated.id}`,
+          alsoEmail: {
+            subject: `New survey: ${updated.title}`,
+            message: updated.description || 'A new survey is open for your input.',
+            ctaLabel: 'Take the survey',
+            ctaUrl: `${RESIDENT_BASE}/surveys/${updated.id}`,
+          },
+        });
+      }
+    }
+
+    return updated;
   }
 
   async submit(id: string, orgId: string, actor: Actor, dto: SubmitSurveyResponseDto) {

@@ -23,12 +23,35 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   cancelled: [],
 };
 
+const RESIDENT_BASE = process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+
 @Injectable()
 export class VotesService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
   ) {}
+
+  /**
+   * User ids eligible to be notified about a vote. Owners-only rules notify
+   * active owners (via the title chain); resident-wide rules notify all active
+   * occupants. (Final eligibility is still enforced at ballot-cast time.)
+   */
+  private async voterUserIds(orgId: string, eligibilityRule: string): Promise<string[]> {
+    if (eligibilityRule === 'all_residents') {
+      const occ = await this.prisma.unitOccupancy.findMany({
+        where: { isActive: true, unit: { estate: { organizationId: orgId } }, person: { userId: { not: null } } },
+        select: { person: { select: { userId: true } } },
+      });
+      return Array.from(new Set(occ.map((o) => o.person?.userId).filter((x): x is string => !!x)));
+    }
+    // all_owners | paid_up_only | tag_match → active titled owners.
+    const own = await this.prisma.unitOwnership.findMany({
+      where: { isActive: true, unit: { estate: { organizationId: orgId } }, person: { userId: { not: null } } },
+      select: { person: { select: { userId: true } } },
+    });
+    return Array.from(new Set(own.map((o) => o.person?.userId).filter((x): x is string => !!x)));
+  }
 
   // ---------- Listing & detail ----------
 
@@ -219,13 +242,13 @@ export class VotesService {
     }
 
     // Snapshot eligible voter count BEFORE opening (under lock)
-    return this.prisma.$transaction(async (tx) => {
+    const opened = await this.prisma.$transaction(async (tx) => {
       const fresh = await tx.vote.findUnique({ where: { id } });
       if (!fresh || fresh.status !== 'draft') {
         throw new ConflictException(`Vote no longer in draft (now ${fresh?.status})`);
       }
       const count = await countEligiblePersons(this.prisma, fresh);
-      const opened = await tx.vote.update({
+      const o = await tx.vote.update({
         where: { id },
         data: { status: 'open', eligibleCountSnapshot: count, opensAt: fresh.opensAt > new Date() ? fresh.opensAt : new Date() },
       });
@@ -240,8 +263,31 @@ export class VotesService {
           changes: { after: { status: 'open', eligibleCountSnapshot: count } } as any,
         },
       });
-      return opened;
+      return o;
     });
+
+    // Notify eligible voters that a vote has opened (in-app + push + email).
+    const recipientUserIds = await this.voterUserIds(orgId, opened.eligibilityRule);
+    if (recipientUserIds.length > 0) {
+      await this.notifications.enqueueFor({
+        organizationId: orgId,
+        recipientUserIds,
+        type: 'vote_opened',
+        title: `New vote: ${opened.title}`,
+        body: (opened.description || 'A new vote is open.').slice(0, 280),
+        entityType: 'Vote',
+        entityId: opened.id,
+        actionUrl: `/votes/${opened.id}`,
+        alsoEmail: {
+          subject: `New vote: ${opened.title}`,
+          message: `${opened.description || 'A new vote is now open.'}\n\nVoting closes ${new Date(opened.closesAt).toLocaleString()}.`,
+          ctaLabel: 'Cast your vote',
+          ctaUrl: `${RESIDENT_BASE}/votes/${opened.id}`,
+        },
+      });
+    }
+
+    return opened;
   }
 
   async close(id: string, orgId: string, actor: Actor) {

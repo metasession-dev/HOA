@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nest
 import { PrismaService } from '../common/prisma.service';
 import { PaginationDto, paginatedResponse } from '../common/dto';
 import { PushService } from './push.service';
+import { MailService } from '../mail/mail.service';
 
 export type EnqueueInput = {
   organizationId: string;
@@ -15,12 +16,52 @@ export type EnqueueInput = {
   alsoBroadcast?: { channels: string[]; createdBy: string };
   /** Phase 10.1: also dispatch a Web Push for each recipient (best-effort). */
   alsoPush?: boolean;
+  /**
+   * Also send a transactional email (generic "announcement" template) to each
+   * recipient. Best-effort; one bad address won't sink the batch.
+   */
+  alsoEmail?: { subject: string; message: string; ctaLabel?: string; ctaUrl?: string };
 };
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  constructor(private prisma: PrismaService, private push: PushService) {}
+  constructor(private prisma: PrismaService, private push: PushService, private mail: MailService) {}
+
+  /** Resolve recipients' emails and send a generic announcement email. */
+  private async emailRecipients(input: EnqueueInput) {
+    const e = input.alsoEmail;
+    if (!e || input.recipientUserIds.length === 0) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: input.recipientUserIds }, isActive: true },
+      select: { id: true, email: true, firstName: true },
+    });
+    for (const u of users) {
+      if (!u.email) continue;
+      try {
+        await this.mail.enqueue(
+          {
+            organizationId: input.organizationId,
+            templateKey: 'announcement',
+            data: {
+              recipientFirstName: u.firstName || 'there',
+              title: e.subject,
+              message: e.message,
+              ctaLabel: e.ctaLabel,
+              ctaUrl: e.ctaUrl,
+            },
+            to: u.email,
+            toUserId: u.id,
+            entityType: input.entityType,
+            entityId: input.entityId,
+          },
+          { force: true },
+        );
+      } catch (err) {
+        this.logger.warn(`announcement email failed for ${u.id}: ${(err as any)?.message ?? err}`);
+      }
+    }
+  }
 
   /**
    * Persist a Notification per recipient. Optionally also write a queued
@@ -71,6 +112,11 @@ export class NotificationsService {
           tag: entityId ? `${type}:${entityId}` : type,
         })
         .catch((err) => this.logger.warn(`push fan-out failed: ${err?.message ?? err}`));
+    }
+
+    // Optional email fan-out (generic announcement template).
+    if (input.alsoEmail) {
+      await this.emailRecipients(input);
     }
 
     return { created: result.count, broadcastId };
