@@ -310,6 +310,14 @@ export class SurveysService {
     }
   }
 
+  /** Delete a survey (and its responses via cascade). Org-scoped. */
+  async remove(id: string, orgId: string) {
+    const s = await this.prisma.survey.findFirst({ where: { id, organizationId: orgId } });
+    if (!s) throw new NotFoundException('Survey not found');
+    await this.prisma.survey.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
   async results(id: string, orgId: string, _actor: Actor) {
     const s = await this.prisma.survey.findFirst({ where: { id, organizationId: orgId } });
     if (!s) throw new NotFoundException('Survey not found');

@@ -265,4 +265,10 @@ export class SurveysController {
   ) {
     return successResponse(await this.service.submit(id, orgId, { userId, role }, dto));
   }
+
+  @Delete(':id')
+  @Roles(...ADMIN, ...COMMS)
+  async remove(@Param('id') id: string, @CurrentUser('organizationId') orgId: string) {
+    return successResponse(await this.service.remove(id, orgId));
+  }
 }

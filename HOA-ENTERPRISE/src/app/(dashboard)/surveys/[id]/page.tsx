@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, PlayCircle, CheckCircle2, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ const qTypeLabel: Record<string, string> = { mc: 'Multiple choice', rating: 'Rat
 
 export default function AdminSurveyDetail() {
   const { id } = useParams();
+  const router = useRouter();
   const confirm = useConfirm();
   const [s, setS] = useState<any>(null);
   const [results, setResults] = useState<any>(null);
@@ -31,6 +32,23 @@ export default function AdminSurveyDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  const remove = async () => {
+    const ok = await confirm({
+      title: `Delete "${s.title}"?`,
+      description: 'This permanently removes the survey and all its responses. This cannot be undone.',
+      confirmText: 'Delete survey',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/surveys/${id}`);
+      toast({ variant: 'success', title: 'Survey deleted' });
+      router.push('/surveys');
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Delete failed', description: err.message });
+    }
+  };
 
   const transition = async (action: 'open' | 'close') => {
     const ok = await confirm({ title: `${action[0].toUpperCase() + action.slice(1)} this survey?`, confirmText: `Yes, ${action}` });
@@ -62,9 +80,12 @@ export default function AdminSurveyDetail() {
           <h1 className="mt-1 font-display text-heading-lg leading-tight text-charcoal-primary">{s.title}</h1>
           <p className="text-caption text-muted-foreground">{questions.length} questions{s.anonymous ? ' · anonymous' : ''}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {s.status === 'draft' && <Button onClick={() => transition('open')} disabled={busy}><PlayCircle className="mr-1.5 h-4 w-4" />Open</Button>}
           {s.status === 'open' && <Button variant="secondary" onClick={() => transition('close')} disabled={busy}><CheckCircle2 className="mr-1.5 h-4 w-4" />Close</Button>}
+          <Button variant="ghost" onClick={remove} disabled={busy} title="Delete survey">
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-coral-red" />
+          </Button>
         </div>
       </header>
 
