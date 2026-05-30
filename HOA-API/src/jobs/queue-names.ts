@@ -17,6 +17,8 @@ export const QUEUE_NAMES = {
   WEBHOOK_DELIVERIES: 'webhook-deliveries',
   // Transactional email dispatch (Phase 2.2). Body: { deliveryId }
   EMAIL_DELIVERIES: 'email-deliveries',
+  // Onboarding "finish setup" nudge for new orgs (sent once, after a few days).
+  ONBOARDING_NUDGE: 'onboarding-nudge',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -39,4 +41,5 @@ export const REPEAT_SCHEDULES: Record<QueueName, { every?: number; pattern?: str
   [QUEUE_NAMES.PAYMENT_PLAN_INSTALLMENTS]:  { pattern: '0 4 * * *',   description: 'Daily at 04:00 UTC — materialize due payment-plan installments' },
   [QUEUE_NAMES.WEBHOOK_DELIVERIES]:         { every: 60_000,           description: 'Every 60 seconds — retry pending webhook deliveries' },
   [QUEUE_NAMES.EMAIL_DELIVERIES]:           { every: 30_000,           description: 'Every 30 seconds — drain pending transactional emails' },
+  [QUEUE_NAMES.ONBOARDING_NUDGE]:           { pattern: '0 9 * * *',    description: "Daily at 09:00 UTC — nudge new orgs that haven't finished onboarding" },
 };

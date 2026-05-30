@@ -6,6 +6,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/layout/notification-bell';
 import { RoleSwitcher } from '@/components/layout/role-switcher';
+import { SetupProgress } from '@/components/layout/setup-progress';
 import { getInitials } from '@/lib/utils';
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -22,6 +23,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         {/* Role switcher: appears only when the user holds >1 active role.
             Clicking through to a resident role hands off the token to the
             resident PWA via URL fragment. */}
+        <SetupProgress />
         <RoleSwitcher />
         <NotificationBell />
         {/* Clicking name/avatar goes to the account page — saves a click vs

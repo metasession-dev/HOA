@@ -1,9 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { MailService } from '../mail/mail.service';
+
+const ENTERPRISE_URL = (
+  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
+).replace(/\/$/, '');
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'dev@metasession.co';
+
+// Step labels for the nudge email's "still to do" list.
+const STEP_LABELS: Record<string, string> = {
+  branding: 'Set your currency, timezone & branding',
+  units: 'Add your units',
+  residents: 'Invite residents to their portal',
+  team: 'Invite your team',
+  invoice: 'Issue your first levy or invoice',
+};
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OrganizationsService.name);
+  constructor(private prisma: PrismaService, private mail: MailService) {}
 
   async findById(id: string) {
     const org = await this.prisma.organization.findUnique({
@@ -50,6 +66,75 @@ export class OrganizationsService {
       percent: Math.round((done / total) * 100),
       completed: done === total,
     };
+  }
+
+  /**
+   * Daily job: send a single gentle "finish setting up" nudge to orgs that
+   * registered a few days ago but haven't completed onboarding. Scoped to a
+   * 3–14 day window so legacy orgs are never blasted, and guarded by
+   * onboardingNudgeAt so it only ever sends once per org.
+   */
+  async sendOnboardingNudges(now: Date = new Date()) {
+    const windowStart = new Date(now.getTime() - 14 * 86400000);
+    const windowEnd = new Date(now.getTime() - 3 * 86400000);
+
+    const orgs = await this.prisma.organization.findMany({
+      where: {
+        isActive: true,
+        onboardingNudgeAt: null,
+        createdAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: { id: true, name: true },
+    });
+
+    let sent = 0;
+    for (const org of orgs) {
+      try {
+        const status = await this.getOnboarding(org.id);
+        // Mark as handled regardless so we never re-evaluate this org daily.
+        await this.prisma.organization.update({
+          where: { id: org.id },
+          data: { onboardingNudgeAt: now },
+        });
+        if (status.completed) continue;
+
+        const remaining = Object.entries(status.steps)
+          .filter(([, ok]) => !ok)
+          .map(([k]) => STEP_LABELS[k] || k);
+
+        const admins = await this.prisma.userRole.findMany({
+          where: { organizationId: org.id, role: { name: { in: ['hoa_admin', 'super_admin'] } } },
+          select: { user: { select: { id: true, email: true, firstName: true } } },
+        });
+        const recipients = new Map<string, { email: string; firstName: string | null }>();
+        for (const a of admins) {
+          if (a.user?.email) recipients.set(a.user.email, { email: a.user.email, firstName: a.user.firstName });
+        }
+
+        const checklist = remaining.map((r) => `• ${r}`).join('\n');
+        for (const r of recipients.values()) {
+          await this.mail.enqueue({
+            organizationId: org.id,
+            templateKey: 'announcement',
+            to: r.email,
+            entityType: 'OrganizationNudge',
+            entityId: org.id,
+            data: {
+              recipientFirstName: r.firstName || 'there',
+              title: `Finish setting up ${org.name}`,
+              message:
+                `You're ${status.percent}% of the way there! A few quick steps will get ${org.name} fully up and running on HOA.africa:\n\n${checklist}\n\nIt only takes a few minutes — and once you're set up, levies, payments and resident communication run themselves. Need a hand? Just reply or reach us at ${SUPPORT_EMAIL}.`,
+              ctaLabel: 'Finish setup',
+              ctaUrl: `${ENTERPRISE_URL}/admin`,
+            },
+          });
+        }
+        sent++;
+      } catch (err: any) {
+        this.logger.warn(`onboarding nudge failed for org ${org.id}: ${err?.message ?? err}`);
+      }
+    }
+    return { evaluated: orgs.length, nudged: sent };
   }
 
   /**

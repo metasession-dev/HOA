@@ -24,6 +24,7 @@ export class JobsService implements OnApplicationBootstrap {
     @Optional() @InjectQueue(QUEUE_NAMES.PAYMENT_PLAN_INSTALLMENTS) private planQ?: Queue,
     @Optional() @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERIES) private webhookQ?: Queue,
     @Optional() @InjectQueue(QUEUE_NAMES.EMAIL_DELIVERIES) private emailQ?: Queue,
+    @Optional() @InjectQueue(QUEUE_NAMES.ONBOARDING_NUDGE) private nudgeQ?: Queue,
   ) {}
 
   async onApplicationBootstrap() {
@@ -133,6 +134,7 @@ export class JobsService implements OnApplicationBootstrap {
       case QUEUE_NAMES.PAYMENT_PLAN_INSTALLMENTS: return this.planQ;
       case QUEUE_NAMES.WEBHOOK_DELIVERIES: return this.webhookQ;
       case QUEUE_NAMES.EMAIL_DELIVERIES: return this.emailQ;
+      case QUEUE_NAMES.ONBOARDING_NUDGE: return this.nudgeQ;
     }
   }
 }

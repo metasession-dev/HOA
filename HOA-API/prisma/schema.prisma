@@ -117,6 +117,8 @@ model Organization {
   accentColor      String?  // hex like #2563EB; null = use platform default
   brandingTagline  String?  // appears under the logo on the resident login + topbar
   isActive  Boolean  @default(true)
+  // Set when the "finish setting up" nudge email has been sent (once per org).
+  onboardingNudgeAt DateTime?
   // ---- Phase 6: enterprise security ----
   // Roles for which MFA is mandatory when set. Empty array = no enforcement.
   mfaRequiredRoles String[] @default([])

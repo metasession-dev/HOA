@@ -8,8 +8,10 @@ import { LateFeeSweepProcessor } from './processors/late-fee-sweep.processor';
 import { PaymentPlanInstallmentsProcessor } from './processors/payment-plan-installments.processor';
 import { WebhookDeliveriesProcessor } from './processors/webhook-deliveries.processor';
 import { EmailDeliveriesProcessor } from './processors/email-deliveries.processor';
+import { OnboardingNudgeProcessor } from './processors/onboarding-nudge.processor';
 import { QUEUE_NAMES } from './queue-names';
 import { BillingModule } from '../billing/billing.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { PrismaService } from '../common/prisma.service';
 
 /**
@@ -52,6 +54,7 @@ export class JobsModule {
           }),
           ...Object.values(QUEUE_NAMES).map((name) => BullModule.registerQueue({ name })),
           BillingModule,
+          OrganizationsModule,
         ];
 
     const providers = jobsDisabled
@@ -63,6 +66,7 @@ export class JobsModule {
           PaymentPlanInstallmentsProcessor,
           WebhookDeliveriesProcessor,
           EmailDeliveriesProcessor,
+          OnboardingNudgeProcessor,
         ];
 
     return {
