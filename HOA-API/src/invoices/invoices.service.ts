@@ -4,11 +4,22 @@ import { PaginationDto, paginatedResponse, coercePagination } from '../common/dt
 import { Decimal } from '@prisma/client/runtime/library';
 import { Actor, scopeInvoiceWhere } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const RESIDENT_BASE = (
+  process.env.APP_RESIDENTS_URL ||
+  process.env.RESIDENT_BASE_URL ||
+  'http://localhost:3002'
+).replace(/\/$/, '');
 
 @Injectable()
 export class InvoicesService {
   private readonly logger = new Logger(InvoicesService.name);
-  constructor(private prisma: PrismaService, private fx: FxService) {}
+  constructor(
+    private prisma: PrismaService,
+    private fx: FxService,
+    private notifications: NotificationsService,
+  ) {}
 
   async findAll(
     orgId: string,
@@ -118,10 +129,40 @@ export class InvoicesService {
     if (invoice.status !== 'draft') {
       throw new BadRequestException('Only draft invoices can be sent');
     }
-    return this.prisma.invoice.update({
+    const updated = await this.prisma.invoice.update({
       where: { id },
       data: { status: 'sent', sentAt: new Date() },
     });
+
+    // Notify the unit's primary contact (in-app + email). Best-effort.
+    const amountText = `${invoice.currency} ${Number(invoice.amount).toLocaleString('en', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    const dueText = new Date(invoice.dueDate).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const unitLabel = (invoice as any).unit?.unitNumber ? ` (Unit ${(invoice as any).unit.unitNumber})` : '';
+    await this.notifications.notifyUnitContacts({
+      organizationId: orgId,
+      unitId: invoice.unitId,
+      type: 'invoice_sent',
+      title: `New invoice ${invoice.invoiceNumber}`,
+      body: `${amountText} due ${dueText}.`,
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      actionUrl: `/invoices/${invoice.id}`,
+      email: {
+        subject: `Invoice ${invoice.invoiceNumber} from your HOA`,
+        message: `A new invoice (${invoice.invoiceNumber}) for ${amountText} has been issued to your unit${unitLabel}.\n\nIt is due on ${dueText}. You can view and pay it from your resident portal.`,
+        ctaLabel: 'View invoice',
+        ctaUrl: `${RESIDENT_BASE}/invoices/${invoice.id}`,
+      },
+    });
+
+    return updated;
   }
 
   async void(id: string, orgId: string) {

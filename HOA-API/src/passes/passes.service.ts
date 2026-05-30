@@ -9,13 +9,24 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole, scopePassWhere } from '../common/scope.util';
 import { generatePassCode, normalizePassCode } from '../common/code.util';
 import { WebhooksService } from '../platform/webhooks.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePassDto } from './dto/create-pass.dto';
+
+const RESIDENT_BASE = (
+  process.env.APP_RESIDENTS_URL ||
+  process.env.RESIDENT_BASE_URL ||
+  'http://localhost:3002'
+).replace(/\/$/, '');
 
 type Validity = { valid: boolean; reason?: string };
 
 @Injectable()
 export class PassesService {
-  constructor(private prisma: PrismaService, private webhooks: WebhooksService) {}
+  constructor(
+    private prisma: PrismaService,
+    private webhooks: WebhooksService,
+    private notifications: NotificationsService,
+  ) {}
 
   private async generateUniqueCode(): Promise<string> {
     for (let i = 0; i < 5; i++) {
@@ -258,6 +269,25 @@ export class PassesService {
         },
       }),
     ]);
+
+    // Notify the unit's contact that their gate pass was just used (in-app + email).
+    const visitor = pass.visitorName ? ` for ${pass.visitorName}` : '';
+    await this.notifications.notifyUnitContacts({
+      organizationId: orgId,
+      unitId: pass.unitId,
+      type: 'gate_pass_used',
+      title: 'Gate pass used',
+      body: `A gate pass${visitor} was just used at the gate${isOverride ? ' (manual override)' : ''}.`,
+      entityType: 'GatePass',
+      entityId: `${id}:${log.id}`,
+      actionUrl: '/passes',
+      email: {
+        subject: 'Your gate pass was just used',
+        message: `A visitor gate pass${visitor} linked to your unit was used at the gate just now${isOverride ? ' (manually overridden by security)' : ''}.\n\nIf this wasn't expected, please contact estate security.`,
+        ctaLabel: 'View gate passes',
+        ctaUrl: `${RESIDENT_BASE}/passes`,
+      },
+    });
 
     return { log, pass: updated };
   }

@@ -21,6 +21,12 @@ import {
   ALLOWED_CONTENT_TYPES,
 } from './dto/create-violation.dto';
 
+const RESIDENT_BASE = (
+  process.env.APP_RESIDENTS_URL ||
+  process.env.RESIDENT_BASE_URL ||
+  'http://localhost:3002'
+).replace(/\/$/, '');
+
 // Server-side state machine. Any transition not listed is rejected with 409.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   open: ['noticed', 'closed'],
@@ -245,6 +251,26 @@ export class ViolationsService {
       occurredAt: v.occurredAt.toISOString(),
       description: v.description,
       photoCount: photos.length,
+    });
+
+    // Notify the unit's primary contact that a violation was logged (in-app + email).
+    const catName = (v as any).category?.name ?? 'Violation';
+    const unitLabel = (v as any).unit?.unitNumber ? ` (Unit ${(v as any).unit.unitNumber})` : '';
+    await this.notifications.notifyUnitContacts({
+      organizationId: orgId,
+      unitId: v.unitId,
+      type: 'violation_logged',
+      title: `Violation logged: ${catName}`,
+      body: v.description.slice(0, 280),
+      entityType: 'Violation',
+      entityId: v.id,
+      actionUrl: `/violations/${v.id}`,
+      email: {
+        subject: 'A violation was logged for your unit',
+        message: `A violation has been logged for your unit${unitLabel}: ${catName}.\n\n${v.description}\n\nPlease log in to your resident portal for details and next steps.`,
+        ctaLabel: 'View violation',
+        ctaUrl: `${RESIDENT_BASE}/violations/${v.id}`,
+      },
     });
 
     return v;

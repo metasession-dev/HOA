@@ -122,6 +122,121 @@ export class NotificationsService {
     return { created: result.count, broadcastId };
   }
 
+  /**
+   * Notify a unit's point(s) of contact — in-app + push + optional email.
+   * Targets the flagged primary contact; falls back to an owner occupancy, then
+   * to every active occupant. Residents with a linked user account get the
+   * in-app + push + email; a contact who has an email but no account still gets
+   * the email. Best-effort — never throws into the caller.
+   */
+  async notifyUnitContacts(input: {
+    organizationId: string;
+    unitId: string;
+    type: string;
+    title: string;
+    body: string;
+    entityType?: string;
+    entityId?: string;
+    actionUrl?: string;
+    email?: { subject: string; message: string; ctaLabel?: string; ctaUrl?: string };
+  }): Promise<{ created: number }> {
+    try {
+      const occ = await this.prisma.unitOccupancy.findMany({
+        where: { unitId: input.unitId, isActive: true },
+        include: { person: { select: { id: true, userId: true, email: true, firstName: true } } },
+      });
+      if (occ.length === 0) return { created: 0 };
+
+      // Prefer the flagged primary contact; else an owner; else everyone active.
+      const primary = occ.find((o) => o.isPrimaryContact) || occ.find((o) => o.role === 'owner');
+      const targets = primary ? [primary] : occ;
+
+      const userIds = Array.from(
+        new Set(targets.map((o) => o.person?.userId).filter((u): u is string => Boolean(u))),
+      );
+
+      let created = 0;
+      if (userIds.length > 0) {
+        const res = await this.enqueueFor({
+          organizationId: input.organizationId,
+          recipientUserIds: userIds,
+          type: input.type,
+          title: input.title,
+          body: input.body,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          actionUrl: input.actionUrl,
+          alsoEmail: input.email,
+        });
+        created = res.created;
+      }
+
+      // Email any target with an address but no linked account (enqueueFor's
+      // email fan-out only covers users).
+      if (input.email) {
+        for (const o of targets) {
+          const p = o.person;
+          if (!p || p.userId || !p.email) continue;
+          await this.emailExternal({
+            organizationId: input.organizationId,
+            to: p.email,
+            recipientName: p.firstName || 'there',
+            subject: input.email.subject,
+            message: input.email.message,
+            ctaLabel: input.email.ctaLabel,
+            ctaUrl: input.email.ctaUrl,
+            entityType: input.entityType,
+            entityId: input.entityId,
+          });
+        }
+      }
+      return { created };
+    } catch (err) {
+      this.logger.warn(`notifyUnitContacts failed for unit ${input.unitId}: ${(err as any)?.message ?? err}`);
+      return { created: 0 };
+    }
+  }
+
+  /**
+   * Send a one-off transactional email to an arbitrary address (e.g. a vendor
+   * with no user account) via the generic announcement template. Best-effort.
+   */
+  async emailExternal(input: {
+    organizationId: string;
+    to: string;
+    recipientName?: string;
+    subject: string;
+    message: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
+    entityType?: string;
+    entityId?: string;
+  }): Promise<void> {
+    if (!input.to) return;
+    try {
+      await this.mail.enqueue(
+        {
+          organizationId: input.organizationId,
+          templateKey: 'announcement',
+          data: {
+            recipientFirstName: input.recipientName || 'there',
+            title: input.subject,
+            message: input.message,
+            ctaLabel: input.ctaLabel,
+            ctaUrl: input.ctaUrl,
+          },
+          to: input.to,
+          toName: input.recipientName,
+          entityType: input.entityType,
+          entityId: input.entityId,
+        },
+        { force: true },
+      );
+    } catch (err) {
+      this.logger.warn(`external email to ${input.to} failed: ${(err as any)?.message ?? err}`);
+    }
+  }
+
   async listForUser(userId: string, query: PaginationDto & { unread?: string }) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(query.limit) || 30));

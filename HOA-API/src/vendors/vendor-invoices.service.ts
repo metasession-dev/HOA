@@ -194,7 +194,7 @@ export class VendorInvoicesService {
 
     const glAccountId = dto.glAccountId ?? vendor.defaultGlAccountId ?? undefined;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const inv = await tx.vendorInvoice.create({
         data: {
           organizationId: orgId,
@@ -310,6 +310,21 @@ export class VendorInvoicesService {
 
       return updated;
     });
+
+    // Acknowledge receipt to the vendor (best-effort; vendors have no account).
+    if (vendor.email) {
+      const amt = `${currency} ${Number(dto.amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      await this.notifications.emailExternal({
+        organizationId: orgId,
+        to: vendor.email,
+        recipientName: vendor.name,
+        subject: `We've recorded your invoice ${result.vendorInvoiceNo}`,
+        message: `Hi ${vendor.name},\n\nWe've recorded your invoice ${result.vendorInvoiceNo} for ${amt}. It's now in our approval queue and we'll be in touch about payment.\n\nThank you.`,
+        entityType: 'VendorInvoice',
+        entityId: `${result.id}:captured`,
+      });
+    }
+    return result;
   }
 
   async update(id: string, orgId: string, actor: Actor, dto: UpdateVendorInvoiceDto) {
@@ -564,7 +579,8 @@ export class VendorInvoicesService {
   }
 
   async pay(id: string, orgId: string, actor: Actor, dto: PayInvoiceDto) {
-    return this.prisma.$transaction(async (tx) => {
+    let vendorContact: { email: string | null; name: string } | null = null;
+    const result = await this.prisma.$transaction(async (tx) => {
       const inv = await tx.vendorInvoice.findFirst({
         where: { id, organizationId: orgId },
         include: { vendor: true },
@@ -573,6 +589,7 @@ export class VendorInvoicesService {
       if (!ALLOWED[inv.status]?.includes('paid')) {
         throw new ConflictException(`Cannot pay invoice in status ${inv.status}`);
       }
+      vendorContact = { email: inv.vendor.email, name: inv.vendor.name };
 
       const paid = await tx.vendorInvoice.update({
         where: { id },
@@ -619,6 +636,22 @@ export class VendorInvoicesService {
 
       return paid;
     });
+
+    // Payment confirmation to the vendor (best-effort).
+    const vc = vendorContact as { email: string | null; name: string } | null;
+    if (vc?.email) {
+      const amt = `${result.currency} ${Number(result.amount.toString()).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      await this.notifications.emailExternal({
+        organizationId: orgId,
+        to: vc.email,
+        recipientName: vc.name,
+        subject: `Payment recorded for invoice ${result.vendorInvoiceNo}`,
+        message: `Hi ${vc.name},\n\nA payment of ${amt} for invoice ${result.vendorInvoiceNo} has been recorded${dto.paymentReference ? `, reference ${dto.paymentReference}` : ''}.\n\nThank you.`,
+        entityType: 'VendorInvoice',
+        entityId: `${result.id}:paid`,
+      });
+    }
+    return result;
   }
 
   async batchPay(orgId: string, actor: Actor, dto: BatchPayDto) {
