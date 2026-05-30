@@ -6,7 +6,7 @@ import { createLlmProvider } from '../assistant/llm/provider';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
 
-const RESIDENT_BASE = process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+const RESIDENT_BASE = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
 
 const SURVEY_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],

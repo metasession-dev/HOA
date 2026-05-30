@@ -109,8 +109,8 @@ export class RequestsService {
       select: { id: true, email: true, firstName: true },
     });
     const base = opts.audience === 'resident'
-      ? (process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002')
-      : (process.env.ENTERPRISE_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000');
+      ? (process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002')
+      : (process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000');
     const path = opts.audience === 'resident' ? `/requests/${opts.requestId}` : `/admin/requests/${opts.requestId}`;
     for (const u of users) {
       if (!u.email) continue;

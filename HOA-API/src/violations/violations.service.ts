@@ -306,7 +306,7 @@ export class ViolationsService {
     });
 
     if (recipientUserIds.length > 0) {
-      const residentBase = process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+      const residentBase = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
       await this.notifications.enqueueFor({
         organizationId: orgId,
         recipientUserIds,

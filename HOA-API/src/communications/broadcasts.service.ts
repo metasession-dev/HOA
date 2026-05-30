@@ -273,7 +273,7 @@ export class BroadcastsService {
           // URL embeds a stateless HMAC token so we don't have to pre-issue
           // rows (which would conflict with "is opted out" semantics).
           const stateless = this.issueStatelessOptOutToken(orgId, r.email, b.optOutTopic ?? null);
-          const optOutUrl = `${process.env.RESIDENT_BASE_URL || 'http://localhost:3002'}/unsubscribe?token=${stateless}`;
+          const optOutUrl = `${process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || 'http://localhost:3002'}/unsubscribe?token=${stateless}`;
 
           const mailRow = await this.mail.enqueue({
             organizationId: orgId,

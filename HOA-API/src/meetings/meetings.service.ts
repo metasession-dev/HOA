@@ -198,7 +198,11 @@ export class MeetingsService {
   // ---------- helpers ----------
 
   private apiBase(): string {
-    return (process.env.API_PUBLIC_URL || process.env.PUBLIC_API_URL || 'http://localhost:3003').replace(/\/$/, '');
+    return (
+      process.env.API_PUBLIC_URL ||
+      process.env.PUBLIC_API_URL ||
+      (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:3003')
+    ).replace(/\/$/, '');
   }
 
   private googleCalUrl(m: { title: string; description: string | null; location: string | null; onlineUrl: string | null; startsAt: Date; endsAt: Date }): string {
