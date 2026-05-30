@@ -7,6 +7,12 @@ import { PrismaService } from '../common/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { sha256 } from '../common/encryption';
+import { MailService } from '../mail/mail.service';
+
+const ENTERPRISE_URL = (
+  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
+).replace(/\/$/, '');
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'dev@metasession.co';
 
 // Short-lived in-memory store for MFA challenges keyed by sha256(challengeToken).
 // Phase 9 swaps this for Redis. The same caveat as the public-resale rate
@@ -69,6 +75,7 @@ export class AuthService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mail: MailService,
   ) {}
 
   /**
@@ -529,6 +536,28 @@ export class AuthService implements OnModuleInit {
     } catch (err: any) {
       // eslint-disable-next-line no-console
       console.warn(`[register] could not seed default request categories: ${err?.message ?? err}`);
+    }
+
+    // Welcome email — best-effort, never blocks sign-up. Deduped per org so a
+    // retried register can't double-send.
+    try {
+      await this.mail.enqueue({
+        organizationId: result.org.id,
+        templateKey: 'welcome',
+        to: result.user.email,
+        toName: `${result.user.firstName ?? ''} ${result.user.lastName ?? ''}`.trim() || undefined,
+        toUserId: result.user.id,
+        entityType: 'Organization',
+        entityId: result.org.id,
+        data: {
+          recipientFirstName: result.user.firstName || 'there',
+          organizationName: result.org.name,
+          dashboardUrl: ENTERPRISE_URL,
+          supportEmail: SUPPORT_EMAIL,
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`[register] welcome email failed: ${err?.message ?? err}`);
     }
 
     const token = this.generateToken(result.user, {

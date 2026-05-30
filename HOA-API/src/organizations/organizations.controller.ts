@@ -42,6 +42,12 @@ export class OrganizationsController {
     return successResponse(stats);
   }
 
+  /** Onboarding checklist state for the "Getting started" card (admin console). */
+  @Get('onboarding')
+  async getOnboarding(@CurrentUser('organizationId') orgId: string) {
+    return successResponse(await this.service.getOnboarding(orgId));
+  }
+
   /** Phase 10.2 — branding update (logo, accent colour, tagline). Admin-only. */
   @Put('current/branding')
   @Roles('hoa_admin')

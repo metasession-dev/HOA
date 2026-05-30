@@ -10,6 +10,8 @@ import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { StatCard } from '@/components/dashboard/stat-card';
+import { GettingStarted } from '@/components/dashboard/getting-started';
+import { WelcomeDialog } from '@/components/dashboard/welcome-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -55,6 +57,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <WelcomeDialog />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-caption uppercase tracking-[0.16em] text-muted-foreground">{organizationName}</p>
@@ -68,6 +71,8 @@ export default function AdminDashboard() {
           <Link href="/communications"><Button variant="secondary"><Megaphone className="mr-1.5 h-4 w-4" />Broadcast</Button></Link>
         </div>
       </header>
+
+      <GettingStarted />
 
       <div className="inline-flex rounded-pill bg-stone-surface p-1">
         {ranges.map((r) => (

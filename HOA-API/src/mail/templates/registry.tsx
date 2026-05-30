@@ -10,6 +10,7 @@ import { Invite, inviteSubject, InviteData } from './invite';
 import { PasswordReset, passwordResetSubject, PasswordResetData } from './password-reset';
 import { MeetingInvite, meetingInviteSubject, MeetingInviteData } from './meeting-invite';
 import { Announcement, announcementSubject, AnnouncementData } from './announcement';
+import { Welcome, welcomeSubject, WelcomeData } from './welcome';
 
 /**
  * Phase 2.2 — Template registry.
@@ -34,6 +35,7 @@ export const TEMPLATE_KEYS = {
   PASSWORD_RESET: 'password_reset',
   MEETING_INVITE: 'meeting_invite',
   ANNOUNCEMENT: 'announcement',
+  WELCOME: 'welcome',
 } as const;
 
 export type TemplateKey = (typeof TEMPLATE_KEYS)[keyof typeof TEMPLATE_KEYS];
@@ -49,6 +51,7 @@ type TemplateMap = {
   password_reset: PasswordResetData;
   meeting_invite: MeetingInviteData;
   announcement: AnnouncementData;
+  welcome: WelcomeData;
 };
 
 export async function renderTemplate<K extends TemplateKey>(key: K, data: TemplateMap[K]): Promise<TemplateRender> {
@@ -92,6 +95,10 @@ export async function renderTemplate<K extends TemplateKey>(key: K, data: Templa
     case 'announcement': {
       const d = data as AnnouncementData;
       return { subject: announcementSubject(d), html: await render(<Announcement data={d} />) };
+    }
+    case 'welcome': {
+      const d = data as WelcomeData;
+      return { subject: welcomeSubject(d), html: await render(<Welcome data={d} />) };
     }
     default: {
       throw new Error(`Unknown email template: ${key}`);
