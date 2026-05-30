@@ -929,12 +929,17 @@ model SurveyResponse {
   id               String   @id @default(cuid())
   surveyId         String
   respondentUserId String?  // null if anonymous
+  // One-way participation marker: sha256(surveyId + userId + secret). Lets us
+  // enforce one-response-per-user even for ANONYMOUS surveys without linking the
+  // user's identity to their answers.
+  anonymousHash    String?
   answers          Json
   submittedAt      DateTime @default(now())
 
   survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@unique([surveyId, respondentUserId])
+  @@unique([surveyId, anonymousHash])
   @@index([surveyId])
   @@map("survey_responses")
 }

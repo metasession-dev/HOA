@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 
 const statusBadge: Record<string, 'muted' | 'success' | 'info'> = { draft: 'muted', open: 'success', closed: 'info' };
+const qTypeLabel: Record<string, string> = { mc: 'Multiple choice', rating: 'Rating', text: 'Open text' };
 
 export default function AdminSurveyDetail() {
   const { id } = useParams();
@@ -135,7 +136,7 @@ export default function AdminSurveyDetail() {
               <span className="font-mono text-caption text-muted-foreground w-8 shrink-0">Q{i + 1}</span>
               <div>
                 <p className="text-graphite">{q.label}</p>
-                <p className="text-caption text-muted-foreground">{q.type}{q.required ? ' · required' : ''}</p>
+                <p className="text-caption text-muted-foreground">{qTypeLabel[q.type] || q.type}{q.required ? ' · required' : ''}{q.type === 'mc' && q.options ? ` · ${q.options.length} options` : ''}</p>
               </div>
             </li>
           ))}

@@ -23,7 +23,6 @@ const adminNav = [
   { title: 'People', href: '/admin/people', icon: Users },
   { title: 'Team', href: '/admin/team', icon: Users },
   { title: 'Anomalies', href: '/admin/anomalies', icon: AlertTriangle },
-  { title: 'Background jobs', href: '/admin/jobs', icon: Workflow },
   { title: 'Assistant', href: '/assistant', icon: Sparkles },
 ];
 
@@ -47,6 +46,7 @@ const operationsNav = [
   { title: 'Gate passes', href: '/passes', icon: KeyRound },
   { title: 'Violations', href: '/violations', icon: ShieldAlert },
   { title: 'Documents', href: '/documents', icon: FolderOpen },
+  { title: 'Background jobs', href: '/admin/jobs', icon: Workflow },
   { title: 'Privacy & data', href: '/settings/privacy', icon: Lock },
   { title: 'Settings', href: '/settings', icon: Settings },
 ];

@@ -82,15 +82,22 @@ export default function ResidentSurveyDetail() {
                 </Label>
                 {q.type === 'mc' && (
                   <div className="space-y-1.5">
-                    {(q.options || []).map((o: any) => {
-                      const sel = answers[q.id] === o.id || (Array.isArray(answers[q.id]) && answers[q.id].includes(o.id));
+                    {(q.options || []).map((o: any, oi: number) => {
+                      // Options may be {id,label} objects or bare strings — handle both.
+                      const optId = typeof o === 'string' ? o : (o?.id ?? String(oi));
+                      const optLabel = typeof o === 'string' ? o : (o?.label ?? o?.id ?? `Option ${oi + 1}`);
+                      const cur = answers[q.id];
+                      // Only "selected" once an answer is actually chosen — otherwise an
+                      // unset answer (undefined) matched an id-less option and every
+                      // row rendered as selected (solid black bars).
+                      const sel = cur != null && (cur === optId || (Array.isArray(cur) && cur.includes(optId)));
                       return (
-                        <button key={o.id} type="button" onClick={() => setAnswer(q.id, o.id)}
+                        <button key={`${optId}-${oi}`} type="button" onClick={() => setAnswer(q.id, optId)}
                           className={cn(
                             'w-full rounded-lg px-4 py-2.5 text-left text-sm transition-colors',
                             sel ? 'bg-midnight text-white' : 'bg-stone-surface text-graphite hover:bg-card hover:shadow-inset-stone',
                           )}>
-                          {o.label}
+                          {optLabel}
                         </button>
                       );
                     })}

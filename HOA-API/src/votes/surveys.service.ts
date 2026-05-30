@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole } from '../common/scope.util';
 import { CreateSurveyDto, SubmitSurveyResponseDto } from './dto/votes.dto';
 import { createLlmProvider } from '../assistant/llm/provider';
+import * as crypto from 'crypto';
 
 const SURVEY_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],
@@ -172,15 +173,22 @@ export class SurveysService {
     if (!s) throw new NotFoundException('Survey not found');
     if (isResidentRole(actor.role) && s.status === 'draft') throw new NotFoundException('Survey not found');
 
-    // Has the actor already submitted?
+    // Has the actor already submitted? Checked via the participation hash so it
+    // works for anonymous surveys too (one response per user, either way).
     let hasSubmitted = false;
-    if (isResidentRole(actor.role) && !s.anonymous) {
+    if (isResidentRole(actor.role)) {
       const existing = await this.prisma.surveyResponse.findFirst({
-        where: { surveyId: id, respondentUserId: actor.userId },
+        where: { surveyId: id, anonymousHash: this.participationHash(id, actor.userId) },
       });
       hasSubmitted = !!existing;
     }
     return { ...s, hasSubmitted };
+  }
+
+  /** One-way per-(survey,user) marker used to enforce one response per user. */
+  private participationHash(surveyId: string, userId: string): string {
+    const secret = process.env.SURVEY_HASH_SECRET || process.env.JWT_SECRET || 'survey-participation-secret';
+    return crypto.createHash('sha256').update(`${surveyId}:${userId}:${secret}`).digest('hex');
   }
 
   async create(orgId: string, actor: Actor, dto: CreateSurveyDto) {
@@ -287,7 +295,10 @@ export class SurveysService {
       return await this.prisma.surveyResponse.create({
         data: {
           surveyId: id,
+          // Anonymous surveys don't store who answered; the participation hash
+          // still blocks a second submission from the same user.
           respondentUserId: s.anonymous ? null : actor.userId,
+          anonymousHash: this.participationHash(id, actor.userId),
           answers: dto.answers as any,
         },
       });
@@ -319,7 +330,13 @@ export class SurveysService {
         }
         totals[q.id] = {
           type: 'mc',
-          options: (q.options || []).map((o: any) => ({ id: o.id, label: o.label, count: counts[o.id] || 0 })),
+          // Options may be {id,label} objects or bare strings — normalize both so
+          // labels and counts are always accurate in the admin results view.
+          options: (q.options || []).map((o: any, oi: number) => {
+            const optId = typeof o === 'string' ? o : (o?.id ?? String(oi));
+            const optLabel = typeof o === 'string' ? o : (o?.label ?? o?.id ?? `Option ${oi + 1}`);
+            return { id: optId, label: optLabel, count: counts[optId] || 0 };
+          }),
         };
       } else if (q.type === 'rating') {
         const values: number[] = [];
