@@ -34,12 +34,16 @@ const FALLBACK: OrgSettings = {
 
 const OrgSettingsContext = createContext<{
   org: OrgSettings;
+  loaded: boolean;
   reload: () => Promise<void>;
-}>({ org: FALLBACK, reload: async () => {} });
+}>({ org: FALLBACK, loaded: false, reload: async () => {} });
 
 export function OrgSettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [org, setOrg] = useState<OrgSettings>(FALLBACK);
+  // Gate currency-bearing UI until the org's real currency is known, so
+  // amounts never flash the ZAR ("R") fallback before settings load.
+  const [loaded, setLoaded] = useState(false);
 
   const reload = async () => {
     try {
@@ -53,6 +57,8 @@ export function OrgSettingsProvider({ children }: { children: ReactNode }) {
       });
     } catch {
       // Keep the fallback so the UI still renders consistent placeholders.
+    } finally {
+      setLoaded(true);
     }
   };
 
@@ -60,14 +66,26 @@ export function OrgSettingsProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setOrg(FALLBACK);
       setOrgSettings({ currency: FALLBACK.currency, timezone: FALLBACK.timezone, language: FALLBACK.language });
+      setLoaded(true);
       return;
     }
+    setLoaded(false);
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // While a signed-in user's org settings load, show a brief loader instead of
+  // rendering amounts in the placeholder currency.
+  if (user && !loaded) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <p className="font-display text-body text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
   return (
-    <OrgSettingsContext.Provider value={{ org, reload }}>
+    <OrgSettingsContext.Provider value={{ org, loaded, reload }}>
       {children}
     </OrgSettingsContext.Provider>
   );
