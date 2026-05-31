@@ -385,7 +385,9 @@ export class TendersService {
     if (t.status !== 'open') throw new ConflictException('This tender is not open for bids.');
     if (new Date() > t.closesAt) throw new ConflictException('The bidding deadline has passed.');
 
-    const currency = (dto.currency || t.currency || vendor.preferredCurrency || 'ZAR').toUpperCase();
+    // Bids always use the tender's currency, which is the org's settings
+    // currency — vendors don't choose a currency.
+    const currency = (t.currency || 'ZAR').toUpperCase();
     const existing = await this.prisma.bid.findUnique({
       where: { tenderId_vendorId: { tenderId: t.id, vendorId: vendor.id } },
     });

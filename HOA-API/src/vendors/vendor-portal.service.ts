@@ -98,8 +98,22 @@ export class VendorPortalService {
   ) {
     const v = await this.vendorForUser(userId, orgId);
     const actor: Actor = { userId, role };
+    // Vendor invoices always use the org's settings currency — vendors don't
+    // pick a currency. Force it server-side (currencyOverride bypasses the
+    // preferred-currency mismatch guard) so a stale/forged client value can't
+    // change it.
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { currency: true },
+    });
+    const currency = (org?.currency || 'ZAR').toUpperCase();
     // vendorId is forced to the logged-in vendor — clients can't submit for
     // another vendor. Reuses the full capture + approval-routing pipeline.
-    return this.invoices.create(orgId, actor, { ...dto, vendorId: v.id } as any);
+    return this.invoices.create(orgId, actor, {
+      ...dto,
+      vendorId: v.id,
+      currency,
+      currencyOverride: true,
+    } as any);
   }
 }

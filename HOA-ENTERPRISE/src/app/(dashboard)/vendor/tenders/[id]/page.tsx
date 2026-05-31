@@ -67,7 +67,6 @@ export default function VendorTenderDetailPage() {
       await api.post('/vendor-portal/tenders/bids', {
         tenderId: id,
         amount: Number(amount),
-        currency: t?.currency,
         proposal: proposal.trim(),
         attachments: attachments.map((a) => ({ url: a.url, filename: a.filename, contentType: a.contentType, size: a.size ?? 0 })),
       });
@@ -149,15 +148,9 @@ export default function VendorTenderDetailPage() {
                 {t.myBid ? 'Update your bid' : 'Submit a bid'}
               </h3>
               <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 sm:max-w-xs">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="amount">Your price</Label>
-                    <Input id="amount" type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Currency</Label>
-                    <Input value={t.currency} disabled />
-                  </div>
+                <div className="space-y-1.5 sm:max-w-[12rem]">
+                  <Label htmlFor="amount">Your price ({t.currency})</Label>
+                  <Input id="amount" type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="proposal">Proposal</Label>

@@ -63,7 +63,8 @@ export class TenderAiDraftDto {
 export class SubmitBidDto {
   @IsString() tenderId: string;
   @IsNumber() @Min(0.01) amount: number;
-  @IsOptional() @IsString() @MaxLength(8) currency?: string;
+  // Currency is intentionally omitted — bids always use the tender's (org
+  // settings) currency, set server-side.
   @IsString() @IsNotEmpty() @MaxLength(10000) proposal: string;
 
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => TenderAttachmentDto)

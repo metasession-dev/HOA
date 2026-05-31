@@ -27,7 +27,6 @@ export default function SubmitVendorInvoicePage() {
   const [form, setForm] = useState({
     vendorInvoiceNo: '',
     amount: '',
-    currency: '',
     issueDate: '',
     dueDate: '',
     notes: '',
@@ -37,10 +36,7 @@ export default function SubmitVendorInvoicePage() {
 
   useEffect(() => {
     api.get<any>('/vendor-portal/me')
-      .then((r) => {
-        setMe(r.data);
-        setForm((f) => ({ ...f, currency: r.data?.preferredCurrency || 'ZAR' }));
-      })
+      .then((r) => setMe(r.data))
       .catch(() => {});
   }, []);
 
@@ -61,8 +57,6 @@ export default function SubmitVendorInvoicePage() {
       await api.post('/vendor-portal/invoices', {
         vendorInvoiceNo: form.vendorInvoiceNo.trim() || undefined,
         amount: Number(form.amount),
-        currency: form.currency.trim().toUpperCase() || undefined,
-        currencyOverride: true,
         issueDate: form.issueDate,
         dueDate: form.dueDate,
         notes: form.notes.trim() || undefined,
@@ -123,29 +117,18 @@ export default function SubmitVendorInvoicePage() {
                     placeholder="e.g. INV-2026-014"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="amount">Amount</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.amount}
-                      onChange={(e) => set('amount', e.target.value)}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Input
-                      id="currency"
-                      value={form.currency}
-                      onChange={(e) => set('currency', e.target.value)}
-                      maxLength={8}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.amount}
+                    onChange={(e) => set('amount', e.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
                 </div>
               </div>
 
