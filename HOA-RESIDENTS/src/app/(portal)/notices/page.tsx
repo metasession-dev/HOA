@@ -1,11 +1,44 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, FileText, Video } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+}
+
+function NoticeAttachments({ items }: { items: Array<{ url: string; filename: string; contentType: string }> }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-3">
+      {items.map((a, i) =>
+        a.contentType?.startsWith('image/') ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <a key={i} href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer" title={a.filename}>
+            <img src={resolveFileUrl(a.url)} alt={a.filename} className="h-20 w-20 rounded-lg object-cover ring-1 ring-stone-surface" />
+          </a>
+        ) : (
+          <a
+            key={i}
+            href={resolveFileUrl(a.url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-stone-surface/60 px-3 py-1.5 text-caption text-graphite hover:text-ember-orange"
+          >
+            {a.contentType?.startsWith('video/') ? <Video className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+            {a.filename}
+          </a>
+        ),
+      )}
+    </div>
+  );
+}
 
 export default function NoticesPage() {
   const [notices, setNotices] = useState<any[]>([]);
@@ -65,6 +98,7 @@ export default function NoticesPage() {
                   </span>
                 </div>
                 <p className="mt-3 text-body text-graphite whitespace-pre-wrap leading-relaxed">{n.body}</p>
+                <NoticeAttachments items={n.attachments || []} />
               </CardContent>
             </Card>
           ))}

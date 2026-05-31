@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Send, Megaphone, Mail, MessageSquare, BellRing } from 'lucide-react';
+import { Plus, Send, Megaphone, Mail, MessageSquare, BellRing, Paperclip } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,12 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 
 const BROADCAST_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
+
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+}
 
 const channelMeta: Record<string, { icon: typeof Mail; label: string }> = {
   email: { icon: Mail, label: 'Email' },
@@ -151,6 +157,22 @@ export default function CommunicationsPage() {
                   </div>
                   <p className="mt-1 text-caption text-muted-foreground">{formatDate(b.createdAt)}</p>
                   <p className="mt-2 text-body text-graphite line-clamp-2">{b.body}</p>
+                  {Array.isArray(b.attachments) && b.attachments.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {b.attachments.map((a: any, i: number) => (
+                        <a
+                          key={i}
+                          href={resolveFileUrl(a.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-stone-surface px-2 py-0.5 text-[11px] text-graphite hover:text-ember-orange"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {a.filename}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {b.status === 'draft' && (
                   <Button size="sm" onClick={() => handleSend(b)}>
