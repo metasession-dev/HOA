@@ -5,6 +5,20 @@ import { isResidentRole } from '../common/scope.util';
 import { WebhooksService } from '../platform/webhooks.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
+import { StorageService } from '../storage/storage.service';
+
+// Public origin of THIS API, so signed attachment links in emails are absolute
+// and fetchable by Resend. Must be set to the public API URL in production.
+const API_BASE = (
+  process.env.API_PUBLIC_URL || process.env.PUBLIC_API_URL || 'http://localhost:3003'
+).replace(/\/$/, '');
+// Files we attach to the email itself (vs link only). Email size limits make
+// real attachments unsuitable for video / very large files.
+const EMAIL_ATTACH_MAX_BYTES = 20 * 1024 * 1024;
+function isEmailAttachable(contentType?: string, size?: number): boolean {
+  if (typeof size === 'number' && size > EMAIL_ATTACH_MAX_BYTES) return false;
+  return /^image\//.test(contentType || '') || contentType === 'application/pdf';
+}
 
 @Injectable()
 export class CommunicationsService {
@@ -13,6 +27,7 @@ export class CommunicationsService {
     private webhooks: WebhooksService,
     private notifications: NotificationsService,
     private mail: MailService,
+    private storage: StorageService,
   ) {}
 
   async findAll(orgId: string, query: PaginationDto, role?: string) {
@@ -111,6 +126,27 @@ export class CommunicationsService {
     // sends via Resend (or the mock provider in dev). De-duped per
     // (broadcast, recipient) by the EmailDelivery unique index, so a repeat
     // send is a no-op rather than a double-send.
+    // Resolve attachment links once for the whole broadcast. For files with a
+    // storedFileId we mint a fresh long-TTL signed absolute URL (so links stay
+    // valid in the inbox and Resend can fetch the real attachments). Legacy
+    // rows without an id fall back to their stored url.
+    const rawAtts: any[] = Array.isArray((updated as any).attachments) ? (updated as any).attachments : [];
+    const signedAtts = rawAtts.map((a) => {
+      let url: string = a.url;
+      if (a.storedFileId) {
+        try {
+          url = `${API_BASE}${this.storage.signUrl(a.storedFileId, 7 * 24 * 3600).url}`;
+        } catch { /* keep stored url */ }
+      } else if (url && !/^https?:\/\//i.test(url)) {
+        url = `${API_BASE}${url}`;
+      }
+      return { filename: a.filename, url, contentType: a.contentType, size: a.size };
+    });
+    const emailLinks = signedAtts.map((a) => ({ filename: a.filename, url: a.url }));
+    const realAttachments = signedAtts
+      .filter((a) => isEmailAttachable(a.contentType, a.size))
+      .map((a) => ({ filename: a.filename, path: a.url }));
+
     let emailed = 0;
     if ((updated.channels || []).includes('email')) {
       // Respect opt-outs (POPIA/GDPR). A global opt-out (topic=null) suppresses
@@ -134,12 +170,14 @@ export class CommunicationsService {
               recipientFirstName: r.firstName || 'there',
               subject: updated.subject,
               body: updated.body,
+              attachments: emailLinks,
             },
             to: r.email,
             toName: `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim() || undefined,
             toUserId: r.userId,
             entityType: 'Broadcast',
             entityId: updated.id,
+            attachments: realAttachments,
           });
           emailed++;
         } catch {

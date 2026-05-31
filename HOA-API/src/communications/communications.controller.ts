@@ -25,8 +25,9 @@ class CreateBroadcastLegacyDto {
   @IsOptional() @IsArray() @IsString({ each: true }) estateIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) personIds?: string[];
   @IsOptional() @IsString() scheduledFor?: string;
-  // Optional file attachments: [{ url, filename, contentType, size }].
-  @IsOptional() @IsArray() attachments?: Array<{ url: string; filename: string; contentType: string; size: number }>;
+  // Optional file attachments: [{ url, filename, contentType, size, storedFileId }].
+  // storedFileId lets the server re-sign a fresh download URL later (emails + UI).
+  @IsOptional() @IsArray() attachments?: Array<{ url: string; filename: string; contentType: string; size: number; storedFileId?: string }>;
 }
 
 @ApiTags('Communications')

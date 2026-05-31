@@ -20,6 +20,9 @@ export type EnqueueEmailInput = {
   entityId?: string;
   replyTo?: string;
   tags?: { name: string; value: string }[];
+  // Real email attachments fetched + attached at send time. `path` is a
+  // publicly-fetchable (signed, time-boxed) URL the provider downloads.
+  attachments?: { filename: string; path: string }[];
 };
 
 /**
@@ -81,6 +84,7 @@ export class MailService {
             subject: render.subject,
             html,
             templateData: input.data as any,
+            attachments: (input.attachments ?? []) as any,
             status: 'pending',
             attempt: 0,
             failedAt: null,
@@ -100,6 +104,7 @@ export class MailService {
             entityType: input.entityType,
             entityId: input.entityId,
             templateData: input.data as any,
+            attachments: (input.attachments ?? []) as any,
             status: 'pending',
             nextAttemptAt: new Date(),
           },
@@ -138,11 +143,13 @@ export class MailService {
     try {
       let providerMessageId: string | null = null;
       if (provider === 'resend') {
+        const atts = Array.isArray(row.attachments) ? (row.attachments as any[]) : [];
         const r = await this.resend.send({
           to: row.recipientEmail,
           toName: row.recipientName || undefined,
           subject: row.subject,
           html: row.html,
+          attachments: atts.length ? atts.map((a) => ({ filename: a.filename, path: a.path })) : undefined,
         });
         providerMessageId = r.id;
       } else {

@@ -2,19 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Paperclip, FileText } from 'lucide-react';
+import { ChevronLeft, Paperclip, FileText, Download } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 
-type Attachment = { url: string; filename: string; contentType: string; size?: number };
+type Attachment = { url: string; filename: string; contentType: string; size?: number; storedFileId?: string };
 
 function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
   return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+}
+
+/** Download via a fresh signed URL so links never 403 from expiry. */
+async function downloadAttachment(att: Attachment) {
+  try {
+    if (att.storedFileId) {
+      const r = await api.get<any>(`/files/${att.storedFileId}`);
+      const url = r.data?.downloadUrl;
+      if (url) { window.open(resolveFileUrl(url), '_blank'); return; }
+    }
+    window.open(resolveFileUrl(att.url), '_blank');
+  } catch {
+    window.open(resolveFileUrl(att.url), '_blank');
+  }
 }
 
 export default function NoticeDetailPage() {
@@ -79,24 +94,20 @@ export default function NoticeDetailPage() {
             <CardContent className="p-4">
               <ul className="space-y-2">
                 {attachments.map((a, i) => (
-                  <li key={i}>
+                  <li key={i} className="space-y-2">
                     {a.contentType?.startsWith('video/') ? (
                       <video controls className="w-full rounded-lg" src={resolveFileUrl(a.url)} />
                     ) : a.contentType?.startsWith('image/') ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer">
-                        <img src={resolveFileUrl(a.url)} alt={a.filename} className="max-h-80 rounded-lg object-contain ring-1 ring-stone-surface" />
-                      </a>
-                    ) : (
-                      <a
-                        href={resolveFileUrl(a.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-sm text-graphite hover:text-ember-orange"
-                      >
-                        <FileText className="h-4 w-4" /> {a.filename}
-                      </a>
-                    )}
+                      <img src={resolveFileUrl(a.url)} alt={a.filename} className="max-h-80 rounded-lg object-contain ring-1 ring-stone-surface" />
+                    ) : null}
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-graphite">{a.filename}</span>
+                      <Button size="sm" variant="secondary" onClick={() => downloadAttachment(a)}>
+                        <Download className="mr-1 h-3.5 w-3.5" />Download
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>

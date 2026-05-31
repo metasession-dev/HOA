@@ -2237,6 +2237,10 @@ model EmailDelivery {
   // Bag for whatever the template needed (resident name, amount, etc).
   // Useful for debugging and for the resend-this-email button.
   templateData    Json?
+  // Real email attachments to fetch + attach at send time: [{ filename, path }]
+  // where `path` is a publicly-fetchable (signed, time-boxed) URL. Empty for
+  // most transactional emails.
+  attachments     Json     @default("[]")
 
   // Lifecycle
   status          String   @default("pending") // pending | sent | failed | bounced | complained

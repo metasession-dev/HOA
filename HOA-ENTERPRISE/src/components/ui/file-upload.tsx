@@ -86,7 +86,7 @@ export function FileUpload({
     // short-lived signed URL would expire, so we store them as public files and
     // reference a stable, signature-less URL. Everything else stays private
     // (signed URLs).
-    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo';
+    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo' || kind === 'broadcast_attachment';
 
     const fd = new FormData();
     fd.append('file', file);

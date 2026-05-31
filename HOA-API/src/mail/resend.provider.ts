@@ -24,6 +24,8 @@ export type SendInput = {
   html: string;
   replyTo?: string;
   tags?: { name: string; value: string }[];
+  // Resend fetches each `path` (a hosted URL) and attaches it to the email.
+  attachments?: { filename: string; path?: string; content?: string }[];
 };
 
 @Injectable()
@@ -60,6 +62,9 @@ export class ResendProvider {
           html: input.html,
           reply_to: input.replyTo,
           tags: input.tags,
+          attachments: input.attachments?.length
+            ? input.attachments.map((a) => ({ filename: a.filename, path: a.path, content: a.content }))
+            : undefined,
         }),
         signal: ctrl.signal,
       });

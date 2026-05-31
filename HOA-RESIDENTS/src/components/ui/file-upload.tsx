@@ -90,7 +90,7 @@ export function FileUpload({
 
     // Avatars / logos are shown via plain <img> long after a signed URL would
     // expire, so store them as public files with a stable, signature-less URL.
-    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo';
+    const isPublicKind = kind === 'user_avatar' || kind === 'org_logo' || kind === 'broadcast_attachment';
 
     const fd = new FormData();
     fd.append('file', file);
