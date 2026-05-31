@@ -81,7 +81,7 @@ const Terms = () => {
       <p>
         To use most features you'll need to register an account. You agree to
         provide accurate, complete information and to keep it up to date. Each
-        account is for a single person — sharing logins is prohibited.
+        account is for a single person, and sharing logins is prohibited.
       </p>
       <h3>3.2 Security</h3>
       <p>
@@ -124,7 +124,7 @@ const Terms = () => {
       <p>
         You can cancel at any time from{" "}
         <em>Settings → Billing</em>. Cancellations take effect at the end of
-        the current billing cycle — you keep access until then. We do not
+        the current billing cycle, and you keep access until then. We do not
         provide refunds for partial periods, unused features, or feature
         deprecations, except where required by applicable consumer-protection
         law.
@@ -205,7 +205,7 @@ const Terms = () => {
       <p>
         We keep encrypted backups for operational resilience. You are
         responsible for the accuracy of Content you (or your administrators)
-        upload — including resident records, balances, and gate-pass
+        upload, including resident records, balances, and gate-pass
         permissions.
       </p>
       <h3>6.4 Removal</h3>
@@ -222,7 +222,7 @@ const Terms = () => {
         branding, is owned by Meta Session Limited and its licensors and is
         protected by intellectual property law. We grant you a limited,
         revocable, non-exclusive, non-transferable licence to access and use
-        the Service in accordance with these Terms — no other rights are
+        the Service in accordance with these Terms. No other rights are
         granted. You may not copy, modify, distribute, sell, or lease any
         part of the Service.
       </p>
@@ -255,7 +255,7 @@ const Terms = () => {
         secure, or that it will meet every requirement of every customer.
       </p>
       <p>
-        You acknowledge that the Service is an operational tool — it is not a
+        You acknowledge that the Service is an operational tool. It is not a
         substitute for professional legal, financial, accounting, or tax
         advice. Any reports, calculations, or AI-generated suggestions are
         provided for your convenience and should be reviewed by qualified
@@ -266,8 +266,8 @@ const Terms = () => {
       <p>
         To the maximum extent permitted by law, neither party will be liable
         to the other for any indirect, incidental, consequential, special,
-        punitive, or exemplary damages — including loss of profits, revenue,
-        goodwill, or data — arising from or related to these Terms or the
+        punitive, or exemplary damages (including loss of profits, revenue,
+        goodwill, or data) arising from or related to these Terms or the
         Service, even if advised of the possibility of such damages.
       </p>
       <p>
@@ -280,7 +280,7 @@ const Terms = () => {
       </ul>
       <p>
         Nothing in this section limits liability that cannot be limited under
-        applicable law — including liability for fraud, gross negligence, or
+        applicable law, including liability for fraud, gross negligence, or
         wilful misconduct.
       </p>
 
@@ -331,8 +331,8 @@ const Terms = () => {
       <p>
         These Terms are governed by the laws of the Federal Republic of
         Nigeria, without regard to conflict-of-law principles. Any dispute
-        arising out of or in connection with these Terms — including its
-        validity, breach, or termination — will be referred to and finally
+        arising out of or in connection with these Terms (including its
+        validity, breach, or termination) will be referred to and finally
         resolved by arbitration in Lagos, Nigeria, under the rules of the
         Lagos Court of Arbitration. The arbitration will be conducted in
         English by a single arbitrator. The arbitration award is final and

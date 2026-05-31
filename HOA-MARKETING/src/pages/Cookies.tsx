@@ -32,9 +32,9 @@ const Cookies = () => {
         A cookie is a small text file that a website saves on your browser
         when you visit it. Cookies let the site recognise your device on
         return visits, remember preferences, and measure how features are
-        used. "Similar technologies" — such as <em>local storage</em>,{" "}
+        used. "Similar technologies" such as <em>local storage</em>,{" "}
         <em>session storage</em>, and{" "}
-        <em>service-worker caches</em> — behave like cookies for the purposes
+        <em>service-worker caches</em> behave like cookies for the purposes
         of this policy and are covered by the same rules.
       </p>
 
@@ -42,18 +42,18 @@ const Cookies = () => {
       <p>We group the technologies we use into three buckets:</p>
       <ul>
         <li>
-          <strong>Strictly necessary</strong> — required to deliver the
+          <strong>Strictly necessary</strong>: required to deliver the
           Service. Without them, the site can't function (you couldn't sign
           in, your shopping cart would lose state, etc.). These don't require
           consent under most laws, but we document them for transparency.
         </li>
         <li>
-          <strong>Functional</strong> — remember the choices you make so the
+          <strong>Functional</strong>: remember the choices you make so the
           site behaves better on return visits (language, theme, dismissed
           banners).
         </li>
         <li>
-          <strong>Analytics</strong> — anonymised usage measurement that
+          <strong>Analytics</strong>: anonymised usage measurement that
           helps us understand which features are valuable and which need
           work. These are off by default until you accept them via the cookie
           banner.
@@ -156,7 +156,7 @@ const Cookies = () => {
             <tr>
               <td className="px-4 py-3 font-mono text-xs text-foreground">ph_*_posthog</td>
               <td className="px-4 py-3">PostHog</td>
-              <td className="px-4 py-3">Anonymised usage analytics — pages viewed, buttons clicked, feature funnels. IP addresses are truncated before storage. Helps us decide what to build next.</td>
+              <td className="px-4 py-3">Anonymised usage analytics: pages viewed, buttons clicked, feature funnels. IP addresses are truncated before storage. Helps us decide what to build next.</td>
               <td className="px-4 py-3 whitespace-nowrap">12 months</td>
             </tr>
             <tr>
@@ -197,19 +197,19 @@ const Cookies = () => {
       </p>
       <ul>
         <li>
-          <strong>PostHog</strong> —{" "}
+          <strong>PostHog</strong>:{" "}
           <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">posthog.com/privacy</a>
         </li>
         <li>
-          <strong>Sentry</strong> —{" "}
+          <strong>Sentry</strong>:{" "}
           <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer">sentry.io/privacy</a>
         </li>
         <li>
-          <strong>Cloudflare</strong> —{" "}
+          <strong>Cloudflare</strong>:{" "}
           <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">cloudflare.com/privacypolicy</a>
         </li>
         <li>
-          <strong>Paystack</strong> (during checkout only) —{" "}
+          <strong>Paystack</strong> (during checkout only):{" "}
           <a href="https://paystack.com/privacy/merchant" target="_blank" rel="noopener noreferrer">paystack.com/privacy</a>
         </li>
       </ul>
@@ -245,7 +245,7 @@ const Cookies = () => {
       <p>
         We respect the <code>Sec-GPC</code> (Global Privacy Control) header.
         If your browser sends it, we will treat that as a signal to suppress
-        analytics cookies and tracking pixels — equivalent to choosing
+        analytics cookies and tracking pixels, the same as choosing
         "Decline" on the banner. Legacy <code>DNT</code> (Do Not Track) is
         not consistently implemented across browsers, so we honour
         <code>Sec-GPC</code> in preference.

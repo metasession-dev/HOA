@@ -68,34 +68,34 @@ const Privacy = () => {
       <h3>2.1 Information you give us directly</h3>
       <ul>
         <li>
-          <strong>Account details</strong> — first name, last name, email
+          <strong>Account details</strong>: first name, last name, email
           address, phone number, hashed password, optional two-factor secret,
           and profile photo (avatar).
         </li>
         <li>
-          <strong>Organisation details</strong> — when you set up an HOA, we
+          <strong>Organisation details</strong>: when you set up an HOA, we
           collect the organisation's legal name, currency, time zone, address,
           tax number, and registered logo.
         </li>
         <li>
-          <strong>Resident and unit records</strong> — entered by HOA admins.
+          <strong>Resident and unit records</strong>: entered by HOA admins.
           May include owner and tenant names, contact details, occupancy
           start/end dates, vehicle registration plates, and emergency contacts.
         </li>
         <li>
-          <strong>Financial information</strong> — invoices, payment records,
+          <strong>Financial information</strong>: invoices, payment records,
           payment plans, vendor bank account details (entered by the HOA),
           tokenised card references from our payment processor (we never store
           full card numbers), and accounting ledger entries.
         </li>
         <li>
-          <strong>Documents and uploads</strong> — files you attach to gate
+          <strong>Documents and uploads</strong>: files you attach to gate
           passes, violations, vendor invoices, resale packs, broadcasts, or the
           general document library. Photos taken to support violation reports
           fall into this bucket.
         </li>
         <li>
-          <strong>Communications</strong> — messages you send through the
+          <strong>Communications</strong>: messages you send through the
           in-app inbox, broadcast notices, gate-pass SMS, support emails, and
           chats with our assistant.
         </li>
@@ -104,17 +104,17 @@ const Privacy = () => {
       <h3>2.2 Information we collect automatically</h3>
       <ul>
         <li>
-          <strong>Device and connection data</strong> — IP address, browser
+          <strong>Device and connection data</strong>: IP address, browser
           type, operating system, screen size, language preference, and
           referrer URL.
         </li>
         <li>
-          <strong>Usage data</strong> — pages viewed, features used, errors
+          <strong>Usage data</strong>: pages viewed, features used, errors
           encountered, the buttons you click, and timing information about
           your session.
         </li>
         <li>
-          <strong>Cookies and similar technologies</strong> — see our{" "}
+          <strong>Cookies and similar technologies</strong>: see our{" "}
           <a href="/cookies">Cookie Policy</a> for the full list and how to
           control them.
         </li>
@@ -123,13 +123,13 @@ const Privacy = () => {
       <h3>2.3 Information from third parties</h3>
       <ul>
         <li>
-          <strong>Payments</strong> — Paystack (our payment processor) sends us
+          <strong>Payments</strong>: Paystack (our payment processor) sends us
           a payment confirmation, the last four digits of the card, the card
           brand, and a transaction reference whenever you pay an invoice. We
           do not see, store, or process the rest of your card data.
         </li>
         <li>
-          <strong>Single sign-on / invitation tokens</strong> — if you join
+          <strong>Single sign-on / invitation tokens</strong>: if you join
           the Service via an invitation, we receive the email address and
           claimed role from the inviting HOA.
         </li>
@@ -149,7 +149,7 @@ const Privacy = () => {
           violation notices, broadcasts, gate-pass codes);</li>
         <li>provide customer support, respond to enquiries, and investigate
           incidents reported to us;</li>
-        <li>operate the AI assistant — when you ask the assistant a question
+        <li>operate the AI assistant. When you ask the assistant a question
           inside the Service, we send a redacted version of the message and
           the conversation context to our LLM provider so it can compose a
           reply;</li>
@@ -167,21 +167,21 @@ const Privacy = () => {
       </p>
       <ul>
         <li>
-          <strong>Contract</strong> — to deliver the Service you signed up for
+          <strong>Contract</strong>: to deliver the Service you signed up for
           or that your HOA has signed up for on your behalf.
         </li>
         <li>
-          <strong>Legitimate interests</strong> — to keep the Service secure,
+          <strong>Legitimate interests</strong>: to keep the Service secure,
           to prevent fraud, and to develop product improvements that don't
           materially affect your privacy.
         </li>
         <li>
-          <strong>Consent</strong> — for optional cookies, marketing emails,
+          <strong>Consent</strong>: for optional cookies, marketing emails,
           and any processing where consent is the most appropriate basis. You
           can withdraw consent at any time without affecting prior processing.
         </li>
         <li>
-          <strong>Legal obligation</strong> — to comply with tax, anti–money
+          <strong>Legal obligation</strong>: to comply with tax, anti-money
           laundering, and other regulatory requirements.
         </li>
       </ul>
@@ -194,40 +194,40 @@ const Privacy = () => {
       </p>
       <ul>
         <li>
-          <strong>Cloud infrastructure</strong> — Railway (United States) and
+          <strong>Cloud infrastructure</strong>: Railway (United States) and
           its underlying providers, where our application, databases, and
           uploaded files are hosted.
         </li>
         <li>
-          <strong>Email delivery</strong> — Resend (United States) for
+          <strong>Email delivery</strong>: Resend (United States) for
           transactional emails.
         </li>
         <li>
-          <strong>Payments</strong> — Paystack (Nigeria/South Africa) for
+          <strong>Payments</strong>: Paystack (Nigeria/South Africa) for
           card and mobile-money charges.
         </li>
         <li>
-          <strong>AI assistant</strong> — OpenAI and/or Anthropic (United
+          <strong>AI assistant</strong>: OpenAI and/or Anthropic (United
           States) for natural-language features. Conversation data is sent for
           inference and is not used by these providers to train their models
           under the enterprise agreements we operate under.
         </li>
         <li>
-          <strong>Error monitoring</strong> — Sentry (United States) to capture
+          <strong>Error monitoring</strong>: Sentry (United States) to capture
           stack traces when something breaks. We strip personal data from
           error reports before transmission where technically feasible.
         </li>
         <li>
-          <strong>Product analytics</strong> — PostHog (United States), used
+          <strong>Product analytics</strong>: PostHog (United States), used
           for anonymised usage analytics. You can opt out via the cookie
           banner.
         </li>
         <li>
-          <strong>Professional advisers</strong> — accountants, auditors, and
+          <strong>Professional advisers</strong>: accountants, auditors, and
           legal counsel under confidentiality.
         </li>
         <li>
-          <strong>Authorities</strong> — when required by law, court order, or
+          <strong>Authorities</strong>: when required by law, court order, or
           to protect the rights, safety, or property of HOA.africa, our
           customers, or the public.
         </li>
@@ -242,35 +242,35 @@ const Privacy = () => {
         Because we use cloud infrastructure based in the United States, your
         personal information may be transferred outside Nigeria, South Africa,
         the EU, the UK, and the UAE. When we do this, we put appropriate
-        safeguards in place — typically <strong>Standard Contractual
+        safeguards in place. These are typically <strong>Standard Contractual
         Clauses</strong> and supplementary technical measures (encryption in
-        transit and at rest, access controls, audit logs) — so that the level
-        of protection is equivalent to your home jurisdiction.
+        transit and at rest, access controls, and audit logs), so that the
+        level of protection is equivalent to your home jurisdiction.
       </p>
 
       <h2>7. How long we keep your data</h2>
       <p>We retain personal information only for as long as we need it:</p>
       <ul>
         <li>
-          <strong>Active accounts</strong> — for the duration of your account
+          <strong>Active accounts</strong>: for the duration of your account
           plus 30 days of grace after closure (so you can re-activate).
         </li>
         <li>
-          <strong>Financial records</strong> — for seven (7) years after the
+          <strong>Financial records</strong>: for seven (7) years after the
           transaction date, in line with tax law requirements.
         </li>
         <li>
-          <strong>Audit logs</strong> — for two (2) years from the event.
+          <strong>Audit logs</strong>: for two (2) years from the event.
         </li>
         <li>
-          <strong>Authentication logs</strong> — for one (1) year.
+          <strong>Authentication logs</strong>: for one (1) year.
         </li>
         <li>
-          <strong>Marketing email logs</strong> — for as long as you remain
+          <strong>Marketing email logs</strong>: for as long as you remain
           subscribed, deleted within 30 days of unsubscribe.
         </li>
         <li>
-          <strong>Backups</strong> — encrypted backups roll off on a 35-day
+          <strong>Backups</strong>: encrypted backups roll off on a 35-day
           cycle.
         </li>
       </ul>
@@ -285,36 +285,36 @@ const Privacy = () => {
       </p>
       <ul>
         <li>
-          <strong>Access</strong> — request a copy of the personal information
+          <strong>Access</strong>: request a copy of the personal information
           we hold about you.
         </li>
         <li>
-          <strong>Rectification</strong> — correct inaccurate or incomplete
+          <strong>Rectification</strong>: correct inaccurate or incomplete
           information. Most fields can be updated yourself in{" "}
           <em>Settings → Profile</em>.
         </li>
         <li>
-          <strong>Erasure</strong> — ask us to delete your information when
+          <strong>Erasure</strong>: ask us to delete your information when
           we no longer need it for the purposes it was collected.
         </li>
         <li>
-          <strong>Portability</strong> — receive your information in a
+          <strong>Portability</strong>: receive your information in a
           structured, machine-readable format.
         </li>
         <li>
-          <strong>Restriction</strong> — ask us to pause processing while a
+          <strong>Restriction</strong>: ask us to pause processing while a
           dispute is being resolved.
         </li>
         <li>
-          <strong>Objection</strong> — object to processing based on legitimate
+          <strong>Objection</strong>: object to processing based on legitimate
           interests, including profiling.
         </li>
         <li>
-          <strong>Withdraw consent</strong> — where we rely on consent, you can
+          <strong>Withdraw consent</strong>: where we rely on consent, you can
           withdraw it at any time.
         </li>
         <li>
-          <strong>Lodge a complaint</strong> — with the Nigeria Data Protection
+          <strong>Lodge a complaint</strong>: with the Nigeria Data Protection
           Commission (NDPC), the South African Information Regulator, or your
           local data protection authority if you are in the EU/UK.
         </li>
@@ -372,7 +372,7 @@ const Privacy = () => {
       <p>
         We do not make decisions about you using fully automated processing
         that has a legal or similarly significant effect. The AI assistant
-        inside the Service is advisory only — final decisions on invoices,
+        inside the Service is advisory only. Final decisions on invoices,
         violations, votes, and any other governance action are taken by
         humans authorised by your HOA.
       </p>
@@ -380,7 +380,7 @@ const Privacy = () => {
       <h2>12. Marketing communications</h2>
       <p>
         We send transactional emails (receipts, password resets, notices) as
-        part of providing the Service — you cannot opt out of these while
+        part of providing the Service, so you cannot opt out of these while
         you have an active account. Optional marketing emails are sent only
         if you've opted in; you can unsubscribe at any time using the link in
         the email footer.

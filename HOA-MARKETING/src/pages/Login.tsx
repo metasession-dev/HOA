@@ -37,8 +37,8 @@ const Login = () => {
             Sign in to HOA Africa
           </h2>
           <p className="text-primary-foreground/80 text-lg">
-            Two portals, one platform. Pick the one that fits — residents manage
-            their unit; admins and exco run the HOA.
+            Two portals, one platform. Residents manage their unit; admins and
+            exco run the HOA. Pick the one that fits.
           </p>
         </div>
 
@@ -136,7 +136,7 @@ const Login = () => {
               </a>
             </p>
             <p className="mt-2 text-xs text-muted-foreground/80">
-              Residents join by invitation — ask your HOA admin to send you a
+              Residents join by invitation. Ask your HOA admin to send you a
               link.
             </p>
           </div>

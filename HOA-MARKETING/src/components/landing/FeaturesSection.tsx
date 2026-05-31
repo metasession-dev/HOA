@@ -18,7 +18,7 @@ const features = [
   {
     icon: Home,
     title: "Units & residents",
-    description: "A living register of every unit, its owner, tenants and additional occupants — with full ownership history and bulk import.",
+    description: "A live register of every unit, its owner, tenants and other occupants, with full ownership history and bulk import.",
   },
   {
     icon: Receipt,
@@ -33,12 +33,12 @@ const features = [
   {
     icon: Building2,
     title: "Vendor self-service portal",
-    description: "Invite vendors to submit their own invoices and receipts, then track approval and payment status live — no back-and-forth calls.",
+    description: "Invite vendors to submit their own invoices and receipts, then track approval and payment status live. No back-and-forth calls.",
   },
   {
     icon: Gavel,
     title: "Contract bidding & Exco voting",
-    description: "Publish tenders, collect vendor bids, shortlist, and award by a formal board vote — with every party notified at each step.",
+    description: "Publish tenders, collect vendor bids, shortlist, and award by a formal board vote, with every party notified at each step.",
   },
   {
     icon: Vote,
@@ -58,17 +58,17 @@ const features = [
   {
     icon: Megaphone,
     title: "Broadcasts & notifications",
-    description: "Reach residents by email, in-app bell, and web push — targeted by segment, with delivery and read tracking.",
+    description: "Reach residents by email, in-app bell, and web push, targeted by segment, with delivery and read tracking.",
   },
   {
     icon: Sparkles,
     title: "Built-in AI assistant",
-    description: "Ask plain-language questions about arrears, occupancy, or finances — answered from your live data, always in your settings currency.",
+    description: "Ask plain-language questions about arrears, occupancy, or finances. Answers come from your live data, always in your settings currency.",
   },
   {
     icon: BarChart3,
     title: "Finance & board-ready reports",
-    description: "Budgets, funds, bank reconciliation, chart of accounts, and one-click board packs — exportable, multi-currency, audit-ready.",
+    description: "Budgets, funds, bank reconciliation, chart of accounts, and one-click board packs. Exportable, multi-currency, and audit-ready.",
   },
   {
     icon: Lock,
@@ -128,8 +128,8 @@ const FeaturesSection = () => {
             className="text-muted-foreground text-lg"
           >
             From levies and vendor payments to contract tenders, governance votes,
-            and visitor access — HOA.africa brings every workflow your community
-            needs into one beautifully simple system.
+            and visitor access, HOA.africa brings every workflow your community
+            needs into one place.
           </motion.p>
         </div>
 

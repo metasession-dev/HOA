@@ -18,7 +18,7 @@ const steps = [
     number: "03",
     icon: Rocket,
     title: "Go Digital",
-    description: "Start managing payments, visitor passes, and transactions digitally. Watch efficiency soar.",
+    description: "Start managing payments, visitor passes, and transactions online. Less paperwork, fewer phone calls, and a clear record of everything.",
   },
 ];
 

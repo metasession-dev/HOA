@@ -24,7 +24,7 @@ const CTASection = () => {
             transition={{ duration: 0.5 }}
             className="text-3xl md:text-4xl lg:text-5xl font-bold text-primary-foreground mb-6"
           >
-            Ready to Transform Your Community?
+            Ready to give your community an easier way to run?
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -33,8 +33,8 @@ const CTASection = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-xl text-primary-foreground/80 mb-10"
           >
-            Join hundreds of HOAs already using HOA Africa to streamline their 
-            operations. Start your free trial today—no credit card required.
+            Join hundreds of HOAs already using HOA Africa to run their day-to-day
+            operations. Start your free trial today. No credit card required.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

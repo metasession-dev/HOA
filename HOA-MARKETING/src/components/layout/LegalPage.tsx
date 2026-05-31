@@ -35,7 +35,7 @@ const LegalPage = ({ title, subtitle, effectiveDate, children }: LegalPageProps)
   // `title` for the rare case a child component renames the page.
   useEffect(() => {
     const previous = document.title;
-    document.title = `${title} — HOA Africa`;
+    document.title = `${title} | HOA Africa`;
     return () => {
       document.title = previous;
     };

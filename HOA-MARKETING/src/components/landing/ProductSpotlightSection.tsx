@@ -209,11 +209,11 @@ const spotlights = [
     eyebrow: "ONE HOME BASE",
     title: "Your whole estate, at a glance",
     body:
-      "Levies, payments, passes, violations and bids — every moving part of your community in a single dashboard built for managers and boards.",
+      "Levies, payments, passes, violations and bids. Every moving part of your community sits in a single dashboard built for managers and boards.",
     bullets: [
       "Live arrears & collection tracking",
-      "Real-time alerts the moment something needs you",
-      "A clean, fast interface your team actually enjoys",
+      "Alerts the moment something needs your attention",
+      "A clean, fast interface your team will actually use",
     ],
     mock: <DashboardMock />,
     reverse: false,
@@ -222,7 +222,7 @@ const spotlights = [
     eyebrow: "VENDORS & PAYABLES",
     title: "Vendor invoicing, fully self-service",
     body:
-      "Vendors submit their own invoices and receipts through a secure portal, then watch them move through your approval chain to payment — with email and in-app updates at every step.",
+      "Vendors submit their own invoices and receipts through a secure portal, then follow them through your approval chain to payment, with email and in-app updates at every step.",
     bullets: [
       "Rule-based, multi-step approvals",
       "Batch payment runs with a full audit trail",
@@ -233,9 +233,9 @@ const spotlights = [
   },
   {
     eyebrow: "PROCUREMENT & GOVERNANCE",
-    title: "Bid, vet & award — by the board",
+    title: "Bid, vet and award, by the board",
     body:
-      "Publish tenders, collect competitive vendor bids, shortlist the strongest, and let your Exco vote on the winner — a transparent, on-record award process from start to finish.",
+      "Publish tenders, collect competitive vendor bids, shortlist the strongest, and let your Exco vote on the winner. The whole award is transparent and on the record from start to finish.",
     bullets: [
       "Open tenders with vendor bidding",
       "Formal Exco voting & vetting",
@@ -267,7 +267,7 @@ const ProductSpotlightSection = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mb-4 text-3xl font-bold text-foreground md:text-4xl"
           >
-            Designed to feel effortless
+            The same screens your team uses every day
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -276,7 +276,7 @@ const ProductSpotlightSection = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg text-muted-foreground"
           >
-            A look at the actual screens your managers, residents and vendors use every day.
+            No mock-ups. This is what managers, residents and vendors actually log in to.
           </motion.p>
         </div>
 

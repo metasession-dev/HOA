@@ -47,37 +47,37 @@ const categories: FAQCategory[] = [
     id: "getting-started",
     title: "Getting Started",
     icon: BookOpen,
-    intro: "The basics — what HOA.africa is and how to start using it.",
+    intro: "The basics: what HOA.africa is and how to start using it.",
     questions: [
       {
         q: "What is HOA.africa?",
         a:
-          "HOA.africa is a property-management platform purpose-built for African homeowners' associations, estates, and bodies corporate. We give your board, property manager, finance officer, and residents one place to handle levies, payments, gate passes, communications, votes, violations, and resale documents — without juggling spreadsheets, WhatsApp groups, and email threads.",
+          "HOA.africa is a property-management platform purpose-built for African homeowners' associations, estates, and bodies corporate. We give your board, property manager, finance officer, and residents one place to handle levies, payments, gate passes, communications, votes, violations, and resale documents, without juggling spreadsheets, WhatsApp groups, and email threads.",
       },
       {
         q: "Who is the platform designed for?",
         a:
-          "Residential estates, gated communities, sectional-title schemes, and homeowners' associations of any size — from 30-unit boutique developments to 5,000-unit master-planned communities. Property management companies that manage several estates can run them all from a single account with separate workspaces.",
+          "Residential estates, gated communities, sectional-title schemes, and homeowners' associations of any size, from 30-unit boutique developments to 5,000-unit master-planned communities. Property management companies that manage several estates can run them all from a single account with separate workspaces.",
       },
       {
         q: "What does each user role do?",
         a:
-          "HOA admins and exco members run the operations side: levies, vendors, governance, communications. Property managers handle day-to-day estate operations and gate management. Finance officers focus on invoicing, payments, and reconciliation. Gate security uses a tablet view for visitor checks. Residents (owners, tenants, stakeholders) see their balance, pay levies, request gate passes, vote, and read notices. Each role only sees what they need — access is strictly scoped by the board.",
+          "HOA admins and exco members run the operations side: levies, vendors, governance, communications. Property managers handle day-to-day estate operations and gate management. Finance officers focus on invoicing, payments, and reconciliation. Gate security uses a tablet view for visitor checks. Residents (owners, tenants, stakeholders) see their balance, pay levies, request gate passes, vote, and read notices. Each role only sees what it needs, and access is strictly scoped by the board.",
       },
       {
         q: "How do I sign up?",
         a:
-          "If your HOA is starting fresh, the board chair or property manager registers the organisation at /register on our enterprise console. You add your estate, your units, and invite residents in. If your HOA is already on HOA.africa, ask your administrator to invite you — residents can't self-register for security reasons.",
+          "If your HOA is starting fresh, the board chair or property manager registers the organisation at /register on our enterprise console. You add your estate, your units, and invite residents in. If your HOA is already on HOA.africa, ask your administrator to invite you. Residents can't self-register, for security reasons.",
       },
       {
         q: "How long does setup take?",
         a:
-          "Most estates are live within a few hours: a board member completes the org setup, imports the unit list (CSV upload is supported), invites the management team, and announces the platform to residents. Migration from a previous system — bringing across opening balances and resident records — typically takes 1–2 working days with our onboarding team's help.",
+          "Most estates are live within a few hours: a board member completes the org setup, imports the unit list (CSV upload is supported), invites the management team, and announces the platform to residents. Migration from a previous system (bringing across opening balances and resident records) usually takes one to two working days with help from our onboarding team.",
       },
       {
         q: "Do residents need to download an app?",
         a:
-          "No. The resident experience runs as a Progressive Web App (PWA), which means it works in any modern mobile browser. Residents can optionally 'Install to Home Screen' to get an app-like icon and offline access — but they don't have to.",
+          "No. The resident experience runs as a Progressive Web App (PWA), which means it works in any modern mobile browser. Residents can optionally 'Install to Home Screen' to get an app-like icon and offline access, but they don't have to.",
       },
     ],
   },
@@ -90,17 +90,17 @@ const categories: FAQCategory[] = [
       {
         q: "How is HOA.africa priced?",
         a:
-          "We charge a flat monthly fee per HOA, based on the plan you pick. Plans are listed on our pricing page. Larger estates and multi-estate operators are on Enterprise — drop us a line for a custom quote.",
+          "We charge a flat monthly fee per HOA, based on the plan you pick. Plans are listed on our pricing page. Larger estates and multi-estate operators are on Enterprise, so drop us a line for a custom quote.",
       },
       {
         q: "Is there a free trial?",
         a:
-          "Yes — every new HOA starts with a 14-day trial of the full feature set, no card required. Add your first unit and invite a resident inside the trial to see how the platform feels with real data.",
+          "Yes. Every new HOA starts with a 14-day trial of the full feature set, no card required. Add your first unit and invite a resident inside the trial to see how the platform feels with real data.",
       },
       {
         q: "Can residents be charged for using the platform?",
         a:
-          "No. Residents never pay HOA.africa directly. The estate subscribes; residents use the resident PWA at no cost to themselves. Payment-processing fees on levy payments are governed by Paystack's pricing and are charged to whichever party your HOA configures — by default the resident bears the gateway fee.",
+          "No. Residents never pay HOA.africa directly. The estate subscribes; residents use the resident PWA at no cost to themselves. Payment-processing fees on levy payments are governed by Paystack's pricing and are charged to whichever party your HOA configures. By default the resident bears the gateway fee.",
       },
       {
         q: "Which currencies do you support?",
@@ -110,7 +110,7 @@ const categories: FAQCategory[] = [
       {
         q: "What happens if I upgrade or downgrade?",
         a:
-          "Upgrades take effect immediately and are prorated — you only pay the difference for the remainder of the current cycle. Downgrades take effect at the end of the current billing cycle. Either way, your data and history stay intact.",
+          "Upgrades take effect immediately and are prorated, so you only pay the difference for the remainder of the current cycle. Downgrades take effect at the end of the current billing cycle. Either way, your data and history stay intact.",
       },
       {
         q: "Can I cancel anytime?",
@@ -138,17 +138,17 @@ const categories: FAQCategory[] = [
       {
         q: "How are late fees handled?",
         a:
-          "You configure late-fee rules per scheme — flat fee, percentage, or hybrid, with grace days and maximum caps. The Late Fee Sweep job runs daily and applies fees automatically to overdue invoices. Each application writes an audit log row, and residents receive an in-app notification when a fee is charged.",
+          "You configure late-fee rules per scheme (flat fee, percentage, or hybrid) with grace days and maximum caps. The Late Fee Sweep job runs daily and applies fees automatically to overdue invoices. Each application writes an audit log row, and residents receive an in-app notification when a fee is charged.",
       },
       {
         q: "Do you support multi-tier approvals for vendor payments?",
         a:
-          "Yes. Define rules based on amount thresholds, currency, and GL accounts. A typical setup: <₦500k requires finance officer only, ₦500k–₦5M needs any exco member, >₦5M needs the exco chairperson. Sequential mode requires earlier approvers before later ones; parallel mode lets any combination approve. The audit log captures every decision.",
+          "Yes. Define rules based on amount thresholds, currency, and GL accounts. A typical setup: under ₦500k requires the finance officer only, ₦500k to ₦5M needs any exco member, and above ₦5M needs the exco chairperson. Sequential mode requires earlier approvers before later ones; parallel mode lets any combination approve. The audit log captures every decision.",
       },
       {
         q: "Can I run an AGM through the platform?",
         a:
-          "Yes — votes support the full AGM flow: motions with a required seconder, notice periods, eligibility rules (e.g. paid-up owners only), quorum thresholds, proxy voting, and special-resolution gates (≥75% threshold, ≥14 days notice, mandatory seconder ≠ proposer). Results can be live or hidden until close. Anonymous ballots are supported with a verifiable hash so we can prove a person voted without revealing how.",
+          "Yes. Votes support the full AGM flow: motions with a required seconder, notice periods, eligibility rules (e.g. paid-up owners only), quorum thresholds, proxy voting, and special-resolution gates (at least 75% threshold, at least 14 days notice, and a mandatory seconder who isn't the proposer). Results can be live or hidden until close. Anonymous ballots are supported with a verifiable hash, so we can prove a person voted without revealing how.",
       },
       {
         q: "How do you handle violations?",
@@ -158,7 +158,7 @@ const categories: FAQCategory[] = [
       {
         q: "Can I issue a resale certificate / property-transfer pack?",
         a:
-          "Yes. The Resale module generates a snapshot of the unit's financial standing, lets you attach the disclosure checklist and supporting documents, and produces a public attorney-facing link with its own audit log. The financial snapshot is frozen at the moment of issue — re-pulling current balances doesn't change a previously issued certificate.",
+          "Yes. The Resale module generates a snapshot of the unit's financial standing, lets you attach the disclosure checklist and supporting documents, and produces a public attorney-facing link with its own audit log. The financial snapshot is frozen at the moment of issue, so re-pulling current balances doesn't change a certificate you've already issued.",
       },
       {
         q: "Can my external accountant access the books without seeing PII?",
@@ -181,7 +181,7 @@ const categories: FAQCategory[] = [
       {
         q: "Does it work offline?",
         a:
-          "Mostly yes — the PWA caches the data you've already loaded, so on a flaky connection you can still see your last balance, recent notices, and active gate passes. Anything that requires writing back to the server (payments, new gate passes) needs a connection.",
+          "Mostly. The PWA caches the data you've already loaded, so on a flaky connection you can still see your last balance, recent notices, and active gate passes. Anything that requires writing back to the server (payments, new gate passes) needs a connection.",
       },
       {
         q: "What about residents who only have a basic phone?",
@@ -196,7 +196,7 @@ const categories: FAQCategory[] = [
       {
         q: "How do gate passes work?",
         a:
-          "From your phone, you request a pass for a visitor — name, expected arrival, vehicle plate if applicable. The system generates a QR code and (optionally) sends an SMS with a numeric code to the visitor. Gate security scans the QR or types the code; if valid, the gate opens and the entry is logged. Every visit is on the audit trail.",
+          "From your phone, you request a pass for a visitor: name, expected arrival, and vehicle plate if applicable. The system generates a QR code and (optionally) sends an SMS with a numeric code to the visitor. Gate security scans the QR or types the code; if valid, the gate opens and the entry is logged. Every visit is on the audit trail.",
       },
       {
         q: "How do I get notified about new notices or balances?",
@@ -214,22 +214,22 @@ const categories: FAQCategory[] = [
       {
         q: "Who processes payments?",
         a:
-          "Paystack is our primary payment processor. They handle card payments, bank transfers, USSD, and mobile-money rails across Nigeria, South Africa, Ghana, Kenya, and Côte d'Ivoire. We don't see, store, or process raw card data — Paystack returns a tokenised reference plus the last four digits of the card.",
+          "Paystack is our primary payment processor. They handle card payments, bank transfers, USSD, and mobile-money rails across Nigeria, South Africa, Ghana, Kenya, and Côte d'Ivoire. We don't see, store, or process raw card data. Paystack returns a tokenised reference plus the last four digits of the card.",
       },
       {
         q: "How do you reconcile payments?",
         a:
-          "Paystack sends us a webhook the moment a charge succeeds; the platform matches the payment to the invoice (by reference) and writes the ledger entries in the same transaction. The webhook signature is verified against Paystack's secret to prevent forgery. Manual reconciliation is also supported when a resident pays through an offline channel — finance officers mark the invoice paid with the reference number.",
+          "Paystack sends us a webhook the moment a charge succeeds; the platform matches the payment to the invoice (by reference) and writes the ledger entries in the same transaction. The webhook signature is verified against Paystack's secret to prevent forgery. Manual reconciliation is also supported when a resident pays through an offline channel: a finance officer marks the invoice paid with the reference number.",
       },
       {
         q: "Can residents set up payment plans?",
         a:
-          "Yes. From a resident's outstanding-invoice view, an admin (or the resident themselves, where allowed) can split the balance into instalments over 2–12 months. The system creates the schedule, generates an invoice for each instalment date, and applies late fees to missed instalments only.",
+          "Yes. From a resident's outstanding-invoice view, an admin (or the resident themselves, where allowed) can split the balance into instalments over 2 to 12 months. The system creates the schedule, generates an invoice for each instalment date, and applies late fees to missed instalments only.",
       },
       {
         q: "Do you handle VAT / tax reporting?",
         a:
-          "Yes — line items can carry VAT/GST rates per your jurisdiction. Reports break out tax totals and let you export the data for filing. Tax-exempt items (e.g. body-corporate levies in some jurisdictions) are flagged so the report excludes them correctly.",
+          "Yes. Line items can carry VAT/GST rates per your jurisdiction. Reports break out tax totals and let you export the data for filing. Tax-exempt items (e.g. body-corporate levies in some jurisdictions) are flagged so the report excludes them correctly.",
       },
       {
         q: "Can I send statements to residents?",
@@ -247,7 +247,7 @@ const categories: FAQCategory[] = [
       {
         q: "Does the gate-pass system work with existing access-control hardware?",
         a:
-          "QR codes are the lowest-friction option and work on any smartphone the security team has. For estates with boom-barrier integrations, we can integrate with selected access-control systems on request — get in touch with your specifics.",
+          "QR codes are the lowest-friction option and work on any smartphone the security team has. For estates with boom-barrier integrations, we can integrate with selected access-control systems on request. Get in touch with your specifics.",
       },
       {
         q: "What happens if a visitor's pass expires while they're inside?",
@@ -268,7 +268,7 @@ const categories: FAQCategory[] = [
   },
   {
     id: "governance",
-    title: "Governance — Voting, Violations & Resale",
+    title: "Governance: Voting, Violations & Resale",
     icon: Vote,
     intro: "Estate decisions, enforcement, and property transfer.",
     questions: [
@@ -280,7 +280,7 @@ const categories: FAQCategory[] = [
       {
         q: "How do proxies work?",
         a:
-          "A resident can delegate their vote to another eligible resident before the vote opens. Proxies expire when the vote closes or the grantor revokes them. We prevent proxy chains — someone who already received a proxy can't delegate further — so concentration of votes through cascading proxies isn't possible.",
+          "A resident can delegate their vote to another eligible resident before the vote opens. Proxies expire when the vote closes or the grantor revokes them. We prevent proxy chains, so someone who already received a proxy can't delegate it further. That stops votes from piling up through cascading proxies.",
       },
       {
         q: "What's a special resolution and when do I need one?",
@@ -290,7 +290,7 @@ const categories: FAQCategory[] = [
       {
         q: "Who can see a resale certificate?",
         a:
-          "Only people you share the access link with. Each access link is a long random token with its own expiry and revocation control. We log every access — IP, user agent, time — so you can prove who viewed the certificate during a dispute. The links are tied to the certificate, so revoking the link works retroactively on link sharing.",
+          "Only people you share the access link with. Each access link is a long random token with its own expiry and revocation control. We log every access (IP, user agent, and time) so you can prove who viewed the certificate during a dispute. The links are tied to the certificate, so revoking the link works retroactively on link sharing.",
       },
       {
         q: "Can I appeal a violation?",
@@ -346,12 +346,12 @@ const categories: FAQCategory[] = [
       {
         q: "How are passwords protected?",
         a:
-          "We hash every password with bcrypt at cost factor 12 — current best practice for password storage. We never store plain-text passwords, and even our engineers can't see your password during support. Forgotten? Use 'forgot password' to reset; we email a single-use, time-limited link.",
+          "We hash every password with bcrypt at cost factor 12, which is current best practice for password storage. We never store plain-text passwords, and even our engineers can't see your password during support. Forgotten yours? Use 'forgot password' to reset; we email a single-use, time-limited link.",
       },
       {
         q: "Do you support two-factor authentication?",
         a:
-          "Yes — TOTP-based 2FA for any user (Google Authenticator, Authy, 1Password, etc.). Two-factor secrets are encrypted at rest with AES-256-GCM, keys held outside the database. Recovery codes are issued when 2FA is enabled so you can sign in if you lose your phone.",
+          "Yes. We support TOTP-based 2FA for any user (Google Authenticator, Authy, 1Password, etc.). Two-factor secrets are encrypted at rest with AES-256-GCM, with keys held outside the database. Recovery codes are issued when 2FA is enabled so you can sign in if you lose your phone.",
       },
       {
         q: "What happens to my data if I cancel?",
@@ -379,12 +379,12 @@ const categories: FAQCategory[] = [
       {
         q: "Can I export my data?",
         a:
-          "Yes — every list in the platform has CSV / Excel export. Full account export (every record we hold, machine-readable) is available on request at privacy@hoa.africa under your data-portability right.",
+          "Yes. Every list in the platform has CSV / Excel export. Full account export (every record we hold, machine-readable) is available on request at privacy@hoa.africa under your data-portability right.",
       },
       {
         q: "How do I get support?",
         a:
-          "Three options. (1) The in-app chat — opens during business hours, attached to the relevant record. (2) Email hello@hoa.africa — first response within 4 working hours. (3) Book a call at our scheduling link — useful for setup help and rollouts.",
+          "Three options. (1) The in-app chat, which opens during business hours and stays attached to the relevant record. (2) Email hello@hoa.africa, with a first response within 4 working hours. (3) Book a call at our scheduling link, which is handy for setup help and rollouts.",
       },
       {
         q: "Do you offer training or onboarding?",
@@ -411,7 +411,7 @@ const FAQ = () => {
   // Document title for the tab + history label. Restored on unmount.
   useEffect(() => {
     const previous = document.title;
-    document.title = "FAQ — HOA Africa";
+    document.title = "FAQ | HOA Africa";
     return () => {
       document.title = previous;
     };
