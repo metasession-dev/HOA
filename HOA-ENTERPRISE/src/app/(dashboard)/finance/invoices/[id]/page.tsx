@@ -184,21 +184,25 @@ export default function InvoiceDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {lineItems.map((item: any, idx: number) => (
-                  <tr
-                    key={idx}
-                    className={idx !== lineItems.length - 1 ? 'border-b border-stone-surface' : ''}
-                  >
-                    <td className="px-6 py-3 text-graphite">{item.description}</td>
-                    <td className="px-6 py-3 text-right text-graphite">{item.quantity || 1}</td>
-                    <td className="px-6 py-3 text-right text-graphite">
-                      {formatCurrency(Number(item.amount || 0))}
-                    </td>
-                    <td className="px-6 py-3 text-right font-medium text-charcoal-primary">
-                      {formatCurrency(Number(item.amount || 0) * (item.quantity || 1))}
-                    </td>
-                  </tr>
-                ))}
+                {lineItems.map((item: any, idx: number) => {
+                  const qty = Number(item.quantity) || 1;
+                  const unit = Number(item.unitPrice) || 0;
+                  return (
+                    <tr
+                      key={idx}
+                      className={idx !== lineItems.length - 1 ? 'border-b border-stone-surface' : ''}
+                    >
+                      <td className="px-6 py-3 text-graphite">{item.description}</td>
+                      <td className="px-6 py-3 text-right text-graphite">{qty}</td>
+                      <td className="px-6 py-3 text-right text-graphite">
+                        {formatCurrency(unit)}
+                      </td>
+                      <td className="px-6 py-3 text-right font-medium text-charcoal-primary">
+                        {formatCurrency(unit * qty)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t border-stone-surface bg-stone-surface/40">

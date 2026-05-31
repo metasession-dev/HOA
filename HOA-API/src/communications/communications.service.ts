@@ -39,10 +39,34 @@ export class CommunicationsService {
         body: data.body,
         channels: data.channels || ['email'],
         targetSegment: data.targetSegment || {},
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
         createdBy: userId,
       },
     });
+  }
+
+  /**
+   * Single notice for a reader. Org-scoped (multi-tenant guard). Residents may
+   * only read notices that have actually gone out — drafts/cancelled ones 404
+   * for them so nothing leaks before send.
+   */
+  async findOne(orgId: string, id: string, role?: string) {
+    const b = await this.prisma.broadcast.findFirst({ where: { id, organizationId: orgId } });
+    if (!b) throw new NotFoundException('Notice not found');
+    if (isResidentRole(role) && !['sent', 'sending', 'queued'].includes(b.status)) {
+      throw new NotFoundException('Notice not found');
+    }
+    return {
+      id: b.id,
+      subject: b.subject,
+      body: b.body,
+      channels: b.channels,
+      attachments: b.attachments ?? [],
+      status: b.status,
+      sentAt: b.sentAt ?? b.createdAt,
+      createdAt: b.createdAt,
+    };
   }
 
   async send(id: string, orgId: string) {

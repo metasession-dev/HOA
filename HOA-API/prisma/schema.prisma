@@ -180,6 +180,7 @@ model Organization {
   platformInvoices      PlatformInvoice[]
   storedFiles           StoredFile[]
   meetings              Meeting[]
+  paystackConfig        PaystackConfig?
 
   @@map("organizations")
 }
@@ -373,6 +374,9 @@ model AdditionalOccupant {
   relationship String?
   // infant | child | teenager | adult | senior
   ageGroup     String?
+  // Optional contact details for the household member (no login account).
+  email        String?
+  phone        String?
   photoUrl     String?
   notes        String?
   isActive     Boolean  @default(true)
@@ -536,6 +540,9 @@ model Broadcast {
   // Phase 2.5: subject can also use merge fields; the worker substitutes both.
   channels       String[]  // ["email"] | ["sms"] | ["email","sms"]
   targetSegment  Json      @default("{}")
+  // Optional file attachments: [{ url, filename, contentType, size }]. Rendered
+  // as download links in the email + notice detail. Image/PDF/short video.
+  attachments    Json      @default("[]")
   // Phase 2.5: status state-machine: draft → scheduled → sending → sent | cancelled | failed
   status         String    @default("draft")
   scheduledAt    DateTime?
@@ -2152,6 +2159,31 @@ model PaymentIntent {
   @@index([invoiceId, status])
   @@index([organizationId, status])
   @@map("payment_intents")
+}
+
+// Per-organization Paystack credentials so each HOA settles into its own
+// Paystack account. The secret key is stored encrypted at rest (AES-256-GCM via
+// common/encryption.ts) and is never returned by the API. `subaccountCode` +
+// `feeBearer` drive split settlement when present. When `isEnabled` is false or
+// no row exists, the org cannot take live payments.
+model PaystackConfig {
+  id                 String   @id @default(cuid())
+  organizationId     String   @unique
+  publicKey          String?
+  // AES-256-GCM ciphertext of the Paystack secret key. Never exposed via API.
+  secretKeyEncrypted String?
+  // Optional Paystack subaccount for split settlement.
+  subaccountCode     String?
+  // Who bears the Paystack transaction fee: "account" (the HOA) | "subaccount".
+  feeBearer          String   @default("account")
+  isEnabled          Boolean  @default(false)
+  testMode           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("paystack_configs")
 }
 
 // ==================== PHASE 2.2: TRANSACTIONAL EMAIL ====================

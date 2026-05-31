@@ -11,6 +11,7 @@ import { Card, CardContent, CardWarm } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { residentInvoiceStatus } from '@/lib/invoice-status';
 
 export default function ResidentDashboard() {
   const { user, organizationName, primaryRole } = useAuth();
@@ -99,7 +100,7 @@ export default function ResidentDashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm tabular-nums text-graphite">{formatCurrency(i.amount)}</p>
-                    <Badge variant={i.status === 'overdue' ? 'destructive' : i.status === 'partial' ? 'warning' : 'info'}>{i.status}</Badge>
+                    <Badge variant={residentInvoiceStatus(i.status).variant}>{residentInvoiceStatus(i.status).label}</Badge>
                   </div>
                 </li>
               ))}
@@ -119,7 +120,9 @@ export default function ResidentDashboard() {
             <ul className="divide-y divide-stone-surface">
               {notices.map((n: any) => (
                 <li key={n.id} className="py-3 first:pt-0 last:pb-0">
-                  <p className="text-sm font-medium text-charcoal-primary truncate">{n.subject}</p>
+                  <Link href={`/notices/${n.id}`} className="text-sm font-medium text-charcoal-primary hover:text-ember-orange truncate block">
+                    {n.subject}
+                  </Link>
                   <p className="text-caption text-muted-foreground">{formatDate(n.sentAt)}</p>
                 </li>
               ))}

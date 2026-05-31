@@ -32,6 +32,7 @@ const VALID_KINDS = [
   'vendor_invoice',
   'resale_attachment',
   'broadcast_attachment',
+  'request_attachment',
   'misc',
 ] as const;
 type ValidKind = (typeof VALID_KINDS)[number];

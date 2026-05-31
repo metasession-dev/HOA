@@ -129,8 +129,8 @@ export class PaymentsController {
   ) {
     const raw = (req as any).rawBody;
     if (!raw) throw new BadRequestException('Raw body unavailable; webhook cannot be verified');
-    this.paystack.verifyWebhookSignature(raw.toString('utf8'), signature);
-    const result = await this.intents.handleWebhookEvent(body);
+    // Signature is verified inside handleWebhook against the owning org's secret.
+    const result = await this.intents.handleWebhook(raw.toString('utf8'), signature, body);
     return successResponse(result);
   }
 

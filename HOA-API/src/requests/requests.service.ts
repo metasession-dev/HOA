@@ -74,8 +74,10 @@ export async function ensureDefaultRequestCategories(
 }
 
 const MAX_ATTACHMENTS = 10;
+const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50MB — accommodates short video clips
 const ALLOWED_CONTENT_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+  'video/mp4', 'video/webm', 'video/quicktime',
 ]);
 
 export type AttachmentInput = { url: string; filename: string; contentType: string; size: number };
@@ -337,7 +339,43 @@ export class RequestsService {
     if (isResidentRole(actor.role)) {
       req.comments = req.comments.filter((c: any) => !c.isInternal);
     }
+    await this.attachCommentAuthors(orgId, req);
     return req;
+  }
+
+  /**
+   * Annotate each comment with `authorName` and `authorType` ('resident' |
+   * 'staff') so both apps can attribute and visually distinguish resident vs
+   * support replies. Computed at read time (no schema change): a batched lookup
+   * of the comment authors and their roles in this org. A user is 'staff' when
+   * they hold any non-resident role here, else 'resident'.
+   */
+  private async attachCommentAuthors(orgId: string, req: any): Promise<void> {
+    const comments: any[] = req.comments || [];
+    if (comments.length === 0) return;
+    const ids = Array.from(new Set(comments.map((c) => c.authorUserId).filter(Boolean)));
+    if (ids.length === 0) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        userRoles: { where: { organizationId: orgId }, select: { role: { select: { name: true } } } },
+      },
+    });
+    const map = new Map<string, { authorName: string; authorType: 'resident' | 'staff' }>();
+    for (const u of users) {
+      const roleNames = u.userRoles.map((ur) => ur.role?.name).filter(Boolean) as string[];
+      const isStaff = roleNames.some((r) => !isResidentRole(r));
+      const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || 'Member';
+      map.set(u.id, { authorName: name, authorType: isStaff ? 'staff' : 'resident' });
+    }
+    for (const c of comments) {
+      const info = map.get(c.authorUserId);
+      c.authorName = info?.authorName ?? 'Member';
+      c.authorType = info?.authorType ?? 'resident';
+    }
   }
 
   async create(
@@ -811,8 +849,8 @@ export class RequestsService {
       if (!ALLOWED_CONTENT_TYPES.has(a.contentType)) {
         throw new BadRequestException(`Attachment content type ${a.contentType} not allowed`);
       }
-      if (typeof a.size !== 'number' || a.size < 0 || a.size > 25 * 1024 * 1024) {
-        throw new BadRequestException('Attachment size must be 0..25MB');
+      if (typeof a.size !== 'number' || a.size < 0 || a.size > MAX_ATTACHMENT_SIZE) {
+        throw new BadRequestException('Attachment size must be 0..50MB');
       }
     }
   }

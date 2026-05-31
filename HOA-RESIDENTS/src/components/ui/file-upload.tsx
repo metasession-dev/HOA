@@ -49,6 +49,7 @@ export interface FileUploadProps {
     | 'vendor_invoice'
     | 'resale_attachment'
     | 'broadcast_attachment'
+    | 'request_attachment'
     | 'user_avatar'
     | 'org_logo'
     | 'misc';

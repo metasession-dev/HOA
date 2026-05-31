@@ -30,7 +30,8 @@ export class CreateTenderDto {
   @IsOptional() @IsString() @MaxLength(120) category?: string;
   @IsOptional() @IsNumber() @Min(0) budgetMin?: number;
   @IsOptional() @IsNumber() @Min(0) budgetMax?: number;
-  @IsOptional() @IsString() @MaxLength(8) currency?: string;
+  // Currency is intentionally omitted — tenders always use the org's settings
+  // currency, set server-side.
   @IsDateString() closesAt: string;
 
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => TenderAttachmentDto)
@@ -44,11 +45,19 @@ export class UpdateTenderDto {
   @IsOptional() @IsString() @MaxLength(120) category?: string;
   @IsOptional() @IsNumber() @Min(0) budgetMin?: number;
   @IsOptional() @IsNumber() @Min(0) budgetMax?: number;
-  @IsOptional() @IsString() @MaxLength(8) currency?: string;
   @IsOptional() @IsDateString() closesAt?: string;
 
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => TenderAttachmentDto)
   attachments?: TenderAttachmentDto[];
+}
+
+/** Ask the assistant to draft a tender Summary or Scope of work. */
+export class TenderAiDraftDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) title: string;
+  @IsIn(['summary', 'scope']) field: 'summary' | 'scope';
+  @IsOptional() @IsString() @MaxLength(120) category?: string;
+  // Optional extra context the admin types (existing notes, constraints, etc.).
+  @IsOptional() @IsString() @MaxLength(4000) context?: string;
 }
 
 export class SubmitBidDto {

@@ -10,6 +10,7 @@ import {
   ShortlistBidDto,
   StartExcoVoteDto,
   AwardBidDto,
+  TenderAiDraftDto,
 } from './dto/tenders.dto';
 
 const MANAGE = ['hoa_admin', 'super_admin', 'finance_officer', 'property_manager'] as const;
@@ -30,6 +31,12 @@ export class TendersController {
     @Body() dto: CreateTenderDto,
   ) {
     return successResponse(await this.tenders.create(orgId, { userId, role }, dto));
+  }
+
+  /** Draft a tender Summary or Scope of work with the assistant. */
+  @Post('ai/draft')
+  async aiDraft(@CurrentUser('organizationId') orgId: string, @Body() dto: TenderAiDraftDto) {
+    return successResponse(await this.tenders.aiDraft(orgId, dto));
   }
 
   @Get()

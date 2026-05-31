@@ -10,11 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-
-const statusBadgeMap: Record<string, 'muted' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
-  draft: 'muted', sent: 'info', partial: 'warning', paid: 'success',
-  voided: 'destructive', overdue: 'destructive', on_plan: 'secondary',
-};
+import { residentInvoiceStatus } from '@/lib/invoice-status';
 
 export default function ResidentInvoiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +85,7 @@ export default function ResidentInvoiceDetail() {
 
       <header className="space-y-2">
         <div className="flex items-center gap-2">
-          <Badge variant={statusBadgeMap[invoice.status] || 'secondary'}>{invoice.status}</Badge>
+          <Badge variant={residentInvoiceStatus(invoice.status).variant}>{residentInvoiceStatus(invoice.status).label}</Badge>
           <span className="font-mono text-caption text-muted-foreground">{invoice.invoiceNumber}</span>
         </div>
         <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">
@@ -147,16 +143,36 @@ export default function ResidentInvoiceDetail() {
             {(invoice.lineItems?.length || 0) === 0 ? (
               <p className="p-6 text-caption text-muted-foreground">No line items.</p>
             ) : (
-              <ul className="divide-y divide-stone-surface">
-                {invoice.lineItems.map((li: any, i: number) => (
-                  <li key={i} className="flex items-start justify-between p-4 gap-4">
-                    <span className="text-sm text-graphite">{li.description}</span>
-                    <span className="text-sm font-medium text-charcoal-primary tabular-nums">
-                      {formatCurrency(Number(li.amount) * (li.quantity || 1), invoice.currency)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-surface text-left text-caption text-muted-foreground">
+                      <th className="px-4 py-2 font-medium">Description</th>
+                      <th className="px-4 py-2 text-right font-medium">Qty</th>
+                      <th className="px-4 py-2 text-right font-medium">Unit price</th>
+                      <th className="px-4 py-2 text-right font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-surface">
+                    {invoice.lineItems.map((li: any, i: number) => {
+                      const qty = Number(li.quantity) || 1;
+                      const unit = Number(li.unitPrice) || 0;
+                      return (
+                        <tr key={i}>
+                          <td className="px-4 py-3 text-graphite">{li.description}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-graphite">{qty}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-graphite">
+                            {formatCurrency(unit, invoice.currency)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium tabular-nums text-charcoal-primary">
+                            {formatCurrency(unit * qty, invoice.currency)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -7,6 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole, actorOccupiesUnit, scopeInvoiceWhere } from '../common/scope.util';
 import { PaystackService } from './paystack.service';
 import { PaymentsService } from './payments.service';
+import { PaymentConfigService } from './payment-config.service';
 
 /**
  * Phase 1.3 PaymentIntents orchestration.
@@ -32,6 +33,7 @@ export class PaymentIntentsService {
     private prisma: PrismaService,
     private paystack: PaystackService,
     private payments: PaymentsService,
+    private paymentConfig: PaymentConfigService,
   ) {}
 
   /**
@@ -69,7 +71,21 @@ export class PaymentIntentsService {
     });
 
     const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
-    const provider = this.paystack.isConfigured() ? 'paystack' : 'mock';
+
+    // Resolve the owning org's Paystack credentials (its own encrypted key, or
+    // the platform env key as a legacy fallback). With no credentials we mock in
+    // dev; in production we refuse rather than silently faking a charge.
+    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
+    let provider: 'paystack' | 'mock';
+    if (creds) {
+      provider = 'paystack';
+    } else if (process.env.NODE_ENV !== 'production') {
+      provider = 'mock';
+    } else {
+      throw new BadRequestException(
+        'Online payments are not configured for this organisation. An administrator must add Paystack keys under Settings → Payment configuration.',
+      );
+    }
 
     // Compute amount in minor units (Paystack expects kobo / cents).
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
@@ -82,19 +98,24 @@ export class PaymentIntentsService {
     let authorizationUrl: string;
 
     if (provider === 'paystack') {
-      const r = await this.paystack.initializeTransaction({
-        email: actorUser.email,
-        amountMinor,
-        currency: invoice.currency,
-        reference,
-        callbackUrl,
-        metadata: {
-          invoiceId: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          organizationId: orgId,
-          unitId: invoice.unitId,
+      const r = await this.paystack.initializeTransaction(
+        {
+          email: actorUser.email,
+          amountMinor,
+          currency: invoice.currency,
+          reference,
+          callbackUrl,
+          metadata: {
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            organizationId: orgId,
+            unitId: invoice.unitId,
+          },
+          subaccount: creds!.subaccountCode,
+          bearer: creds!.subaccountCode ? creds!.feeBearer : null,
         },
-      });
+        creds!.secretKey,
+      );
       authorizationUrl = r.authorizationUrl;
     } else {
       // Mock provider: surface a URL that points to a "simulate success" page
@@ -132,9 +153,46 @@ export class PaymentIntentsService {
   }
 
   /**
-   * Inbound Paystack webhook handler. Verifies signature before this is called
-   * (controller does that). Payload shape:
-   *   { event: "charge.success", data: { reference, status, amount, ... } }
+   * Webhook entrypoint with multi-tenant signature verification. We can only
+   * pick the right secret after we know which org the event belongs to, so:
+   *   1. read the `reference` from the (still-untrusted) payload,
+   *   2. locate the PaymentIntent → its organizationId,
+   *   3. verify the HMAC over the RAW body using that org's secret,
+   *   4. process the parsed payload.
+   * The reference only selects which secret to check against — forging a valid
+   * HMAC still requires that org's secret, so this is safe.
+   */
+  async handleWebhook(rawBody: string, signature: string | undefined, payload: any) {
+    if (!payload || typeof payload !== 'object') {
+      throw new BadRequestException('Empty webhook payload');
+    }
+    const reference = payload?.data?.reference;
+    if (!reference) {
+      this.logger.warn('Webhook missing reference; ignoring');
+      return { ok: true, ignored: true };
+    }
+    const intent = await this.prisma.paymentIntent.findUnique({
+      where: { providerReference: reference },
+      select: { organizationId: true },
+    });
+    if (!intent) {
+      // Unknown reference (test event / different env) — nothing to verify or do.
+      this.logger.warn(`Webhook reference ${reference} unknown — ignoring`);
+      return { ok: true, ignored: true };
+    }
+    const creds = await this.paymentConfig.getResolvedCredentials(intent.organizationId);
+    if (!creds) {
+      this.logger.error(`No Paystack secret to verify webhook for org ${intent.organizationId}`);
+      return { ok: false, reason: 'no-secret' };
+    }
+    this.paystack.verifyWebhookSignature(rawBody, signature, creds.secretKey);
+    return this.handleWebhookEvent(payload);
+  }
+
+  /**
+   * Inbound Paystack webhook handler. Signature is verified by `handleWebhook`
+   * (or, for the synthetic mock/verify paths, trust is established by the caller).
+   * Payload shape: { event: "charge.success", data: { reference, status, amount, ... } }
    */
   async handleWebhookEvent(payload: any) {
     if (!payload || typeof payload !== 'object') {
@@ -241,7 +299,9 @@ export class PaymentIntentsService {
     // Mock provider has no remote to verify against.
     if (intent.provider !== 'paystack') return intent;
 
-    const result = await this.paystack.verifyTransaction(intent.providerReference);
+    const creds = await this.paymentConfig.getResolvedCredentials(intent.organizationId);
+    if (!creds) return intent; // can't verify without a key; webhook will reconcile
+    const result = await this.paystack.verifyTransaction(intent.providerReference, creds.secretKey);
     if (result.status === 'success') {
       const synthetic = {
         event: 'charge.success',

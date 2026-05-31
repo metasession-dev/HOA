@@ -20,6 +20,10 @@ export type InitTransactionInput = {
   reference: string;
   callbackUrl: string;
   metadata?: Record<string, any>;
+  // Optional split-settlement: route funds to the HOA's Paystack subaccount.
+  subaccount?: string | null;
+  // Who bears the Paystack fee when a subaccount is used: "account" | "subaccount".
+  bearer?: string | null;
 };
 
 export type InitTransactionResult = {
@@ -52,12 +56,15 @@ export class PaystackService {
 
   /**
    * Hit Paystack's `/transaction/initialize` to get a hosted-checkout link.
+   * `secretKey` is supplied per-call by the caller, which resolves the owning
+   * org's encrypted key (or the platform env key as a legacy fallback) — so
+   * each HOA charges into its own Paystack account.
    * Throws BadRequestException on Paystack-side rejection so the controller
    * can surface the error message to the admin/resident.
    */
-  async initializeTransaction(input: InitTransactionInput): Promise<InitTransactionResult> {
-    const key = this.requireKey();
-    const body = {
+  async initializeTransaction(input: InitTransactionInput, secretKey?: string): Promise<InitTransactionResult> {
+    const key = this.requireKey(secretKey);
+    const body: Record<string, any> = {
       email: input.email,
       amount: input.amountMinor,
       currency: input.currency,
@@ -65,6 +72,11 @@ export class PaystackService {
       callback_url: input.callbackUrl,
       metadata: input.metadata,
     };
+    // Split settlement only applies when a subaccount is configured.
+    if (input.subaccount) {
+      body.subaccount = input.subaccount;
+      if (input.bearer) body.bearer = input.bearer;
+    }
     const data = await this.post<any>('/transaction/initialize', body, key);
     if (!data?.status || !data?.data?.authorization_url) {
       throw new BadRequestException(`Paystack init failed: ${data?.message || 'unknown'}`);
@@ -81,8 +93,8 @@ export class PaystackService {
    * of the webhook — if the webhook is delayed or never fires, the callback
    * page can poll this and progress the payment.
    */
-  async verifyTransaction(reference: string): Promise<VerifyTransactionResult> {
-    const key = this.requireKey();
+  async verifyTransaction(reference: string, secretKey?: string): Promise<VerifyTransactionResult> {
+    const key = this.requireKey(secretKey);
     const data = await this.get<any>(`/transaction/verify/${encodeURIComponent(reference)}`, key);
     const d = data?.data;
     if (!d) throw new BadRequestException(`Paystack verify failed: ${data?.message || 'unknown'}`);
@@ -103,8 +115,8 @@ export class PaystackService {
    * MUST be called against the raw (unparsed) request body, not the JSON-parsed
    * version — even a single whitespace difference invalidates the HMAC.
    */
-  verifyWebhookSignature(rawBody: string, header: string | undefined): void {
-    const key = this.requireKey();
+  verifyWebhookSignature(rawBody: string, header: string | undefined, secretKey?: string): void {
+    const key = this.requireKey(secretKey);
     if (!header) throw new UnauthorizedException('Missing X-Paystack-Signature');
     const expected = crypto.createHmac('sha512', key).update(rawBody).digest('hex');
     try {
@@ -222,9 +234,14 @@ export class PaystackService {
 
   // ============ Internals ============
 
-  private requireKey(): string {
-    const key = process.env.PAYSTACK_SECRET_KEY;
-    if (!key) throw new BadRequestException('Paystack is not configured on this server');
+  /**
+   * Resolve the secret key to use. Resident-payment methods pass the owning
+   * org's key explicitly; platform-billing methods omit it and fall back to the
+   * platform env key.
+   */
+  private requireKey(explicit?: string): string {
+    const key = explicit || process.env.PAYSTACK_SECRET_KEY;
+    if (!key) throw new BadRequestException('Paystack is not configured');
     return key;
   }
 

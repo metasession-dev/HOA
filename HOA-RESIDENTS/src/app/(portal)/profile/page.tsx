@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { toast } from '@/components/ui/use-toast';
 import { getInitials } from '@/lib/utils';
+import { HouseholdManager } from '@/components/household-manager';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -123,7 +124,7 @@ export default function ProfilePage() {
       <header>
         <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Your account</h1>
         <p className="mt-1 text-body text-muted-foreground">
-          Update your name, contact details, password, and avatar.
+          Update your name, contact details, password, avatar, and household.
         </p>
       </header>
 
@@ -319,6 +320,8 @@ export default function ProfilePage() {
           />
         </CardContent>
       </Card>
+
+      <HouseholdManager />
     </div>
   );
 }

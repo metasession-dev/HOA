@@ -9,15 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-
-const statusBadgeMap: Record<string, 'muted' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
-  draft: 'muted',
-  sent: 'info',
-  partial: 'warning',
-  paid: 'success',
-  voided: 'destructive',
-  overdue: 'destructive',
-};
+import { residentInvoiceStatus } from '@/lib/invoice-status';
 
 export default function MyInvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -115,7 +107,7 @@ export default function MyInvoicesPage() {
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{formatDate(inv.dueDate)}</td>
                       <td className="px-6 py-4">
-                        <Badge variant={statusBadgeMap[inv.status] || 'secondary'}>{inv.status}</Badge>
+                        <Badge variant={residentInvoiceStatus(inv.status).variant}>{residentInvoiceStatus(inv.status).label}</Badge>
                       </td>
                     </tr>
                   ))}

@@ -6,6 +6,11 @@ import { Actor, scopePaymentWhere } from '../common/scope.util';
 import { WebhooksService } from '../platform/webhooks.service';
 import { PaymentPlansService } from '../billing/payment-plans.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const ENTERPRISE_BASE = (
+  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
+).replace(/\/$/, '');
 
 @Injectable()
 export class PaymentsService {
@@ -14,6 +19,7 @@ export class PaymentsService {
     private webhooks: WebhooksService,
     private paymentPlans: PaymentPlansService,
     private mail: MailService,
+    private notifications: NotificationsService,
   ) {}
 
   async findAll(orgId: string, query: PaginationDto, actor?: Actor) {
@@ -37,7 +43,10 @@ export class PaymentsService {
   async logPayment(data: { invoiceId: string; amount: number; method: string; processorReference?: string }, userId: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: data.invoiceId },
-      include: { payments: { where: { status: 'completed' } } },
+      include: {
+        payments: { where: { status: 'completed' } },
+        unit: { select: { unitNumber: true } },
+      },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
@@ -98,6 +107,29 @@ export class PaymentsService {
     if (newStatus === 'paid') {
       this.sendPaidEmail(invoice.id, payment.id).catch(() => { /* swallow */ });
     }
+
+    // Notify the finance/admin team in-app + email that a payment landed.
+    // Fire-and-forget so we never slow the webhook/payment path.
+    const amountText = `${invoice.currency} ${Number(data.amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const unitLabel = invoice.unit?.unitNumber ? ` (Unit ${invoice.unit.unitNumber})` : '';
+    this.notifications
+      .notifyByRole({
+        organizationId: invoice.organizationId,
+        roleNames: ['hoa_admin', 'super_admin', 'finance_officer'],
+        type: 'payment_received',
+        title: `Payment received: ${amountText}`,
+        body: `${amountText} received on invoice ${invoice.invoiceNumber}${unitLabel}.`,
+        entityType: 'Invoice',
+        entityId: invoice.id,
+        actionUrl: `/finance/invoices/${invoice.id}`,
+        alsoEmail: {
+          subject: `Payment received — ${invoice.invoiceNumber}`,
+          message: `${amountText} has been received on invoice ${invoice.invoiceNumber}${unitLabel}. The invoice is now ${newStatus}.`,
+          ctaLabel: 'View invoice',
+          ctaUrl: `${ENTERPRISE_BASE}/finance/invoices/${invoice.id}`,
+        },
+      })
+      .catch(() => { /* swallow */ });
 
     return payment;
   }

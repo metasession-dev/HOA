@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * Phase 10.3 — resident self-service endpoints.
@@ -33,7 +34,45 @@ export type Channel = (typeof CHANNELS)[number];
 
 @Injectable()
 export class MeService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
+
+  /**
+   * Notify the management team (admins + property managers) that a resident
+   * changed something on their account. Best-effort; never blocks the write and
+   * skips the actor themselves. `summary` is a short human sentence.
+   */
+  private notifyManagersOfChange(
+    organizationId: string,
+    actorUserId: string,
+    actorName: string,
+    type: string,
+    summary: string,
+  ) {
+    this.notifications
+      .notifyByRole({
+        organizationId,
+        roleNames: ['hoa_admin', 'super_admin', 'property_manager'],
+        type,
+        title: summary,
+        body: summary,
+        entityType: 'User',
+        entityId: actorUserId,
+        excludeUserId: actorUserId,
+        alsoEmail: { subject: summary, message: `${summary} You can review the change in the People area.` },
+      })
+      .catch(() => { /* swallow */ });
+  }
+
+  private async actorDisplayName(userId: string): Promise<string> {
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+    return [u?.firstName, u?.lastName].filter(Boolean).join(' ').trim() || u?.email || 'A resident';
+  }
 
   // ----- profile -----
   async getProfile(userId: string) {
@@ -57,6 +96,7 @@ export class MeService {
 
   async updateProfile(
     userId: string,
+    organizationId: string,
     data: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null; language?: string },
   ) {
     const trimmed = {
@@ -95,6 +135,16 @@ export class MeService {
         photoUrl: trimmed.avatarUrl,
       },
     });
+    if (organizationId) {
+      const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+      this.notifyManagersOfChange(
+        organizationId,
+        userId,
+        name,
+        'resident_profile_updated',
+        `${name} updated their profile details.`,
+      );
+    }
     return user;
   }
 
@@ -382,5 +432,150 @@ export class MeService {
         phone: input.phone === undefined ? undefined : input.phone?.trim() || null,
       },
     });
+  }
+
+  // ----- household members (AdditionalOccupant) -----
+  // Lightweight family / household records (no login) the resident manages for
+  // any unit they actively occupy (owner OR tenant). Scope-guarded so a
+  // resident can never touch a unit they don't occupy.
+
+  /** Units the user actively occupies (owner or tenant) — the household scope. */
+  private async myOccupiedUnitIds(userId: string, organizationId: string): Promise<string[]> {
+    const persons = await this.prisma.person.findMany({
+      where: { userId, organizationId },
+      select: { id: true },
+    });
+    if (persons.length === 0) return [];
+    const occ = await this.prisma.unitOccupancy.findMany({
+      where: { personId: { in: persons.map((p) => p.id) }, isActive: true },
+      select: { unitId: true },
+    });
+    return Array.from(new Set(occ.map((o) => o.unitId)));
+  }
+
+  async listHousehold(userId: string, organizationId: string) {
+    const unitIds = await this.myOccupiedUnitIds(userId, organizationId);
+    if (unitIds.length === 0) return [];
+    return this.prisma.additionalOccupant.findMany({
+      where: { unitId: { in: unitIds }, isActive: true },
+      include: { unit: { select: { id: true, unitNumber: true, block: true } } },
+      orderBy: [{ unitId: 'asc' }, { firstName: 'asc' }],
+    });
+  }
+
+  async addHousehold(
+    userId: string,
+    organizationId: string,
+    input: {
+      unitId: string;
+      firstName: string;
+      lastName?: string;
+      relationship?: string;
+      gender?: string;
+      ageGroup?: string;
+      email?: string;
+      phone?: string;
+      photoUrl?: string;
+      notes?: string;
+    },
+  ) {
+    const unitIds = await this.myOccupiedUnitIds(userId, organizationId);
+    if (!unitIds.includes(input.unitId)) {
+      throw new ForbiddenException('You can only add household members to a unit you occupy.');
+    }
+    if (!input.firstName?.trim()) throw new BadRequestException('firstName is required');
+    const created = await this.prisma.additionalOccupant.create({
+      data: {
+        unitId: input.unitId,
+        firstName: input.firstName.trim(),
+        lastName: input.lastName?.trim() || null,
+        relationship: input.relationship?.trim() || null,
+        gender: input.gender?.trim() || null,
+        ageGroup: input.ageGroup?.trim() || null,
+        email: input.email?.trim() || null,
+        phone: input.phone?.trim() || null,
+        photoUrl: input.photoUrl?.trim() || null,
+        notes: input.notes?.trim() || null,
+        isActive: true,
+      },
+    });
+    const name = await this.actorDisplayName(userId);
+    this.notifyManagersOfChange(
+      organizationId,
+      userId,
+      name,
+      'resident_household_updated',
+      `${name} added a household member.`,
+    );
+    return created;
+  }
+
+  /** Load + scope-check a household record belongs to a unit the user occupies. */
+  private async scopedHousehold(userId: string, organizationId: string, id: string) {
+    const ho = await this.prisma.additionalOccupant.findUnique({ where: { id } });
+    if (!ho) throw new NotFoundException('Household member not found');
+    const unitIds = await this.myOccupiedUnitIds(userId, organizationId);
+    if (!unitIds.includes(ho.unitId)) throw new ForbiddenException('Not your unit');
+    return ho;
+  }
+
+  async updateHousehold(
+    userId: string,
+    organizationId: string,
+    id: string,
+    input: {
+      firstName?: string;
+      lastName?: string | null;
+      relationship?: string | null;
+      gender?: string | null;
+      ageGroup?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      photoUrl?: string | null;
+      notes?: string | null;
+    },
+  ) {
+    await this.scopedHousehold(userId, organizationId, id);
+    const clean = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() || null);
+    const updated = await this.prisma.additionalOccupant.update({
+      where: { id },
+      data: {
+        firstName: input.firstName?.trim() || undefined,
+        lastName: clean(input.lastName),
+        relationship: clean(input.relationship),
+        gender: clean(input.gender),
+        ageGroup: clean(input.ageGroup),
+        email: clean(input.email),
+        phone: clean(input.phone),
+        photoUrl: clean(input.photoUrl),
+        notes: clean(input.notes),
+      },
+    });
+    const name = await this.actorDisplayName(userId);
+    this.notifyManagersOfChange(
+      organizationId,
+      userId,
+      name,
+      'resident_household_updated',
+      `${name} updated a household member.`,
+    );
+    return updated;
+  }
+
+  async removeHousehold(userId: string, organizationId: string, id: string) {
+    await this.scopedHousehold(userId, organizationId, id);
+    const removed = await this.prisma.additionalOccupant.update({
+      where: { id },
+      data: { isActive: false },
+    });
+    const name = await this.actorDisplayName(userId);
+    this.notifyManagersOfChange(
+      organizationId,
+      userId,
+      name,
+      'resident_household_updated',
+      `${name} removed a household member.`,
+    );
+    return removed;
   }
 }

@@ -23,6 +23,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
+
+const ATTACH_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
 
 const selectClass = cn(
   'flex h-10 w-full rounded-lg bg-card px-3 text-sm text-foreground shadow-inset-stone',
@@ -50,6 +53,7 @@ export default function NewRequestPage() {
   const [myUnits, setMyUnits] = useState<MyUnit[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(true);
   const [form, setForm] = useState({ categoryId: '', subject: '', body: '', unitId: '' });
+  const [attachments, setAttachments] = useState<UploadedFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -92,7 +96,11 @@ export default function NewRequestPage() {
     setSubmitting(true);
     try {
       const idemp = `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const r = await api.post<any>('/requests', form, idemp);
+      const payload = {
+        ...form,
+        attachments: attachments.map((a) => ({ url: a.url, filename: a.filename, contentType: a.contentType, size: a.size ?? 0 })),
+      };
+      const r = await api.post<any>('/requests', payload, idemp);
       toast({ variant: 'success', title: 'Request submitted' });
       router.replace(`/requests/${r.data.id}`);
     } catch (err: any) {
@@ -194,6 +202,15 @@ export default function NewRequestPage() {
                 required
               />
             </div>
+
+            <FileUpload
+              value={attachments}
+              onChange={setAttachments}
+              kind="request_attachment"
+              label="Attachments (optional)"
+              helpText="Add a photo, PDF, or short video clip (max 50MB each)."
+              accept={ATTACH_ACCEPT}
+            />
 
             <div className="flex justify-end">
               <Button type="submit" loading={submitting} disabled={!form.unitId}>

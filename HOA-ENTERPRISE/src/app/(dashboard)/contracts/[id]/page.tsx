@@ -81,6 +81,11 @@ export default function ContractDetailPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {t.status === 'draft' && (
+            <Link href={`/contracts/${id}/edit`}>
+              <Button variant="secondary" disabled={busy}>Edit</Button>
+            </Link>
+          )}
+          {t.status === 'draft' && (
             <Button disabled={busy} onClick={() => act(() => api.post(`/tenders/${id}/open`), 'Tender opened for bids')}>
               <Gavel className="mr-1.5 h-3.5 w-3.5" />Open for bids
             </Button>

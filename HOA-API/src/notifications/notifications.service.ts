@@ -198,6 +198,58 @@ export class NotificationsService {
   }
 
   /**
+   * Notify every active user holding one of `roleNames` in the org — in-app +
+   * push + optional email. Used for staff-side alerts (e.g. finance officers on
+   * a payment, admins on a resident profile change). Best-effort; resolving an
+   * empty cohort is a no-op. Excludes the optional `excludeUserId` (e.g. the
+   * actor who triggered the event) so people don't get pinged about their own
+   * action.
+   */
+  async notifyByRole(input: {
+    organizationId: string;
+    roleNames: string[];
+    type: string;
+    title: string;
+    body: string;
+    entityType?: string;
+    entityId?: string;
+    actionUrl?: string;
+    excludeUserId?: string;
+    alsoEmail?: { subject: string; message: string; ctaLabel?: string; ctaUrl?: string };
+  }): Promise<{ created: number }> {
+    try {
+      if (input.roleNames.length === 0) return { created: 0 };
+      const rows = await this.prisma.userRole.findMany({
+        where: {
+          organizationId: input.organizationId,
+          role: { name: { in: input.roleNames } },
+          user: { isActive: true },
+        },
+        select: { userId: true },
+      });
+      const userIds = Array.from(new Set(rows.map((r) => r.userId))).filter(
+        (id) => id !== input.excludeUserId,
+      );
+      if (userIds.length === 0) return { created: 0 };
+      const res = await this.enqueueFor({
+        organizationId: input.organizationId,
+        recipientUserIds: userIds,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        actionUrl: input.actionUrl,
+        alsoEmail: input.alsoEmail,
+      });
+      return { created: res.created };
+    } catch (err) {
+      this.logger.warn(`notifyByRole failed for ${input.organizationId}: ${(err as any)?.message ?? err}`);
+      return { created: 0 };
+    }
+  }
+
+  /**
    * Send a one-off transactional email to an arbitrary address (e.g. a vendor
    * with no user account) via the generic announcement template. Best-effort.
    */

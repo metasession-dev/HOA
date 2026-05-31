@@ -26,7 +26,7 @@ export class AttachmentDto {
   @ApiProperty()
   @IsInt()
   @Min(0)
-  @Max(25 * 1024 * 1024)
+  @Max(50 * 1024 * 1024)
   size!: number;
 }
 

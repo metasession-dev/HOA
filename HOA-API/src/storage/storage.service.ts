@@ -39,6 +39,7 @@ export interface UploadInput {
     | 'vendor_invoice'
     | 'resale_attachment'
     | 'broadcast_attachment'
+    | 'request_attachment'
     | 'board_pack'
     | 'misc';
   organizationId: string | null;
@@ -62,7 +63,9 @@ const SIZE_LIMITS: Record<UploadInput['kind'], number> = {
   violation_photo: 10 * 1024 * 1024,
   vendor_invoice: 25 * 1024 * 1024,
   resale_attachment: 25 * 1024 * 1024,
-  broadcast_attachment: 10 * 1024 * 1024,
+  // Broadcasts + requests allow short video clips, so the cap is higher.
+  broadcast_attachment: 50 * 1024 * 1024,
+  request_attachment: 50 * 1024 * 1024,
   board_pack: 50 * 1024 * 1024,
   misc: 25 * 1024 * 1024,
 };
@@ -74,7 +77,8 @@ const ALLOWED_MIME_BY_KIND: Record<UploadInput['kind'], RegExp> = {
   violation_photo: /^image\/(png|jpeg|webp|heic)$/,
   vendor_invoice: /^application\/pdf$|^image\/(png|jpeg|webp)$/,
   resale_attachment: /^application\/pdf$|^image\/|^text\//,
-  broadcast_attachment: /^image\/|^application\/pdf$/,
+  broadcast_attachment: /^image\/|^application\/pdf$|^video\/(mp4|webm|quicktime)$/,
+  request_attachment: /^image\/|^application\/pdf$|^video\/(mp4|webm|quicktime)$/,
   board_pack: /^application\/pdf$/,
   misc: /.*/,
 };

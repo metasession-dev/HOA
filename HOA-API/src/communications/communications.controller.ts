@@ -25,6 +25,8 @@ class CreateBroadcastLegacyDto {
   @IsOptional() @IsArray() @IsString({ each: true }) estateIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) personIds?: string[];
   @IsOptional() @IsString() scheduledFor?: string;
+  // Optional file attachments: [{ url, filename, contentType, size }].
+  @IsOptional() @IsArray() attachments?: Array<{ url: string; filename: string; contentType: string; size: number }>;
 }
 
 @ApiTags('Communications')
@@ -138,6 +140,20 @@ export class CommunicationsController {
   async sendLegacy(@Param('id') id: string, @CurrentUser('organizationId') orgId: string) {
     const broadcast = await this.service.send(id, orgId);
     return successResponse(broadcast);
+  }
+
+  /**
+   * Read a single notice. Available to any authenticated member of the org;
+   * residents only see notices that have gone out (the service scopes by
+   * status). Declared after the /v2 routes so `:id` never shadows them.
+   */
+  @Get('broadcasts/:id')
+  async getOne(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.service.findOne(orgId, id, role));
   }
 
   // ============ Public unsubscribe ============

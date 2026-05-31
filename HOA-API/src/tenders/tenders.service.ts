@@ -16,7 +16,9 @@ import {
   ShortlistBidDto,
   StartExcoVoteDto,
   AwardBidDto,
+  TenderAiDraftDto,
 } from './dto/tenders.dto';
+import { createLlmProvider } from '../assistant/llm/provider';
 
 type Actor = { userId: string; role: string };
 
@@ -65,13 +67,53 @@ export class TendersService {
         category: dto.category?.trim() || null,
         budgetMin: dto.budgetMin != null ? new Decimal(dto.budgetMin) : null,
         budgetMax: dto.budgetMax != null ? new Decimal(dto.budgetMax) : null,
-        currency: (dto.currency || org?.currency || 'ZAR').toUpperCase(),
+        // Tenders always use the org's settings currency.
+        currency: (org?.currency || 'ZAR').toUpperCase(),
         closesAt,
         attachments: (dto.attachments ?? []) as any,
         status: 'draft',
         createdBy: actor.userId,
       },
     });
+  }
+
+  /**
+   * Draft a tender Summary or Scope of work with the assistant. Sends only the
+   * title/category/context the admin typed — no resident PII. Falls back to the
+   * mock LLM provider in dev (deterministic, offline). Returns plain text the
+   * admin can edit before saving.
+   */
+  async aiDraft(orgId: string, dto: TenderAiDraftDto): Promise<{ text: string }> {
+    const title = dto.title.trim();
+    if (!title) throw new BadRequestException('A tender title is required to draft text');
+    const category = dto.category?.trim();
+    const context = dto.context?.trim();
+
+    const system =
+      dto.field === 'summary'
+        ? 'You are a procurement officer for an African residential estate / HOA. Write a concise, professional 2–3 sentence summary of a contract tender that vendors will read. Plain prose, no headings, no markdown, no em dashes. Do not invent budgets, dates, or vendor names.'
+        : 'You are a procurement officer for an African residential estate / HOA. Draft a clear, well-structured scope of work for a contract tender: responsibilities, deliverables, frequency/standards, and what a compliant bid must include. Use short plain-text bullet lines (prefixed with "- "), no markdown headings, no em dashes. Do not invent budgets, dates, or vendor names.';
+
+    const parts = [`Tender title: ${title}`];
+    if (category) parts.push(`Category: ${category}`);
+    if (context) parts.push(`Additional context from the manager: ${context}`);
+    parts.push(
+      dto.field === 'summary'
+        ? 'Write the summary now.'
+        : 'Write the scope of work now.',
+    );
+
+    const llm = createLlmProvider();
+    const res = await llm.generate(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: parts.join('\n') },
+      ],
+      { maxTokens: dto.field === 'summary' ? 300 : 900, temperature: 0.4 },
+    );
+    const text = (res.content || '').trim();
+    if (!text) throw new BadRequestException('The assistant could not draft text. Try again or write it manually.');
+    return { text };
   }
 
   async update(id: string, orgId: string, dto: UpdateTenderDto) {
@@ -86,7 +128,6 @@ export class TendersService {
         category: dto.category === undefined ? undefined : (dto.category?.trim() || null),
         budgetMin: dto.budgetMin === undefined ? undefined : dto.budgetMin != null ? new Decimal(dto.budgetMin) : null,
         budgetMax: dto.budgetMax === undefined ? undefined : dto.budgetMax != null ? new Decimal(dto.budgetMax) : null,
-        currency: dto.currency ? dto.currency.toUpperCase() : undefined,
         closesAt: dto.closesAt ? new Date(dto.closesAt) : undefined,
         attachments: dto.attachments ? (dto.attachments as any) : undefined,
       },

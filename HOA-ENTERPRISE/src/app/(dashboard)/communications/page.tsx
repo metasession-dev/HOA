@@ -18,6 +18,9 @@ import {
   DrawerBody, DrawerFooter, DrawerClose,
 } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
+
+const BROADCAST_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
 
 const channelMeta: Record<string, { icon: typeof Mail; label: string }> = {
   email: { icon: Mail, label: 'Email' },
@@ -31,6 +34,7 @@ export default function CommunicationsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ subject: '', body: '', channels: ['email'] as string[] });
+  const [attachments, setAttachments] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchBroadcasts = () => {
@@ -49,10 +53,14 @@ export default function CommunicationsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post('/communications/broadcasts', form);
+      await api.post('/communications/broadcasts', {
+        ...form,
+        attachments: attachments.map((a) => ({ url: a.url, filename: a.filename, contentType: a.contentType, size: a.size ?? 0 })),
+      });
       toast({ variant: 'success', title: 'Draft saved', description: form.subject });
       setShowCreate(false);
       setForm({ subject: '', body: '', channels: ['email'] });
+      setAttachments([]);
       fetchBroadcasts();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Could not save draft', description: err.message });
@@ -219,6 +227,14 @@ export default function CommunicationsPage() {
                   Push goes to residents who have installed the PWA and opted in.
                 </p>
               </div>
+              <FileUpload
+                value={attachments}
+                onChange={setAttachments}
+                kind="broadcast_attachment"
+                label="Attachments (optional)"
+                helpText="Image, PDF, or short video clip (max 50MB each)."
+                accept={BROADCAST_ACCEPT}
+              />
             </DrawerBody>
             <DrawerFooter>
               <Button type="submit" disabled={submitting || form.channels.length === 0}>

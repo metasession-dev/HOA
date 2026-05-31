@@ -74,6 +74,35 @@ class UpdateOccupantDto {
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
 }
 
+const RELATIONSHIPS = ['spouse', 'partner', 'child', 'parent', 'sibling', 'relative', 'domestic_staff', 'other'];
+const GENDERS = ['male', 'female', 'other', 'undisclosed'];
+const AGE_GROUPS = ['infant', 'child', 'teenager', 'adult', 'senior'];
+
+class AddHouseholdDto {
+  @IsString() unitId!: string;
+  @IsString() @MinLength(1) @MaxLength(120) firstName!: string;
+  @IsOptional() @IsString() @MaxLength(120) lastName?: string;
+  @IsOptional() @IsIn(RELATIONSHIPS) relationship?: string;
+  @IsOptional() @IsIn(GENDERS) gender?: string;
+  @IsOptional() @IsIn(AGE_GROUPS) ageGroup?: string;
+  @IsOptional() @IsString() @MaxLength(160) email?: string;
+  @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+class UpdateHouseholdDto {
+  @IsOptional() @IsString() @MaxLength(120) firstName?: string;
+  @IsOptional() @IsString() @MaxLength(120) lastName?: string;
+  @IsOptional() @IsIn(RELATIONSHIPS) relationship?: string;
+  @IsOptional() @IsIn(GENDERS) gender?: string;
+  @IsOptional() @IsIn(AGE_GROUPS) ageGroup?: string;
+  @IsOptional() @IsString() @MaxLength(160) email?: string;
+  @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(500) photoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
 @ApiTags('Me')
 @ApiBearerAuth()
 @Controller('me')
@@ -87,8 +116,12 @@ export class MeController {
   }
 
   @Put('profile')
-  async updateProfile(@CurrentUser('sub') userId: string, @Body() dto: UpdateProfileDto) {
-    return successResponse(await this.service.updateProfile(userId, dto));
+  async updateProfile(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return successResponse(await this.service.updateProfile(userId, organizationId, dto));
   }
 
   /**
@@ -168,5 +201,43 @@ export class MeController {
     @Query('endDate') endDate?: string,
   ) {
     return successResponse(await this.service.endOccupant(userId, organizationId, id, endDate));
+  }
+
+  // ----- household / family members (AdditionalOccupant) -----
+
+  @Get('household')
+  async listHousehold(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+  ) {
+    return successResponse(await this.service.listHousehold(userId, organizationId));
+  }
+
+  @Post('household')
+  async addHousehold(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: AddHouseholdDto,
+  ) {
+    return successResponse(await this.service.addHousehold(userId, organizationId, dto));
+  }
+
+  @Put('household/:id')
+  async updateHousehold(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateHouseholdDto,
+  ) {
+    return successResponse(await this.service.updateHousehold(userId, organizationId, id, dto));
+  }
+
+  @Delete('household/:id')
+  async removeHousehold(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return successResponse(await this.service.removeHousehold(userId, organizationId, id));
   }
 }

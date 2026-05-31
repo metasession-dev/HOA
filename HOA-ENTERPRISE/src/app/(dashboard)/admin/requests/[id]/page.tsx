@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { cn } from '@/lib/utils';
+import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
+import { FileText } from 'lucide-react';
 import {
   Drawer,
   DrawerContent,
@@ -24,6 +26,38 @@ import {
 } from '@/components/ui/drawer';
 
 type Detail = any;
+
+const ATTACH_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
+
+function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+}
+
+function AttachmentList({ items }: { items: Array<{ url: string; filename: string; contentType: string }> }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-2">
+      {items.map((a, i) => (
+        <li key={i}>
+          {a.contentType?.startsWith('video/') ? (
+            <video controls className="w-full max-w-md rounded-lg" src={resolveFileUrl(a.url)} />
+          ) : a.contentType?.startsWith('image/') ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer">
+              <img src={resolveFileUrl(a.url)} alt={a.filename} className="max-h-64 rounded-lg object-contain ring-1 ring-stone-surface" />
+            </a>
+          ) : (
+            <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-ember-orange hover:underline">
+              <FileText className="h-4 w-4" /> {a.filename}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const ALL_TARGETS: Record<string, string[]> = {
   submitted: ['triaged', 'in_progress', 'cancelled'],
@@ -53,6 +87,7 @@ export default function AdminRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [comment, setComment] = useState('');
+  const [commentFiles, setCommentFiles] = useState<UploadedFile[]>([]);
   const [internalNote, setInternalNote] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [showResolve, setShowResolve] = useState(false);
@@ -106,11 +141,15 @@ export default function AdminRequestDetailPage() {
 
   const addComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim()) return;
+    if (!comment.trim() && commentFiles.length === 0) return;
     setBusy(true);
     try {
-      await api.post(`/requests/${params.id}/comments`, { body: comment, isInternal: internalNote });
-      setComment(''); setInternalNote(false);
+      await api.post(`/requests/${params.id}/comments`, {
+        body: comment.trim() || '(see attachment)',
+        isInternal: internalNote,
+        attachments: commentFiles.map((a) => ({ url: a.url, filename: a.filename, contentType: a.contentType, size: a.size ?? 0 })),
+      });
+      setComment(''); setInternalNote(false); setCommentFiles([]);
       load();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Failed', description: err.message });
@@ -158,16 +197,7 @@ export default function AdminRequestDetailPage() {
           {r.attachments?.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-caption text-muted-foreground">Attachments</p>
-              <ul className="space-y-1">
-                {r.attachments.map((a: any, i: number) => (
-                  <li key={i}>
-                    <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-sm text-ember-orange hover:underline">
-                      {a.filename}
-                    </a>
-                    <span className="ml-2 text-caption text-muted-foreground">{(a.size / 1024).toFixed(1)} KB</span>
-                  </li>
-                ))}
-              </ul>
+              <AttachmentList items={r.attachments} />
             </div>
           )}
         </CardContent>
@@ -217,15 +247,21 @@ export default function AdminRequestDetailPage() {
               <p className="p-6 text-caption text-muted-foreground">No comments yet.</p>
             ) : (
               <ul className="divide-y divide-stone-surface">
-                {r.comments?.map((c: any) => (
-                  <li key={c.id} className="p-4">
-                    <div className="flex items-center gap-2">
-                      {c.isInternal && <Badge variant="muted"><Lock className="mr-1 h-2.5 w-2.5 inline" />internal</Badge>}
-                      <span className="text-caption text-muted-foreground">{formatDate(c.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-graphite whitespace-pre-wrap">{c.body}</p>
-                  </li>
-                ))}
+                {r.comments?.map((c: any) => {
+                  const isStaff = c.authorType === 'staff';
+                  return (
+                    <li key={c.id} className={cn('p-4', isStaff ? 'border-l-2 border-l-ocean-blue bg-sky-blue/5' : 'border-l-2 border-l-meadow-green bg-meadow-green/5')}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={isStaff ? 'info' : 'success'}>{isStaff ? 'HOA team' : 'Resident'}</Badge>
+                        {c.isInternal && <Badge variant="muted"><Lock className="mr-1 h-2.5 w-2.5 inline" />internal</Badge>}
+                        <span className="text-caption font-medium text-charcoal-primary">{c.authorName || 'Member'}</span>
+                        <span className="text-caption text-muted-foreground">· {formatDate(c.createdAt)}</span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-graphite whitespace-pre-wrap">{c.body}</p>
+                      <AttachmentList items={c.attachments || []} />
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardContent>
@@ -240,12 +276,21 @@ export default function AdminRequestDetailPage() {
                 placeholder="Reply to the resident, or leave an internal note…"
                 className="flex min-h-[100px] w-full rounded-lg bg-card px-3 py-2.5 text-sm text-foreground shadow-inset-stone focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40"
               />
+              <FileUpload
+                value={commentFiles}
+                onChange={setCommentFiles}
+                kind="request_attachment"
+                label="Attach (optional)"
+                helpText="Photo, PDF, or short video (max 50MB each)."
+                accept={ATTACH_ACCEPT}
+                maxFiles={5}
+              />
               <div className="flex items-center justify-between gap-2">
                 <label className="inline-flex items-center gap-2 text-caption text-graphite">
                   <input type="checkbox" checked={internalNote} onChange={(e) => setInternalNote(e.target.checked)} />
                   Internal note (resident won&apos;t see)
                 </label>
-                <Button type="submit" size="sm" disabled={busy || !comment.trim()}>
+                <Button type="submit" size="sm" disabled={busy || (!comment.trim() && commentFiles.length === 0)}>
                   <MessageSquare className="mr-1 h-3.5 w-3.5" />Send
                 </Button>
               </div>
