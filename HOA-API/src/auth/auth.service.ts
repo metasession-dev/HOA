@@ -7,6 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { sha256 } from '../common/encryption';
+import { isResidentRole } from '../common/scope.util';
 import { MailService } from '../mail/mail.service';
 
 const ENTERPRISE_URL = (
@@ -238,6 +239,10 @@ export class AuthService implements OnModuleInit {
       const hasAdminRole = activeRoles.some((ur) =>
         ADMIN_SHAPED_ROLES.has(ur.role.name),
       );
+      // Vendors operate from the ENTERPRISE app too (vendor-only view). They
+      // don't need (and shouldn't get) the enterpriseAccess flag — being a
+      // vendor in this org is sufficient.
+      const hasVendorRole = activeRoles.some((ur) => ur.role.name === 'vendor');
       if (hasAdminRole) {
         await this.prisma.user.update({
           where: { id: user.id },
@@ -247,7 +252,7 @@ export class AuthService implements OnModuleInit {
         this.logger.log(
           `Granted enterpriseAccess inline for ${user.email} (admin-shaped role detected).`,
         );
-      } else {
+      } else if (!hasVendorRole) {
         await recordLogin('failed', 'enterprise_access_denied');
         throw new ForbiddenException(
           'Your account doesn\'t have access to the admin console. Ask your HOA admin to grant you enterprise access, or sign in to the resident portal instead.',
@@ -255,10 +260,28 @@ export class AuthService implements OnModuleInit {
       }
     }
 
+    // Resident portal is for resident roles ONLY. A staff/team role (e.g.
+    // gate_security) or a vendor must use the admin console — without this gate
+    // a non-resident role lands on resident endpoints whose scope helpers don't
+    // narrow for non-residents, exposing the whole org's data.
+    let loginRoles = activeRoles;
+    if (dto.app === 'residents') {
+      const residentRoles = activeRoles.filter((ur) => isResidentRole(ur.role.name));
+      if (residentRoles.length === 0) {
+        await recordLogin('failed', 'residents_access_denied');
+        throw new ForbiddenException(
+          'Your account isn\'t a resident of this community. Please sign in to the admin console instead.',
+        );
+      }
+      // Pick the primary among resident roles so an owner-who-is-also-staff
+      // still gets a proper resident session here.
+      loginRoles = residentRoles;
+    }
+
     // Highest-privilege role first so e.g. an exco_member-who-is-also-a-tenant
     // lands on the admin app by default. They can flip to the resident view
     // via the topbar role switcher if they want.
-    const primaryRole = pickPrimary(activeRoles);
+    const primaryRole = pickPrimary(loginRoles);
 
     // MFA gate: if MFA is enabled for this user, OR mandatory for any of the
     // user's active roles in their primary org, short-circuit here. The client

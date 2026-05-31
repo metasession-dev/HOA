@@ -157,7 +157,10 @@ export class TendersService {
       include: {
         bids: {
           orderBy: { amount: 'asc' },
-          include: { vendor: { select: { id: true, name: true, email: true, status: true, rating: true } } },
+          include: {
+            vendor: { select: { id: true, name: true, email: true, status: true, rating: true } },
+            events: { orderBy: { createdAt: 'asc' } },
+          },
         },
       },
     });
@@ -187,7 +190,7 @@ export class TendersService {
     return this.prisma.tender.update({ where: { id }, data: { status: 'evaluating' } });
   }
 
-  async shortlist(id: string, orgId: string, dto: ShortlistBidDto) {
+  async shortlist(id: string, orgId: string, actor: Actor, dto: ShortlistBidDto) {
     const t = await this.getRaw(id, orgId);
     if (!['open', 'evaluating'].includes(t.status)) {
       throw new ConflictException('Bids can only be shortlisted while open or evaluating');
@@ -195,7 +198,14 @@ export class TendersService {
     const bid = await this.prisma.bid.findFirst({ where: { id: dto.bidId, tenderId: id } });
     if (!bid) throw new NotFoundException('Bid not found on this tender');
     const next = dto.shortlisted === false ? 'submitted' : 'shortlisted';
-    return this.prisma.bid.update({ where: { id: bid.id }, data: { status: next } });
+    const updated = await this.prisma.bid.update({ where: { id: bid.id }, data: { status: next } });
+    await this.recordBidEvent(
+      bid.id,
+      next === 'shortlisted' ? 'shortlisted' : 'unshortlisted',
+      actor.userId,
+      { oldStatus: bid.status, newStatus: next },
+    );
+    return updated;
   }
 
   async startExcoVote(id: string, orgId: string, actor: Actor, dto: StartExcoVoteDto) {
@@ -241,7 +251,7 @@ export class TendersService {
     return this.get(id, orgId);
   }
 
-  async award(id: string, orgId: string, _actor: Actor, dto: AwardBidDto) {
+  async award(id: string, orgId: string, actor: Actor, dto: AwardBidDto) {
     const t = await this.prisma.tender.findFirst({
       where: { id, organizationId: orgId },
       include: { bids: true },
@@ -252,6 +262,10 @@ export class TendersService {
     }
     const winner = t.bids.find((b) => b.id === dto.bidId);
     if (!winner) throw new BadRequestException('That bid is not part of this tender');
+
+    const rejectedIds = t.bids
+      .filter((b) => b.id !== winner.id && ['submitted', 'shortlisted'].includes(b.status))
+      .map((b) => b.id);
 
     await this.prisma.$transaction([
       this.prisma.tender.update({
@@ -265,6 +279,12 @@ export class TendersService {
       }),
     ]);
 
+    // History entries for the award decision.
+    await this.recordBidEvent(winner.id, 'awarded', actor.userId, { oldStatus: winner.status });
+    for (const rid of rejectedIds) {
+      await this.recordBidEvent(rid, 'rejected', actor.userId, { reason: 'another_bid_awarded' });
+    }
+
     // Notify the winner + the unsuccessful bidders.
     await this.notifyVendor(winner.vendorId, id, {
       title: `Contract awarded: ${t.title}`,
@@ -273,7 +293,7 @@ export class TendersService {
         subject: `You've been awarded the contract: ${t.title}`,
         message: `Good news — your bid for "${t.title}" has been selected as the winning bid.\n\nThe HOA office will be in touch with next steps.`,
         ctaLabel: 'View tender',
-        ctaUrl: `${RESIDENT_BASE}/vendor/tenders/${t.id}`,
+        ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${t.id}`,
       },
     });
     for (const b of t.bids) {
@@ -285,7 +305,7 @@ export class TendersService {
           subject: `Outcome of "${t.title}"`,
           message: `Thank you for bidding on "${t.title}". On this occasion the contract was awarded to another vendor.\n\nWe value your participation and look forward to future opportunities.`,
           ctaLabel: 'View tender',
-          ctaUrl: `${RESIDENT_BASE}/vendor/tenders/${t.id}`,
+          ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${t.id}`,
         },
       });
     }
@@ -335,7 +355,10 @@ export class TendersService {
     const vendor = await this.vendorForUser(userId, orgId);
     const t = await this.prisma.tender.findFirst({ where: { id, organizationId: orgId } });
     if (!t) throw new NotFoundException('Tender not found');
-    const myBid = await this.prisma.bid.findFirst({ where: { tenderId: id, vendorId: vendor.id } });
+    const myBid = await this.prisma.bid.findFirst({
+      where: { tenderId: id, vendorId: vendor.id },
+      include: { events: { orderBy: { createdAt: 'asc' } } },
+    });
     return {
       id: t.id,
       title: t.title,
@@ -363,6 +386,9 @@ export class TendersService {
     if (new Date() > t.closesAt) throw new ConflictException('The bidding deadline has passed.');
 
     const currency = (dto.currency || t.currency || vendor.preferredCurrency || 'ZAR').toUpperCase();
+    const existing = await this.prisma.bid.findUnique({
+      where: { tenderId_vendorId: { tenderId: t.id, vendorId: vendor.id } },
+    });
     const bid = await this.prisma.bid.upsert({
       where: { tenderId_vendorId: { tenderId: t.id, vendorId: vendor.id } },
       update: {
@@ -384,8 +410,31 @@ export class TendersService {
         submittedBy: userId,
       },
     });
+    // History: first submit vs a resubmission (capture what changed).
+    if (!existing) {
+      await this.recordBidEvent(bid.id, 'submitted', userId, {
+        amount: bid.amount.toString(),
+        currency: bid.currency,
+      });
+    } else {
+      await this.recordBidEvent(bid.id, 'resubmitted', userId, {
+        oldAmount: existing.amount.toString(),
+        newAmount: bid.amount.toString(),
+        oldStatus: existing.status,
+        proposalChanged: existing.proposal !== bid.proposal,
+      });
+    }
     await this.notifyProcurement(orgId, t, bid, vendor.name);
     return bid;
+  }
+
+  /** Append a bid timeline event. Best-effort — never blocks the mutation. */
+  private async recordBidEvent(bidId: string, type: string, actorId: string, payload: any = {}) {
+    try {
+      await this.prisma.bidEvent.create({ data: { bidId, type, actorId, payload: payload as any } });
+    } catch (err) {
+      // non-fatal — the timeline is auxiliary
+    }
   }
 
   // ============ Notifications ============
@@ -399,7 +448,7 @@ export class TendersService {
       subject: `New contract opportunity: ${tender.title}`,
       message: `A new tender, "${tender.title}", is open for bids until ${dateText(tender.closesAt)}.\n\nSign in to your vendor portal to review the details and submit a bid.`,
       ctaLabel: 'View tender',
-      ctaUrl: `${RESIDENT_BASE}/vendor/tenders/${tender.id}`,
+      ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${tender.id}`,
     };
     for (const v of vendors) {
       if (v.userId) {

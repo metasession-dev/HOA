@@ -24,6 +24,13 @@ const ROLE_PRIORITY: Record<string, number> = {
 };
 function rank(name: string) { return ROLE_PRIORITY[name] ?? 100; }
 
+// The resident portal is for residents only. owner/tenant are the resident
+// roles; everyone else (staff/team, vendor) belongs in the admin console.
+const RESIDENT_ROLES = new Set(['owner', 'tenant']);
+function hasResidentRole(roles?: Array<{ role: string }>) {
+  return (roles ?? []).some((r) => RESIDENT_ROLES.has(r.role));
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -83,6 +90,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, []);
+
+  // Hard gate: if a session somehow resolves to a non-resident (e.g. a staff
+  // token handed off from the admin app, or a role switch), don't render
+  // resident pages with it — clear it and bounce to login. The backend login
+  // gate + the gate_security API lock are the primary defences; this closes the
+  // client-side loophole where resident endpoints would otherwise be queried
+  // with a non-resident role.
+  useEffect(() => {
+    if (!user) return;
+    if (!hasResidentRole(user.roles)) {
+      api.setToken(null);
+      setToken(null);
+      setUser(null);
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?error=staff_use_admin';
+      }
+    }
+  }, [user]);
 
   const persistActiveRole = (role: string | null) => {
     setActiveRole(role);

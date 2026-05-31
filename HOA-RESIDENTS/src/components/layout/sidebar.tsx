@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, FilePlus, User, Gavel } from 'lucide-react';
+import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -19,26 +19,28 @@ export const mainNav = [
   { title: 'Notices', href: '/notices', icon: Bell },
 ];
 
-// Vendors are external suppliers — they get their own focused portal, not the
-// resident destinations.
-export const vendorNav = [
-  { title: 'My invoices', href: '/vendor/invoices', icon: Receipt },
-  { title: 'Submit invoice', href: '/vendor/invoices/new', icon: FilePlus },
-  { title: 'Tenders', href: '/vendor/tenders', icon: Gavel },
-  { title: 'Profile', href: '/profile', icon: User },
-];
-
-/** Pick the nav set for the active role. */
-export function navForRole(role: string | undefined | null) {
-  return role === 'vendor' ? vendorNav : mainNav;
+/**
+ * Which nav item is active. Longest-matching-href wins so a detail route
+ * (/invoices/123) keeps its parent (/invoices) highlighted, while a sibling or
+ * shorter-prefix route never lights up alongside the more specific one. Returns
+ * the single active href (or null).
+ */
+export function activeNavHref(pathname: string, hrefs: string[]): string | null {
+  let best: string | null = null;
+  for (const h of hrefs) {
+    const matches = pathname === h || (h !== '/' && pathname.startsWith(h + '/'));
+    if (matches && (!best || h.length > best.length)) best = h;
+  }
+  return best;
 }
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { organizationName, primaryRole } = useAuth();
+  const { organizationName } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const nav = navForRole(primaryRole);
-  const portalLabel = primaryRole === 'vendor' ? 'Vendor portal' : 'Resident portal';
+  const nav = mainNav;
+  const portalLabel = 'Resident portal';
+  const activeHref = activeNavHref(pathname, nav.map((i) => i.href));
 
   return (
     <aside
@@ -77,12 +79,7 @@ export function Sidebar() {
           </h4>
         )}
         {nav.map((item) => {
-          // Use a `/`-boundary check so `/passes` doesn't match `/passes-history`,
-          // and exact match for the root. No competing children at this level.
-          const isActive =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname === item.href || pathname.startsWith(item.href + '/');
+          const isActive = item.href === activeHref;
           return (
             <Link
               key={item.href}

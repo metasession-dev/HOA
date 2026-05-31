@@ -63,6 +63,14 @@ const gateNav = [
   { title: 'Security gate', href: '/gate', icon: ScanLine },
 ];
 
+// Vendors are external suppliers — a focused, self-service nav. They never see
+// the admin/finance/operations sections.
+const vendorNav = [
+  { title: 'My invoices', href: '/vendor/invoices', icon: Receipt },
+  { title: 'Submit invoice', href: '/vendor/invoices/new', icon: FileText },
+  { title: 'Tenders', href: '/vendor/tenders', icon: Gavel },
+];
+
 const integrationsNav = [
   { title: 'API keys', href: '/admin/integrations/api-keys', icon: KeySquare },
   { title: 'Webhooks', href: '/admin/integrations/webhooks', icon: Webhook },
@@ -79,6 +87,9 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
   const isFinance = ['super_admin', 'hoa_admin', 'finance_officer'].includes(primaryRole);
   const isGateOperator = ['super_admin', 'hoa_admin', 'property_manager', 'gate_security'].includes(primaryRole);
   const isGovernance = ['super_admin', 'hoa_admin', 'exco_member', 'exco_chairperson', 'communications_manager'].includes(primaryRole);
+  // Narrowly-scoped personas get a single, focused nav and nothing else.
+  const isVendor = primaryRole === 'vendor';
+  const isGateOnly = primaryRole === 'gate_security';
 
   /**
    * Compute the single active nav href via longest-prefix-wins. Without this,
@@ -96,6 +107,7 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
       ...governanceNav,
       ...gateNav,
       ...integrationsNav,
+      ...vendorNav,
     ].map((i) => i.href);
     let best: string | null = null;
     for (const href of allHrefs) {
@@ -118,6 +130,7 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
       { key: 'governance', items: governanceNav },
       { key: 'integrations', items: integrationsNav },
       { key: 'gate', items: gateNav },
+      { key: 'vendor', items: vendorNav },
     ];
     for (const s of lookup) {
       if (s.items.some((i) => i.href === activeHref)) return s.key;
@@ -241,12 +254,22 @@ export function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean;
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-3">
-        <NavSection title="Management" sectionKey="management" items={adminNav} />
-        {(isFinance || isAdmin) && <NavSection title="Finance" sectionKey="finance" items={financeNav} />}
-        <NavSection title="Operations" sectionKey="operations" items={operationsNav} />
-        {isGovernance && <NavSection title="Governance" sectionKey="governance" items={governanceNav} />}
-        {isAdmin && <NavSection title="Integrations" sectionKey="integrations" items={integrationsNav} />}
-        {isGateOperator && <NavSection title="Gate" sectionKey="gate" items={gateNav} />}
+        {isVendor ? (
+          // Vendors only ever see their own portal.
+          <NavSection title="Vendor portal" sectionKey="vendor" items={vendorNav} />
+        ) : isGateOnly ? (
+          // gate_security is locked to the gate screen (enforced server-side too).
+          <NavSection title="Gate" sectionKey="gate" items={gateNav} />
+        ) : (
+          <>
+            <NavSection title="Management" sectionKey="management" items={adminNav} />
+            {(isFinance || isAdmin) && <NavSection title="Finance" sectionKey="finance" items={financeNav} />}
+            <NavSection title="Operations" sectionKey="operations" items={operationsNav} />
+            {isGovernance && <NavSection title="Governance" sectionKey="governance" items={governanceNav} />}
+            {isAdmin && <NavSection title="Integrations" sectionKey="integrations" items={integrationsNav} />}
+            {isGateOperator && <NavSection title="Gate" sectionKey="gate" items={gateNav} />}
+          </>
+        )}
       </nav>
 
       {!collapsed && (

@@ -177,6 +177,36 @@ export default function VendorTenderDetailPage() {
               </form>
             </CardContent></Card>
           )}
+
+          {Array.isArray(t.myBid?.events) && t.myBid.events.length > 0 && (
+            <Card><CardContent className="p-6">
+              <h3 className="mb-3 text-heading-sm font-display font-medium text-charcoal-primary">Bid history</h3>
+              <ul className="space-y-2">
+                {t.myBid.events.map((e: any) => {
+                  const label = ({
+                    submitted: 'Bid submitted',
+                    resubmitted: 'Bid updated',
+                    shortlisted: 'Shortlisted',
+                    unshortlisted: 'Removed from shortlist',
+                    awarded: 'Awarded',
+                    rejected: 'Not selected',
+                  } as Record<string, string>)[e.type] || e.type;
+                  return (
+                    <li key={e.id} className="flex items-start gap-2 text-caption">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-ember-orange/70" aria-hidden />
+                      <span className="text-graphite">
+                        <span className="font-medium text-charcoal-primary">{label}</span>
+                        {e.payload?.oldAmount && e.payload?.newAmount && (
+                          <span className="text-muted-foreground"> · {e.payload.oldAmount} → {e.payload.newAmount}</span>
+                        )}
+                        <span className="text-muted-foreground"> · {formatDate(e.createdAt)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </CardContent></Card>
+          )}
         </>
       )}
     </div>

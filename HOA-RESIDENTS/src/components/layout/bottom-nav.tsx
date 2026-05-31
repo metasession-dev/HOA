@@ -10,30 +10,23 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { navForRole } from './sidebar';
-import { useAuth } from '@/providers/auth-provider';
+import { mainNav, activeNavHref } from './sidebar';
 
 // The four quick-access tabs for residents (rest live under "More").
 const PRIMARY_HREFS = ['/', '/invoices', '/passes', '/notices'];
 
-function useIsActive() {
-  const pathname = usePathname();
-  return (href: string) =>
-    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
-}
-
 export function BottomNav() {
-  const isActive = useIsActive();
   const pathname = usePathname();
-  const { primaryRole } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the sheet whenever the route changes.
   useEffect(() => { setMoreOpen(false); }, [pathname]);
 
-  const nav = navForRole(primaryRole);
-  // Vendors have a small nav — show all of it as primary tabs (no "More").
-  const primaryHrefs = primaryRole === 'vendor' ? nav.map((i) => i.href) : PRIMARY_HREFS;
+  const nav = mainNav;
+  // Longest-prefix-wins so a detail route keeps only its parent active.
+  const activeHref = activeNavHref(pathname, nav.map((i) => i.href));
+  const isActive = (href: string) => href === activeHref;
+  const primaryHrefs = PRIMARY_HREFS;
   const primary = primaryHrefs
     .map((h) => nav.find((i) => i.href === h))
     .filter(Boolean) as typeof nav;

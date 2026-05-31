@@ -9,7 +9,7 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, primaryRole } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   // Mobile off-canvas nav state. Closes automatically on route change.
@@ -21,6 +21,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/login');
     }
   }, [user, isLoading, router]);
+
+  // Keep narrowly-scoped personas in their lane (the API enforces this too):
+  //   • vendors only ever see /vendor/*
+  //   • gate_security is locked to the gate screen
+  useEffect(() => {
+    if (isLoading || !user) return;
+    if (primaryRole === 'vendor' && !pathname.startsWith('/vendor')) {
+      router.replace('/vendor/invoices');
+    } else if (primaryRole === 'gate_security' && !pathname.startsWith('/gate')) {
+      router.replace('/gate');
+    }
+  }, [primaryRole, pathname, isLoading, user, router]);
 
   if (isLoading) {
     return (

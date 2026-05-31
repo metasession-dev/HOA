@@ -20,6 +20,44 @@ const bidBadge: Record<string, 'muted' | 'info' | 'warning' | 'success' | 'destr
   submitted: 'info', shortlisted: 'warning', awarded: 'success', rejected: 'destructive', withdrawn: 'secondary',
 };
 
+function bidEventLabel(type: string): string {
+  switch (type) {
+    case 'submitted': return 'Bid submitted';
+    case 'resubmitted': return 'Bid updated';
+    case 'shortlisted': return 'Shortlisted';
+    case 'unshortlisted': return 'Removed from shortlist';
+    case 'awarded': return 'Awarded';
+    case 'rejected': return 'Not selected';
+    default: return type;
+  }
+}
+
+/** Collapsible audit trail of a bid's changes (submit → resubmit → shortlist → award). */
+function BidHistory({ events }: { events?: any[] }) {
+  if (!events || events.length === 0) return null;
+  return (
+    <details className="mt-2 border-t border-stone-surface pt-2">
+      <summary className="cursor-pointer text-caption text-muted-foreground hover:text-graphite">
+        History ({events.length})
+      </summary>
+      <ul className="mt-2 space-y-1.5">
+        {events.map((e: any) => (
+          <li key={e.id} className="flex items-start gap-2 text-caption">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-ember-orange/70" aria-hidden />
+            <span className="text-graphite">
+              <span className="font-medium text-charcoal-primary">{bidEventLabel(e.type)}</span>
+              {e.payload?.oldAmount && e.payload?.newAmount && (
+                <span className="text-muted-foreground"> · {e.payload.oldAmount} → {e.payload.newAmount}</span>
+              )}
+              <span className="text-muted-foreground"> · {formatDate(e.createdAt)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export default function ContractDetailPage() {
   const { id } = useParams();
   const confirm = useConfirm();
@@ -180,6 +218,7 @@ export default function ContractDetailPage() {
                     ))}
                   </div>
                 )}
+                <BidHistory events={b.events} />
               </div>
             ))}
           </div>

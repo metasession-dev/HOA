@@ -961,11 +961,31 @@ model Bid {
 
   tender Tender @relation(fields: [tenderId], references: [id], onDelete: Cascade)
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  events BidEvent[]
 
   @@unique([tenderId, vendorId])
   @@index([organizationId, status])
   @@index([vendorId])
   @@map("bids")
+}
+
+// Immutable timeline of changes to a bid: initial submit, resubmission (amount
+// or proposal changed), shortlist toggles, and award/reject outcomes. Mirrors
+// VendorInvoiceEvent. Surfaced to procurement (admin) and to the bidding vendor
+// for their own bid.
+model BidEvent {
+  id        String   @id @default(cuid())
+  bidId     String
+  // submitted | resubmitted | shortlisted | unshortlisted | awarded | rejected
+  type      String
+  actorId   String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  bid Bid @relation(fields: [bidId], references: [id], onDelete: Cascade)
+
+  @@index([bidId, createdAt])
+  @@map("bid_events")
 }
 
 model Survey {

@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { RestrictedRoleGuard } from './guards/restricted-role.guard';
 import { PrismaService } from '../common/prisma.service';
 import { MailModule } from '../mail/mail.module';
 import { APP_GUARD } from '@nestjs/core';
@@ -38,6 +39,9 @@ import { APP_GUARD } from '@nestjs/core';
     // before JwtAuthGuard for some module-load configurations, throwing
     // "Not authenticated" before req.user was ever set.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Runs after Jwt (req.user populated), before Roles/Permissions. Locks
+    // narrowly-scoped roles (gate_security) to an endpoint allowlist.
+    { provide: APP_GUARD, useClass: RestrictedRoleGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

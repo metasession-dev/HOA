@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Receipt, Bell, FileText, CreditCard, ArrowUpRight, KeyRound, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -14,29 +13,13 @@ import { Button } from '@/components/ui/button';
 import { residentInvoiceStatus } from '@/lib/invoice-status';
 
 export default function ResidentDashboard() {
-  const { user, organizationName, primaryRole } = useAuth();
-  const router = useRouter();
+  const { user, organizationName } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Vendors don't have a resident dashboard — send them to their portal.
-  const isVendor = primaryRole === 'vendor';
   useEffect(() => {
-    if (isVendor) router.replace('/vendor/invoices');
-  }, [isVendor, router]);
-
-  useEffect(() => {
-    if (isVendor) return;
     api.get<any>('/dashboard?range=month').then((r) => setData(r.data)).catch(console.error).finally(() => setLoading(false));
-  }, [isVendor]);
-
-  if (isVendor) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="font-display text-body text-muted-foreground">Loading your vendor portal…</p>
-      </div>
-    );
-  }
+  }, []);
 
   const stats = data?.stats || { invoicesDue: 0, totalOutstanding: 0, openPasses: 0, openViolations: 0 };
   const invoices = data?.activity?.recentInvoices || [];

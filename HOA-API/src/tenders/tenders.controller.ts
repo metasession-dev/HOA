@@ -70,8 +70,14 @@ export class TendersController {
   }
 
   @Post(':id/shortlist')
-  async shortlist(@Param('id') id: string, @CurrentUser('organizationId') orgId: string, @Body() dto: ShortlistBidDto) {
-    return successResponse(await this.tenders.shortlist(id, orgId, dto));
+  async shortlist(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+    @Body() dto: ShortlistBidDto,
+  ) {
+    return successResponse(await this.tenders.shortlist(id, orgId, { userId, role }, dto));
   }
 
   @Post(':id/exco-vote')

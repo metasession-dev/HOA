@@ -19,8 +19,16 @@ const PRIMARY = [
 
 export function BottomNav({ onMore }: { onMore?: () => void }) {
   const pathname = usePathname();
-  const isActive = (href: string) =>
-    href === '/admin' ? pathname === '/admin' : pathname === href || pathname.startsWith(href + '/');
+  // Longest-matching-href wins so /admin/units doesn't also light up /admin.
+  const activeHref = (() => {
+    let best: string | null = null;
+    for (const { href } of PRIMARY) {
+      const matches = pathname === href || (href !== '/admin' && pathname.startsWith(href + '/'));
+      if (matches && (!best || href.length > best.length)) best = href;
+    }
+    return best;
+  })();
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <nav
