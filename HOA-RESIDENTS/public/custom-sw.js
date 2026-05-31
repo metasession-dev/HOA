@@ -5,6 +5,15 @@
 // Workbox precaching + runtime caching, and adds the push + click handlers
 // here.
 
+// "New update available" prompt support. We ship with `skipWaiting: false`, so a
+// freshly-installed worker waits until the user accepts the in-app update banner
+// (components/pwa-updater.tsx), which posts this message to activate it on demand.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   let payload;

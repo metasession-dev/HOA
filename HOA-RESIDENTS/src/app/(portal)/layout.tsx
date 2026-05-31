@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
 import { InstallBanner } from '@/components/install-banner';
+import { PwaUpdater } from '@/components/pwa-updater';
 import { OnboardingTour } from '@/components/onboarding-tour';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
         <BottomNav />
         <InstallBanner />
+        <PwaUpdater />
         <OnboardingTour />
       </div>
     </OrgSettingsProvider>

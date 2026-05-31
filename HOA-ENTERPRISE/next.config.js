@@ -1,4 +1,46 @@
 /** @type {import('next').NextConfig} */
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  // Keep the freshly-installed worker in "waiting" until the user accepts the
+  // in-app update prompt (see components/pwa-updater.tsx). The prompt posts
+  // SKIP_WAITING (handled in custom-sw.js) to activate it on demand.
+  skipWaiting: false,
+  disable: process.env.NODE_ENV === 'development',
+  importScripts: ['/custom-sw.js'],
+  // Offline-first for static assets; network-first with a short fallback for
+  // API GETs so admins still see their last-seen data when briefly offline
+  // (POST/PUT/DELETE are never cached).
+  runtimeCaching: [
+    {
+      urlPattern: /^https?:\/\/.*\/api\/(?!auth\/login|auth\/register).*$/,
+      handler: 'NetworkFirst',
+      method: 'GET',
+      options: {
+        cacheName: 'hoa-api',
+        networkTimeoutSeconds: 5,
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 30 },
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'hoa-images',
+        expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+      },
+    },
+    {
+      urlPattern: /\.(?:css|js|woff2?)$/,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'hoa-static',
+        expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
+      },
+    },
+  ],
+});
 
 /**
  * Security headers — applied to every response. Goals:
@@ -36,6 +78,8 @@ const cspDirectives = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  // The enterprise PWA registers a service worker — allow worker scripts.
+  "worker-src 'self' blob:",
 ].join('; ');
 
 const securityHeaders = [
@@ -54,4 +98,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

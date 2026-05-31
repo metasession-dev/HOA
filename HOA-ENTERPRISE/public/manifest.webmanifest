@@ -1,14 +1,14 @@
 {
-  "name": "HOA.africa Resident Portal",
-  "short_name": "HOA",
-  "description": "Resident portal for HOA.africa — pay levies, submit requests, manage visitor passes.",
+  "name": "HOA.africa Enterprise",
+  "short_name": "HOA Admin",
+  "description": "Manage your community — finances, communications, requests and gate access from anywhere.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#fbfaf9",
   "theme_color": "#fbfaf9",
   "orientation": "portrait",
-  "categories": ["finance", "productivity", "lifestyle"],
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
@@ -19,23 +19,30 @@
   ],
   "shortcuts": [
     {
-      "name": "Pay levies",
-      "short_name": "Pay",
-      "description": "View and pay your invoices",
-      "url": "/invoices",
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Jump to your admin overview",
+      "url": "/admin",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "New request",
-      "short_name": "Request",
-      "description": "Submit a maintenance or service request",
-      "url": "/requests/new",
+      "name": "Invoices",
+      "short_name": "Invoices",
+      "description": "Review and issue resident invoices",
+      "url": "/finance/invoices",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Visitor passes",
+      "name": "Broadcasts",
+      "short_name": "Broadcasts",
+      "description": "Send a notice to your community",
+      "url": "/communications",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Gate passes",
       "short_name": "Passes",
-      "description": "Create and manage visitor passes",
+      "description": "Manage visitor and gate access",
       "url": "/passes",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }

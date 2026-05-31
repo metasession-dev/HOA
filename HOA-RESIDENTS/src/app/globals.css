@@ -88,12 +88,27 @@
   }
   html {
     color-scheme: light;
+    /* Stop iOS/Android from "boosting" (zooming) text on orientation change —
+       the page should keep the same scale when the device is rotated. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-inter);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  /* iOS Safari auto-zooms when a focused control has a font smaller than 16px.
+     Floor interactive controls at 16px on touch devices so filling a form never
+     yanks the viewport. The viewport meta also pins maximum-scale, but this is
+     the belt-and-braces fix that survives a relaxed viewport. */
+  @media (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
   }
   /* Headlines use the display family by default */
   h1, h2, h3 {

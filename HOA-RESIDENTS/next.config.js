@@ -2,7 +2,11 @@
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  // Hold a freshly-installed worker in "waiting" so the in-app update banner
+  // (components/pwa-updater.tsx) controls when it activates — accepting posts
+  // SKIP_WAITING (handled in custom-sw.js) and the page reloads. Avoids the
+  // jarring silent swap of skipWaiting:true.
+  skipWaiting: false,
   disable: process.env.NODE_ENV === 'development',
   // Phase 10.1: inject our push handler into the generated service worker.
   importScripts: ['/custom-sw.js'],

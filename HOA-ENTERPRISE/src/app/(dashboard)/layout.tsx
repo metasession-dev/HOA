@@ -7,6 +7,8 @@ import { OrgSettingsProvider } from '@/providers/org-settings-provider';
 import { Sidebar } from '@/components/layout/sidebar';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
+import { InstallBanner } from '@/components/install-banner';
+import { PwaUpdater } from '@/components/pwa-updater';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, primaryRole } = useAuth();
@@ -59,6 +61,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <main className="flex-1 overflow-y-auto p-6 pb-24 lg:pb-6">{children}</main>
         </div>
         <BottomNav onMore={() => setMobileNavOpen(true)} />
+        <InstallBanner />
+        <PwaUpdater />
       </div>
     </OrgSettingsProvider>
   );

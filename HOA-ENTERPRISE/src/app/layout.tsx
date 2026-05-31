@@ -25,6 +25,7 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: 'HOA.africa — Enterprise',
   description: 'Enterprise-grade HOA & Resident Association Management Platform for Africa',
+  manifest: '/manifest.webmanifest',
   icons: {
     // PNG-only favicon set. The generator writes a square /favicon.png plus
     // a 32px and 16px size into public/icons; we declare both so browsers
@@ -36,12 +37,25 @@ export const metadata: Metadata = {
     ],
     apple: '/icons/apple-touch-icon.png',
   },
+  // Installable PWA on iOS: standalone chrome + branded home-screen title.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'HOA Admin',
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: '#fbfaf9',
   width: 'device-width',
   initialScale: 1,
+  // Pin the scale so iOS doesn't zoom in when an input is focused, and doesn't
+  // zoom out / reflow when the device is rotated. Combined with the 16px control
+  // floor in globals.css this keeps the app feeling native on phones.
+  maximumScale: 1,
+  userScalable: false,
+  // Draw under the notch / home indicator (we pair this with env(safe-area-*)).
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
