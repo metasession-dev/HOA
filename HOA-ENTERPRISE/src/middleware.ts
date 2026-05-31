@@ -36,6 +36,11 @@ function isAlwaysAllowed(pathname: string) {
     pathname.startsWith('/splash/') ||
     pathname === '/favicon.ico' ||
     pathname === '/favicon.png' ||
+    // PWA plumbing must be reachable without a session — the browser fetches
+    // the manifest before sign-in, and registers the SW on public pages too.
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
+    pathname === '/custom-sw.js' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml'
   );
@@ -66,5 +71,5 @@ export function middleware(req: NextRequest) {
 // Run the middleware on everything EXCEPT next internals + static assets
 // (faster than re-checking in the handler).
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|favicon.png).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|favicon.png|manifest.webmanifest|sw.js|custom-sw.js).*)'],
 };
