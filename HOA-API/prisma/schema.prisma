@@ -110,9 +110,11 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
-  country   String   @default("ZA")
-  currency  String   @default("ZAR")
-  timezone  String   @default("Africa/Johannesburg")
+  // Platform defaults when the admin hasn't picked yet: Nigeria / USD /
+  // Africa/Lagos / English. Currency is USD (neutral), never ZAR.
+  country   String   @default("NG")
+  currency  String   @default("USD")
+  timezone  String   @default("Africa/Lagos")
   language  String   @default("en")
   settings  Json     @default("{}")
   logoUrl   String?

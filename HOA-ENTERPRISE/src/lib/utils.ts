@@ -13,8 +13,10 @@ export function cn(...inputs: ClassValue[]) {
  *
  * Always treat these as defaults — callers may still override per call.
  */
-let _orgCurrency = 'ZAR';
-let _orgTimezone = 'Africa/Johannesburg';
+// Platform defaults when the org hasn't set them yet — USD (never ZAR/R),
+// Africa/Lagos, English.
+let _orgCurrency = 'USD';
+let _orgTimezone = 'Africa/Lagos';
 let _orgLanguage = 'en';
 
 export function setOrgSettings(opts: { currency?: string; timezone?: string; language?: string }) {

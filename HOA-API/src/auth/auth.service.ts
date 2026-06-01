@@ -446,12 +446,14 @@ export class AuthService implements OnModuleInit {
         },
       });
 
+      // Default to USD when the registrant doesn't pick a currency (never ZAR).
+      const orgCurrency = dto.currency || 'USD';
       const org = await tx.organization.create({
         data: {
           name: dto.organizationName,
           slug,
-          country: dto.country || 'ZA',
-          currency: dto.currency || 'ZAR',
+          country: dto.country || 'NG',
+          currency: orgCurrency,
         },
       });
 
@@ -513,7 +515,7 @@ export class AuthService implements OnModuleInit {
             name: 'Routine payment (< R5 000)',
             minAmount: null,
             maxAmount: 5000,
-            currency: 'ZAR',
+            currency: orgCurrency,
             requiredRoles: ['finance_officer', 'hoa_admin'],
             approverCount: 1,
             mode: 'any',
@@ -524,7 +526,7 @@ export class AuthService implements OnModuleInit {
             name: 'Standard payment (R5 000 – R50 000)',
             minAmount: 5000,
             maxAmount: 50000,
-            currency: 'ZAR',
+            currency: orgCurrency,
             requiredRoles: ['exco_member', 'exco_chairperson', 'hoa_admin'],
             approverCount: 1,
             mode: 'any',
@@ -535,7 +537,7 @@ export class AuthService implements OnModuleInit {
             name: 'High-value payment (> R50 000)',
             minAmount: 50000,
             maxAmount: null,
-            currency: 'ZAR',
+            currency: orgCurrency,
             requiredRoles: ['exco_chairperson', 'hoa_admin'],
             approverCount: 1,
             mode: 'any',
