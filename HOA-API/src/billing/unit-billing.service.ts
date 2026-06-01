@@ -296,14 +296,10 @@ export class UnitBillingService {
     const periodKey = opts.periodOverride || periodKeyFor(bt.baseTerm, new Date());
     const active = await this.prisma.unitBilling.findMany({
       where: { billingTypeId, organizationId: orgId, isActive: true },
-      select: { id: true, amount: true },
+      select: { id: true, unitId: true, amount: true },
     });
-    const billed = await this.prisma.invoice.findMany({
-      where: { unitBillingId: { in: active.map((a) => a.id) }, periodKey },
-      select: { unitBillingId: true },
-    });
-    const billedSet = new Set(billed.map((b) => b.unitBillingId));
-    const fresh = active.filter((a) => !billedSet.has(a.id));
+    const alreadyBilledUnitIds = await this.billedUnitIds(this.prisma, orgId, bt.id, active, periodKey);
+    const fresh = active.filter((a) => !alreadyBilledUnitIds.has(a.unitId));
     const totalAmount = fresh.reduce((s, a) => s.plus(new Decimal(a.amount.toString())), new Decimal(0));
     const orgCcy = (bt.currency || (await this.orgCurrency(orgId))).toUpperCase();
     return {
@@ -332,17 +328,10 @@ export class UnitBillingService {
     });
     if (active.length === 0) return { periodKey, created: 0, skipped: 0 };
 
-    const billed = await this.prisma.invoice.findMany({
-      where: { unitBillingId: { in: active.map((a) => a.id) }, periodKey },
-      select: { unitBillingId: true },
-    });
-    const billedSet = new Set(billed.map((b) => b.unitBillingId));
-    const fresh = active.filter((a) => !billedSet.has(a.id));
-    if (fresh.length === 0) return { periodKey, created: 0, skipped: active.length };
-
-    // Lock the FX rate per distinct non-base currency once for the batch.
+    // Lock the FX rate per distinct non-base currency once for the batch (read-only,
+    // done before the write transaction).
     const fxByCcy = new Map<string, { lockedRate: Decimal; lockedRateAsOf: Date; baseCurrency: string }>();
-    for (const ccy of new Set(fresh.map((f) => (f.currency || orgBaseCcy).toUpperCase()))) {
+    for (const ccy of new Set(active.map((f) => (f.currency || orgBaseCcy).toUpperCase()))) {
       if (ccy === orgBaseCcy) continue;
       try {
         const locked = await this.fx.lockedRateForInvoice(orgId, ccy, orgBaseCcy, new Date());
@@ -353,6 +342,12 @@ export class UnitBillingService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
+      // Re-check the already-billed set INSIDE the transaction for a consistent
+      // view, so we never double-bill a unit already invoiced for this period.
+      const alreadyBilled = await this.billedUnitIds(tx, orgId, bt.id, active, periodKey);
+      const fresh = active.filter((a) => !alreadyBilled.has(a.unitId));
+      if (fresh.length === 0) return 0;
+
       const invoiceNumbers = await reserveInvoiceNumbers(tx, orgId, fresh.length);
       const issue = new Date();
       const due = new Date(issue.getTime() + 30 * 86400000);
@@ -427,6 +422,38 @@ export class UnitBillingService {
         'Daily and weekly charges are billed via resident prepay, not scheduled generation.',
       );
     }
+  }
+
+  /**
+   * Units that have ALREADY been invoiced for this charge in this period and so
+   * must be excluded from generation (the no-double-billing guard). A unit is
+   * "billed" if it has any non-voided invoice for this period that is tagged
+   * with this billing type OR with one of these unit-billing attachments — this
+   * covers prior generation, resident prepay, and charge-linked recurring
+   * schedules. Returns the set of already-billed unitIds.
+   */
+  private async billedUnitIds(
+    db: Prisma.TransactionClient,
+    orgId: string,
+    billingTypeId: string,
+    active: Array<{ id: string; unitId: string }>,
+    periodKey: string,
+  ): Promise<Set<string>> {
+    if (active.length === 0) return new Set();
+    const rows = await db.invoice.findMany({
+      where: {
+        organizationId: orgId,
+        periodKey,
+        status: { not: 'voided' },
+        unitId: { in: active.map((a) => a.unitId) },
+        OR: [
+          { billingTypeId },
+          { unitBillingId: { in: active.map((a) => a.id) } },
+        ],
+      },
+      select: { unitId: true },
+    });
+    return new Set(rows.map((r) => r.unitId));
   }
 
   // ---- resident prepay / choose-your-term (Phase 5) ----
