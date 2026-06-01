@@ -429,6 +429,11 @@ model Invoice {
   // Payment plan attachment: when set, this invoice is a child of a payment-plan
   // installment, not a standalone bill. Used by reconciliation + arrears reports.
   paymentPlanInstallmentId String? @unique
+  // Phase 3 (unit-default-billing): which catalog charge + per-unit attachment
+  // this invoice settles. Null = legacy / ad-hoc invoice. periodKey is reused
+  // for the per-unit dedupe unique below.
+  billingTypeId    String?
+  unitBillingId    String?
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -440,10 +445,13 @@ model Invoice {
   parentSchedule   RecurringInvoiceSchedule? @relation(fields: [parentScheduleId], references: [id])
   paymentPlanInstallment PaymentPlanInstallment? @relation(fields: [paymentPlanInstallmentId], references: [id])
   paymentIntents   PaymentIntent[]
+  unitBilling      UnitBilling? @relation(fields: [unitBillingId], references: [id])
 
   @@unique([organizationId, invoiceNumber])
   @@unique([parentScheduleId, unitId, periodKey])
+  @@unique([unitBillingId, periodKey])
   @@index([organizationId, status, dueDate])
+  @@index([organizationId, billingTypeId, status])
   @@map("invoices")
 }
 
@@ -2158,6 +2166,7 @@ model UnitBilling {
 
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   billingType BillingType @relation(fields: [billingTypeId], references: [id], onDelete: Restrict)
+  invoices    Invoice[]
 
   @@unique([unitId, billingTypeId])
   @@index([organizationId, isActive])

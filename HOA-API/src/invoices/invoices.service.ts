@@ -70,8 +70,15 @@ export class InvoicesService {
   }
 
   async create(orgId: string, userId: string, data: any) {
-    const lineItems = data.lineItems || [];
-    // Line items carry unitPrice (per the DTO); total = Σ unitPrice × quantity.
+    // Every invoice MUST have at least one valid line item — an empty/zero
+    // invoice is never allowed (org policy). Line items carry unitPrice.
+    const lineItems = (data.lineItems || []).filter(
+      (item: any) => item && String(item.description || '').trim() && Number(item.unitPrice) > 0,
+    );
+    if (lineItems.length === 0) {
+      throw new BadRequestException('An invoice must have at least one line item with a description and an amount greater than zero');
+    }
+    // total = Σ unitPrice × quantity.
     const amount = lineItems.reduce((sum: number, item: any) =>
       sum + ((Number(item.unitPrice) || 0) * (Number(item.quantity) || 1)), 0);
 

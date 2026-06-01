@@ -238,6 +238,14 @@ export class RecurringInvoicesService {
       ? new Decimal(s.amount.toString())
       : this.lineItemsTotal(s.lineItems as any);
 
+    // Every generated invoice MUST carry at least one line item (org policy —
+    // an empty-line-item invoice is never allowed). Legacy amount-only
+    // schedules get a single synthesized line from the schedule name + amount.
+    const scheduleLineItems = (s.lineItems as any[]) || [];
+    const genLineItems = scheduleLineItems.length > 0
+      ? scheduleLineItems
+      : [{ description: s.name, amount: Number(baseAmount.toString()), quantity: 1 }];
+
     // Compute the human-facing invoice numbers in batch — we increment a
     // counter under a transaction to avoid concurrent runs colliding.
     return this.prisma.$transaction(async (tx) => {
@@ -256,7 +264,7 @@ export class RecurringInvoicesService {
         dueDate,
         status: 'sent',
         sentAt: issueDate,
-        lineItems: (s.lineItems as any) || [],
+        lineItems: genLineItems as any,
         notes: s.notes,
         createdBy: actor.userId,
         baseCurrency, lockedRate, lockedRateAsOf,

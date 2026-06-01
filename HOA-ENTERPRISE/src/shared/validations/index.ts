@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { getOrgCurrency } from '@/lib/utils';
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -12,7 +13,7 @@ export const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   organizationName: z.string().min(2, 'Organization name is required'),
   country: z.string().default('ZA'),
-  currency: z.string().default('ZAR'),
+  currency: z.string().default(() => getOrgCurrency()),
 });
 
 export const createEstateSchema = z.object({
@@ -41,7 +42,7 @@ export const createInvoiceSchema = z.object({
   unitId: z.string().min(1, 'Unit is required'),
   type: z.enum(['recurring', 'one_time']).default('recurring'),
   dueDate: z.string().or(z.date()),
-  currency: z.string().default('ZAR'),
+  currency: z.string().default(() => getOrgCurrency()),
   notes: z.string().optional(),
   lineItems: z.array(z.object({
     description: z.string().min(1),

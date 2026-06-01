@@ -30,6 +30,7 @@ const financeNav = [
   { title: 'Invoices', href: '/finance/invoices', icon: FileText },
   { title: 'Recurring', href: '/finance/recurring', icon: Repeat },
   { title: 'Billing activation', href: '/finance/billing-activation', icon: Banknote },
+  { title: 'Generate charges', href: '/finance/billing-runs', icon: CalendarDays },
   { title: 'Late fees', href: '/finance/late-fees', icon: Hourglass },
   { title: 'Payments', href: '/finance/payments', icon: CreditCard },
   { title: 'Payables', href: '/payables', icon: Receipt },
