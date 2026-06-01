@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { residentInvoiceStatus } from '@/lib/invoice-status';
 import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
+import { InvoiceStats } from '@/components/finance/invoice-stats';
 
 const selectClass = cn(
   'flex h-10 rounded-lg border border-stone-surface bg-card px-3 text-sm text-foreground',
@@ -52,10 +53,6 @@ export default function MyInvoicesPage() {
     date: (i: any) => i.dueDate,
   });
 
-  const outstanding = invoices
-    .filter((i) => i.status !== 'paid' && i.status !== 'voided')
-    .reduce((sum, i) => sum + Math.max(Number(i.amount || 0) - Number(i.amountPaid || 0), 0), 0);
-
   return (
     <div className="space-y-6">
       <header>
@@ -65,24 +62,7 @@ export default function MyInvoicesPage() {
         </p>
       </header>
 
-      {!loading && invoices.length > 0 && (
-        <Card>
-          <CardContent className="flex items-center justify-between p-6">
-            <div>
-              <p className="text-caption uppercase tracking-wider text-muted-foreground">
-                Outstanding
-              </p>
-              <p className="mt-1 font-display text-heading-lg font-medium text-charcoal-primary">
-                {formatCurrency(outstanding)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-caption text-muted-foreground">Total invoices</p>
-              <p className="text-heading-sm font-medium text-charcoal-primary">{invoices.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <InvoiceStats />
 
       {!loading && invoices.length > 0 && (
         <ListToolbar c={c} searchPlaceholder="Search by number, unit or status">

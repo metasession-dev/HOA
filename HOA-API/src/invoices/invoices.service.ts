@@ -78,7 +78,11 @@ export class InvoicesService {
 
     const rows = await this.prisma.invoice.findMany({
       where,
-      select: { amount: true, amountPaid: true, status: true, dueDate: true, createdAt: true },
+      select: {
+        amount: true, amountPaid: true, status: true, dueDate: true, createdAt: true,
+        billingTypeId: true, type: true,
+        billingType: { select: { name: true } },
+      },
     });
 
     const now = new Date();
@@ -96,6 +100,9 @@ export class InvoicesService {
 
     let totalAmount = 0, totalPaid = 0, count = 0, paidCount = 0, unpaidCount = 0, overdueCount = 0;
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Breakdown keyed by billing type — unlinked invoices fall back to their
+    // ad-hoc `type` so every invoice is accounted for somewhere.
+    const byType = new Map<string, { key: string; name: string; billed: number; paid: number; outstanding: number; count: number }>();
     for (const r of rows) {
       const amt = Number(r.amount as any) || 0;
       const paid = Number(r.amountPaid as any) || 0;
@@ -115,6 +122,15 @@ export class InvoicesService {
         buckets[idx].unpaid += outstanding;
         buckets[idx].count += 1;
       }
+
+      const key = r.billingTypeId || `adhoc:${r.type || 'other'}`;
+      const name = r.billingType?.name || (r.type ? `${r.type[0].toUpperCase()}${r.type.slice(1)}` : 'Ad-hoc');
+      const bucket = byType.get(key) || { key, name, billed: 0, paid: 0, outstanding: 0, count: 0 };
+      bucket.billed += amt;
+      bucket.paid += paid;
+      bucket.outstanding += outstanding;
+      bucket.count += 1;
+      byType.set(key, bucket);
     }
 
     const round = (n: number) => Math.round(n * 100) / 100;
@@ -136,6 +152,9 @@ export class InvoicesService {
         unpaid: round(b.unpaid),
         count: b.count,
       })),
+      byBillingType: Array.from(byType.values())
+        .map((t) => ({ ...t, billed: round(t.billed), paid: round(t.paid), outstanding: round(t.outstanding) }))
+        .sort((a, b) => b.billed - a.billed),
     };
   }
 
