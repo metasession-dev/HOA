@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, BadRequestException, ConflictException, Logger,
+  Injectable, NotFoundException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -537,17 +537,37 @@ export class UnitBillingService {
     };
   }
 
-  /** Materialize the prepay's period invoices + a PrepaymentCredit record.
-   *  Returns the invoice ids for a multi-invoice checkout. */
-  async materializePrepay(actor: Actor, unitBillingId: string, request: { periods?: number; days?: number }) {
-    const ub = await this.resolvePrepayUb(actor.userId, unitBillingId);
-    const periods = await this.computePrepayPeriods(ub, request);
-    if (periods.length === 0) throw new BadRequestException('Nothing to prepay for this term');
+  /**
+   * Materialize a prepay's period invoices from a plan locked at quote time, and
+   * record the PrepaymentCredit. Called ONLY on payment success.
+   *
+   * Idempotent: only periods that don't already have an invoice for this charge
+   * are created (the per-unit period unique guarantees no duplicates), and it
+   * returns the invoice ids for ALL the plan's periods (pre-existing + new) so
+   * the payment can be allocated across them.
+   */
+  async materializePrepayFromPlan(
+    orgId: string,
+    plan: { unitBillingId: string; termLabel: string; currency?: string; periods: Array<{ periodKey: string; from: string | Date; to: string | Date; amount: number }> },
+    createdBy: string,
+  ): Promise<string[]> {
+    const ub = await this.prisma.unitBilling.findFirst({
+      where: { id: plan.unitBillingId, organizationId: orgId },
+      include: { billingType: true },
+    });
+    if (!ub) throw new NotFoundException('Charge not found');
 
-    const orgId = ub.organizationId;
+    const periods = (plan.periods || []).map((p) => ({
+      periodKey: p.periodKey,
+      from: new Date(p.from),
+      to: new Date(p.to),
+      amountMinor: Math.round(Number(p.amount) * 100),
+    }));
+    if (periods.length === 0) return [];
+    const periodKeys = periods.map((p) => p.periodKey);
+
     const orgBaseCcy = (await this.orgCurrency(orgId)).toUpperCase();
     const ccy = (ub.currency || orgBaseCcy).toUpperCase();
-    const termLabel = this.termLabelFor(ub, request);
 
     let fxLock: { lockedRate: Decimal; lockedRateAsOf: Date; baseCurrency: string } | null = null;
     if (ccy !== orgBaseCcy) {
@@ -559,75 +579,78 @@ export class UnitBillingService {
       }
     }
 
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-      const numbers = await reserveInvoiceNumbers(tx, orgId, periods.length);
-      const issue = new Date();
-      const invoiceIds: string[] = [];
-      for (let i = 0; i < periods.length; i += 1) {
-        const p = periods[i];
-        const amt = new Decimal(p.amountMinor).div(100);
-        const inv = await tx.invoice.create({
+    return this.prisma.$transaction(async (tx) => {
+      // Which periods already have an invoice for this charge? (idempotency)
+      const existing = await tx.invoice.findMany({
+        where: { unitBillingId: ub.id, periodKey: { in: periodKeys } },
+        select: { periodKey: true },
+      });
+      const existingKeys = new Set(existing.map((e) => e.periodKey));
+      const fresh = periods.filter((p) => !existingKeys.has(p.periodKey));
+
+      if (fresh.length > 0) {
+        const numbers = await reserveInvoiceNumbers(tx, orgId, fresh.length);
+        const issue = new Date();
+        for (let i = 0; i < fresh.length; i += 1) {
+          const p = fresh[i];
+          const amt = new Decimal(p.amountMinor).div(100);
+          await tx.invoice.create({
+            data: {
+              organizationId: orgId,
+              unitId: ub.unitId,
+              invoiceNumber: numbers[i],
+              type: 'recurring',
+              amount: amt,
+              originalAmount: amt,
+              currency: ccy,
+              dueDate: p.from,
+              status: 'sent',
+              sentAt: issue,
+              lineItems: [{ description: `${ub.billingType.name} (${p.periodKey})`, amount: Number(amt.toString()), quantity: 1 }] as any,
+              createdBy,
+              baseCurrency: fxLock?.baseCurrency ?? null,
+              lockedRate: fxLock?.lockedRate ?? null,
+              lockedRateAsOf: fxLock?.lockedRateAsOf ?? null,
+              billingTypeId: ub.billingTypeId,
+              unitBillingId: ub.id,
+              periodKey: p.periodKey,
+            },
+          });
+        }
+        // Record the prepay span once (only when we actually created invoices).
+        const totalMinor = periods.reduce((s, p) => s + p.amountMinor, 0);
+        await tx.prepaymentCredit.create({
           data: {
             organizationId: orgId,
-            unitId: ub.unitId,
-            invoiceNumber: numbers[i],
-            type: 'recurring',
-            amount: amt,
-            originalAmount: amt,
-            currency: ccy,
-            dueDate: p.from,
-            status: 'sent',
-            sentAt: issue,
-            lineItems: [{ description: `${ub.billingType.name} (${p.periodKey})`, amount: Number(amt.toString()), quantity: 1 }] as any,
-            createdBy: actor.userId,
-            baseCurrency: fxLock?.baseCurrency ?? null,
-            lockedRate: fxLock?.lockedRate ?? null,
-            lockedRateAsOf: fxLock?.lockedRateAsOf ?? null,
-            billingTypeId: ub.billingTypeId,
             unitBillingId: ub.id,
-            periodKey: p.periodKey,
+            coverageFrom: periods[0].from,
+            coverageTo: periods[periods.length - 1].to,
+            termLabel: plan.termLabel,
+            periodKeys,
+            amount: new Decimal(totalMinor).div(100),
+            currency: ccy,
+            createdBy,
           },
         });
-        invoiceIds.push(inv.id);
+        await tx.auditLog.create({
+          data: {
+            organizationId: orgId,
+            actorId: createdBy,
+            actorRole: 'resident',
+            action: 'prepay_materialized',
+            entityType: 'UnitBilling',
+            entityId: ub.id,
+            changes: { periodKeys, termLabel: plan.termLabel, created: fresh.length, currency: ccy } as any,
+          },
+        });
       }
 
-      const totalMinor = periods.reduce((s, p) => s + p.amountMinor, 0);
-      await tx.prepaymentCredit.create({
-        data: {
-          organizationId: orgId,
-          unitBillingId: ub.id,
-          coverageFrom: periods[0].from,
-          coverageTo: periods[periods.length - 1].to,
-          termLabel,
-          periodKeys: periods.map((p) => p.periodKey),
-          amount: new Decimal(totalMinor).div(100),
-          currency: ccy,
-          createdBy: actor.userId,
-        },
+      const all = await tx.invoice.findMany({
+        where: { unitBillingId: ub.id, periodKey: { in: periodKeys } },
+        select: { id: true },
       });
-      await tx.auditLog.create({
-        data: {
-          organizationId: orgId,
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: 'prepay_materialized',
-          entityType: 'UnitBilling',
-          entityId: ub.id,
-          changes: { invoiceIds, periodKeys: periods.map((p) => p.periodKey), termLabel, total: (totalMinor / 100).toString(), currency: ccy } as any,
-        },
-      });
-
-      return { invoiceIds, totalMinor, currency: ccy, organizationId: orgId };
-      });
-    } catch (e: any) {
-      // A concurrent prepay already created an invoice for one of these periods
-      // (the per-unit period unique). Surface it clearly rather than a 500.
-      if (e?.code === 'P2002') {
-        throw new ConflictException('A payment for one or more of these periods has already been generated. Refresh to see the latest.');
-      }
-      throw e;
-    }
+      return all.map((a) => a.id);
+    });
   }
 
   // ---- helpers ----

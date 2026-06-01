@@ -182,4 +182,40 @@ export class InvoicesService {
       data: { status: 'voided' },
     });
   }
+
+  /**
+   * Hard-delete one or more UNPAID invoices (no money received) — for clearing
+   * erroneous or abandoned-prepay bills. Invoices that have received any payment
+   * are skipped (never delete a billed-and-paid record). Cascades remove any
+   * pending payment intents on the deleted invoices.
+   */
+  async bulkDeleteUnpaid(orgId: string, actor: { userId: string; role: string }, ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestException('ids is required');
+    if (ids.length > 500) throw new BadRequestException('Cannot delete more than 500 invoices at once');
+
+    const deletable = await this.prisma.invoice.findMany({
+      where: { id: { in: ids }, organizationId: orgId, amountPaid: 0, status: { notIn: ['paid'] } },
+      select: { id: true, invoiceNumber: true },
+    });
+    const delIds = deletable.map((d) => d.id);
+
+    if (delIds.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.invoice.deleteMany({ where: { id: { in: delIds } } });
+        await tx.auditLog.create({
+          data: {
+            organizationId: orgId,
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'invoices_bulk_deleted',
+            entityType: 'Invoice',
+            entityId: delIds[0],
+            changes: { deleted: delIds.length, invoiceNumbers: deletable.map((d) => d.invoiceNumber) } as any,
+          },
+        });
+      });
+    }
+
+    return { deleted: delIds.length, skipped: ids.length - delIds.length };
+  }
 }
