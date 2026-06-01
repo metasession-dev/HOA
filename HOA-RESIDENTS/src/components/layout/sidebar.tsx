@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
+import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, Wallet, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ export const mainNav = [
   { title: 'Surveys', href: '/surveys', icon: ClipboardList },
   { title: 'Requests', href: '/requests', icon: FileText },
   { title: 'Notices', href: '/notices', icon: Bell },
+  { title: 'My account', href: '/profile', icon: UserCircle },
 ];
 
 /**
