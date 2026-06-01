@@ -67,7 +67,7 @@ export default function RecurringSchedulesPage() {
   const [busy, setBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
   // Currency is taken from org Settings at save time — see `create()`.
-  const [form, setForm] = useState({ name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '' });
+  const [form, setForm] = useState({ name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '', billingTypeId: '' });
   // Line items the generated invoices carry. Previously the form only sent a
   // flat `amount`, so generated invoices had an amount but no itemisation —
   // this is the "line item is missing" bug.
@@ -76,8 +76,13 @@ export default function RecurringSchedulesPage() {
   // Billing catalog names feed the line-item suggestions (Phase 1 of
   // unit-default-billing). Falls back to the static presets when empty.
   const [catalogNames, setCatalogNames] = useState<string[]>([]);
+  // Full active catalog — used to optionally LINK a schedule to a catalog charge.
+  // Linking makes the schedule the sole biller of that charge; the API then
+  // blocks billing it per-unit (Billing activation / Generate charges) so the
+  // two paths can never double-bill.
+  const [catalog, setCatalog] = useState<{ id: string; name: string; baseTerm: string }[]>([]);
 
-  const blankForm = { name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '' };
+  const blankForm = { name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '', billingTypeId: '' };
   const addLineItem = () => setLineItems((li) => [...li, { description: '', amount: 0, quantity: 1 }]);
   const removeLineItem = (idx: number) => setLineItems((li) => li.filter((_, i) => i !== idx));
   const updateLineItem = (idx: number, field: keyof RecurringLineItem, value: any) =>
@@ -93,7 +98,11 @@ export default function RecurringSchedulesPage() {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     api.get<any>('/billing/catalog')
-      .then((r) => setCatalogNames((r.data || []).filter((t: any) => t.isActive).map((t: any) => t.name)))
+      .then((r) => {
+        const active = (r.data || []).filter((t: any) => t.isActive);
+        setCatalogNames(active.map((t: any) => t.name));
+        setCatalog(active.map((t: any) => ({ id: t.id, name: t.name, baseTerm: t.baseTerm })));
+      })
       .catch(() => { /* suggestions are best-effort */ });
   }, []);
   const lineItemOptions = Array.from(new Set([...catalogNames, ...LINE_ITEM_PRESETS]));
@@ -125,6 +134,9 @@ export default function RecurringSchedulesPage() {
         // Always use the org currency from Settings — no per-form override.
         currency: getOrgCurrency(),
         description: form.description || undefined,
+        // Optional link to a catalog charge — when set, this schedule becomes the
+        // sole biller of that charge (per-unit billing for it is blocked).
+        billingTypeId: form.billingTypeId || undefined,
       });
       toast({ variant: 'success', title: 'Schedule created' });
       setShowNew(false);
@@ -320,6 +332,19 @@ export default function RecurringSchedulesPage() {
                 <Label htmlFor="sdesc">Description (optional)</Label>
                 <Input id="sdesc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
+              {catalog.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="sbt">Linked catalog charge (optional)</Label>
+                  <select id="sbt" className={selectClass} value={form.billingTypeId} onChange={(e) => setForm({ ...form, billingTypeId: e.target.value })}>
+                    <option value="">Not linked — standalone schedule</option>
+                    {catalog.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <p className="text-caption text-muted-foreground">
+                    Link this schedule to a billing-catalog charge to make it the sole biller of that charge.
+                    Per-unit billing for the charge (Billing activation / Generate charges) is then blocked, so the two paths can never double-bill.
+                  </p>
+                </div>
+              )}
             </DrawerBody>
             <DrawerFooter>
               <Button type="submit" disabled={busy}>Create</Button>

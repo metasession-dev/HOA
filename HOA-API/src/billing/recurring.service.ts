@@ -7,6 +7,7 @@ import { Actor } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { MailService } from '../mail/mail.service';
 import { reserveInvoiceNumbers } from '../common/invoice-number';
+import { assertNoBillingPathConflict } from './billing-overlap';
 
 const FREQUENCIES = ['monthly', 'quarterly', 'annual'] as const;
 type Frequency = typeof FREQUENCIES[number];
@@ -53,9 +54,13 @@ export class RecurringInvoicesService {
     dto: {
       name: string; description?: string; frequency: string; billingDayOfMonth?: number; dueDays?: number;
       amount?: number; currency?: string; lineItems?: LineItem[]; notes?: string; unitFilter?: UnitFilter;
+      billingTypeId?: string | null;
     },
   ) {
     this.validateSchedule(dto);
+    // If this schedule bills a catalog charge, ensure that charge isn't already
+    // billed per-unit — the two paths must never overlap.
+    if (dto.billingTypeId) await assertNoBillingPathConflict(this.prisma, orgId, dto.billingTypeId, 'recurring');
     const nextRunAt = this.computeNextRun(dto.frequency as Frequency, dto.billingDayOfMonth || 1, null);
     return this.prisma.$transaction(async (tx) => {
       const s = await tx.recurringInvoiceSchedule.create({
@@ -71,6 +76,7 @@ export class RecurringInvoicesService {
           lineItems: (dto.lineItems || []) as any,
           notes: dto.notes,
           unitFilter: (dto.unitFilter || {}) as any,
+          billingTypeId: dto.billingTypeId ?? null,
           nextRunAt,
           createdBy: actor.userId,
         },
@@ -97,13 +103,18 @@ export class RecurringInvoicesService {
     dto: {
       name?: string; description?: string; frequency?: string; billingDayOfMonth?: number; dueDays?: number;
       amount?: number; currency?: string; lineItems?: LineItem[]; notes?: string; unitFilter?: UnitFilter;
-      isActive?: boolean;
+      isActive?: boolean; billingTypeId?: string | null;
     },
   ) {
     const existing = await this.prisma.recurringInvoiceSchedule.findFirst({
       where: { id, organizationId: orgId },
     });
     if (!existing) throw new NotFoundException('Schedule not found');
+    // If, after this update, the schedule will be active AND linked to a catalog
+    // charge, make sure that charge isn't already billed per-unit.
+    const effBillingTypeId = dto.billingTypeId !== undefined ? dto.billingTypeId : (existing as any).billingTypeId;
+    const effActive = dto.isActive !== undefined ? dto.isActive : existing.isActive;
+    if (effBillingTypeId && effActive) await assertNoBillingPathConflict(this.prisma, orgId, effBillingTypeId, 'recurring');
     if (dto.frequency || dto.billingDayOfMonth !== undefined || dto.amount !== undefined || dto.lineItems !== undefined) {
       // Re-validate the merged shape
       this.validateSchedule({
@@ -126,6 +137,7 @@ export class RecurringInvoicesService {
         lineItems: dto.lineItems as any,
         notes: dto.notes,
         unitFilter: dto.unitFilter as any,
+        billingTypeId: dto.billingTypeId,
         isActive: dto.isActive,
       };
       if (dto.frequency || dto.billingDayOfMonth !== undefined) {
@@ -202,9 +214,15 @@ export class RecurringInvoicesService {
       return this.recordRun(s.id, orgId, periodKey, actor.userId, 0, 0, 'No matching units');
     }
 
-    // De-dup: pull the unitIds already invoiced for this period.
+    // De-dup: pull the unitIds already invoiced for this period — both from this
+    // schedule AND, if it's linked to a catalog charge, from the per-unit path for
+    // the same charge. The create/update guards keep the two paths mutually
+    // exclusive, but this makes a run idempotent against the charge no matter how
+    // the invoice was issued, so the two paths can never double-bill.
+    const dedupOr: any[] = [{ parentScheduleId: id }];
+    if (s.billingTypeId) dedupOr.push({ billingTypeId: s.billingTypeId });
     const already = await this.prisma.invoice.findMany({
-      where: { parentScheduleId: id, periodKey },
+      where: { organizationId: orgId, periodKey, status: { not: 'voided' }, OR: dedupOr },
       select: { unitId: true },
     });
     const alreadyIds = new Set(already.map((i) => i.unitId));
@@ -269,6 +287,7 @@ export class RecurringInvoicesService {
         createdBy: actor.userId,
         baseCurrency, lockedRate, lockedRateAsOf,
         parentScheduleId: s.id,
+        billingTypeId: s.billingTypeId ?? null,
         periodKey,
       }));
 

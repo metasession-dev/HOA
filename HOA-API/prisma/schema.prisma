@@ -2078,6 +2078,10 @@ model RecurringInvoiceSchedule {
   lineItems       Json     @default("[]") // [{ description, amount, quantity? }]
   notes           String?
   unitFilter      Json     @default("{}") // { estateIds?: string[], tagIn?: string[] }
+  // Optional link to a catalog charge (BillingType). When set, this schedule IS
+  // that charge — the system blocks billing the same charge per-unit (catalog
+  // Generate charges / activation) so the two paths can never double-bill.
+  billingTypeId   String?
   isActive        Boolean  @default(true)
   // Cron-driven bookkeeping
   nextRunAt       DateTime?

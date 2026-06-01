@@ -7,6 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { reserveInvoiceNumbers } from '../common/invoice-number';
+import { assertNoBillingPathConflict } from './billing-overlap';
 
 type Target = { unitIds?: string[]; estateIds?: string[] };
 
@@ -185,6 +186,9 @@ export class UnitBillingService {
   ) {
     const bt = await this.prisma.billingType.findFirst({ where: { id: billingTypeId, organizationId: orgId } });
     if (!bt) throw new NotFoundException('Billing type not found');
+    // Turning the per-unit path ON for a charge that a recurring schedule already
+    // bills would double-bill — block it.
+    if (opts.active) await assertNoBillingPathConflict(this.prisma, orgId, billingTypeId, 'unit_billing');
     const orgCurrency = await this.orgCurrency(orgId);
     const unitIds = await this.resolveUnitIds(orgId, opts.target);
     if (unitIds.length === 0) throw new BadRequestException('No matching units');
@@ -319,6 +323,8 @@ export class UnitBillingService {
     const bt = await this.prisma.billingType.findFirst({ where: { id: billingTypeId, organizationId: orgId } });
     if (!bt) throw new NotFoundException('Billing type not found');
     this.assertSchedulable(bt.baseTerm);
+    // Never bill a charge per-unit if a recurring schedule already bills it.
+    await assertNoBillingPathConflict(this.prisma, orgId, billingTypeId, 'unit_billing');
     const periodKey = opts.periodOverride || periodKeyFor(bt.baseTerm, new Date());
     const orgBaseCcy = (await this.orgCurrency(orgId)).toUpperCase();
 
