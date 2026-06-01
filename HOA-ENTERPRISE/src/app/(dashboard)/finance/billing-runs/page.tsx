@@ -159,6 +159,11 @@ export default function BillingRunsPage() {
                   <Stat label="To bill" value={preview.toBill} accent />
                   <Stat label="Total" value={formatCurrency(Number(preview.totalAmount), preview.currency)} />
                 </div>
+                {preview.alreadyBilled > 0 && (
+                  <p className="text-caption text-muted-foreground">
+                    {preview.alreadyBilled} unit(s) already have an invoice for this charge &amp; period (issued or paid, incl. prepaid) and are skipped — no double billing.
+                  </p>
+                )}
               </div>
             )}
           </div>
