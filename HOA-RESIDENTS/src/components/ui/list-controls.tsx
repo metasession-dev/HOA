@@ -65,13 +65,14 @@ export function useListControls<T>(
   return { q, setQ, from, setFrom, to, setTo, page: safePage, setPage, totalPages, total: filtered.length, pageSize, pageItems };
 }
 
-export function ListToolbar<T>({ c, searchPlaceholder = 'Search…', showDate = true, className }: { c: ListControls<T>; searchPlaceholder?: string; showDate?: boolean; className?: string }) {
+export function ListToolbar<T>({ c, searchPlaceholder = 'Search…', showDate = true, className, children }: { c: ListControls<T>; searchPlaceholder?: string; showDate?: boolean; className?: string; children?: React.ReactNode }) {
   return (
     <div className={cn('flex flex-wrap items-end gap-3', className)}>
       <div className="relative min-w-[12rem] flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input className="pl-9" placeholder={searchPlaceholder} value={c.q} onChange={(e) => c.setQ(e.target.value)} />
       </div>
+      {children}
       {showDate && (
         <div className="flex items-end gap-2">
           <div className="space-y-1">

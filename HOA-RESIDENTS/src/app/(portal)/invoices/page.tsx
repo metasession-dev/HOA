@@ -13,10 +13,19 @@ import { cn } from '@/lib/utils';
 import { residentInvoiceStatus } from '@/lib/invoice-status';
 import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
+const selectClass = cn(
+  'flex h-10 rounded-lg border border-stone-surface bg-card px-3 text-sm text-foreground',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+);
+
 export default function MyInvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Billing-type filter — '' = all, 'none' = ad-hoc/unlinked, else a catalog id.
+  // Residents can't read the org catalog, so options are derived from their own
+  // invoices' linked billing types.
+  const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
     api
@@ -26,10 +35,20 @@ export default function MyInvoicesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Distinct billing types present on the resident's invoices, for the filter.
+  const billingTypeOptions = Array.from(
+    new Map(invoices.filter((i) => i.billingType).map((i) => [i.billingType.id, i.billingType.name])),
+  ).map(([id, name]) => ({ id, name }));
+  const hasUnlinked = invoices.some((i) => !i.billingType);
+
+  const visibleInvoices = typeFilter
+    ? invoices.filter((i) => (typeFilter === 'none' ? !i.billingType : i.billingType?.id === typeFilter))
+    : invoices;
+
   // Balance is server-authoritative: amount − amountPaid (the maintained ledger
   // cache). Never just sum invoice amounts — that ignores partial payments.
-  const c = useListControls(invoices, {
-    searchText: (i: any) => `${i.invoiceNumber ?? ''} ${i.unit?.unitNumber ?? ''} ${i.unit?.estate?.name ?? ''} ${i.status ?? ''}`,
+  const c = useListControls(visibleInvoices, {
+    searchText: (i: any) => `${i.invoiceNumber ?? ''} ${i.unit?.unitNumber ?? ''} ${i.unit?.estate?.name ?? ''} ${i.status ?? ''} ${i.billingType?.name ?? ''}`,
     date: (i: any) => i.dueDate,
   });
 
@@ -66,7 +85,20 @@ export default function MyInvoicesPage() {
       )}
 
       {!loading && invoices.length > 0 && (
-        <ListToolbar c={c} searchPlaceholder="Search by number, unit or status" />
+        <ListToolbar c={c} searchPlaceholder="Search by number, unit or status">
+          {(billingTypeOptions.length > 0 || hasUnlinked) && (
+            <select
+              className={selectClass}
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              title="Filter by billing type"
+            >
+              <option value="">All billing types</option>
+              {billingTypeOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {hasUnlinked && <option value="none">Other / ad-hoc</option>}
+            </select>
+          )}
+        </ListToolbar>
       )}
 
       <Card>
@@ -94,6 +126,7 @@ export default function MyInvoicesPage() {
                   <tr className="border-b border-stone-surface text-left text-caption font-medium uppercase tracking-wider text-muted-foreground">
                     <th className="px-6 py-3">Invoice</th>
                     <th className="px-6 py-3">Unit</th>
+                    <th className="px-6 py-3">Charge</th>
                     <th className="px-6 py-3 text-right">Amount</th>
                     <th className="px-6 py-3">Due</th>
                     <th className="px-6 py-3">Status</th>
@@ -117,6 +150,11 @@ export default function MyInvoicesPage() {
                       <td className="px-6 py-4 text-graphite">
                         Unit {inv.unit?.unitNumber}
                         <span className="text-muted-foreground"> · {inv.unit?.estate?.name}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {inv.billingType?.name
+                          ? <Badge variant="secondary">{inv.billingType.name}</Badge>
+                          : <span className="text-caption text-muted-foreground">{inv.type || 'ad-hoc'}</span>}
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-charcoal-primary">
                         {formatCurrency(Number(inv.amount))}

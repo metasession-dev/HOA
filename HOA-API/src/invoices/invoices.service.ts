@@ -24,17 +24,21 @@ export class InvoicesService {
 
   async findAll(
     orgId: string,
-    query: PaginationDto & { status?: string; unitId?: string; search?: string },
+    query: PaginationDto & { status?: string; unitId?: string; search?: string; billingTypeId?: string },
     actor?: Actor,
   ) {
     // Defensive coercion: ValidationPipe's @Type(() => Number) doesn't fire on
     // intersection types like `PaginationDto & {...}`, so `?limit=5` arrives
     // as the string '5' and crashes Prisma's take/skip.
     const { page, limit, skip } = coercePagination(query);
-    const { search, status, unitId } = query || ({} as any);
+    const { search, status, unitId, billingTypeId } = query || ({} as any);
     let where: any = { organizationId: orgId };
     if (status) where.status = status;
     if (unitId) where.unitId = unitId;
+    // Billing-type filter: a catalog charge id, or the sentinel 'none' for
+    // ad-hoc / manual invoices that aren't linked to any catalog charge.
+    if (billingTypeId === 'none') where.billingTypeId = null;
+    else if (billingTypeId) where.billingTypeId = billingTypeId;
     if (search) {
       where.OR = [{ invoiceNumber: { contains: search, mode: 'insensitive' } }];
     }
@@ -46,6 +50,7 @@ export class InvoicesService {
         include: {
           unit: { include: { estate: true } },
           payments: true,
+          billingType: { select: { id: true, name: true, key: true } },
         },
         skip,
         take: limit,

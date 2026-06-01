@@ -455,6 +455,9 @@ model Invoice {
   paymentPlanInstallment PaymentPlanInstallment? @relation(fields: [paymentPlanInstallmentId], references: [id])
   paymentIntents   PaymentIntent[]
   unitBilling      UnitBilling? @relation(fields: [unitBillingId], references: [id])
+  // The catalog charge this invoice settles (when generated from the catalog /
+  // a linked recurring schedule). SetNull so deleting a type never orphans bills.
+  billingType      BillingType? @relation(fields: [billingTypeId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, invoiceNumber])
   @@unique([parentScheduleId, unitId, periodKey])
@@ -2184,6 +2187,7 @@ model BillingType {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   unitBillings UnitBilling[]
+  invoices     Invoice[]
 
   @@unique([organizationId, key])
   @@index([organizationId, isActive])

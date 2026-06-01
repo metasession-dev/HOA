@@ -38,7 +38,7 @@ export class InvoicesController {
     @CurrentUser('organizationId') orgId: string,
     @CurrentUser('sub') userId: string,
     @CurrentUser('role') role: string,
-    @Query() query: PaginationDto & { status?: string; unitId?: string },
+    @Query() query: PaginationDto & { status?: string; unitId?: string; billingTypeId?: string },
   ) {
     return this.service.findAll(orgId, query, { userId, role });
   }
