@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, FileText, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Search, FileText, Trash2, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ const statusBadgeMap: Record<string, 'muted' | 'info' | 'warning' | 'success' | 
 };
 
 export default function InvoicesPage() {
+  const router = useRouter();
   const confirm = useConfirm();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,13 +170,17 @@ export default function InvoicesPage() {
                   {filtered.map((inv: any, idx: number) => (
                     <tr
                       key={inv.id}
+                      onClick={() => router.push(`/finance/invoices/${inv.id}`)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/finance/invoices/${inv.id}`); }}
                       className={cn(
-                        'group transition-colors hover:bg-stone-surface/50',
+                        'group cursor-pointer transition-colors hover:bg-stone-surface/60 focus:bg-stone-surface/60 focus:outline-none',
                         idx !== filtered.length - 1 && 'border-b border-stone-surface',
                         selected.has(inv.id) && 'bg-stone-surface/40',
                       )}
                     >
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="h-4 w-4"
@@ -184,14 +190,14 @@ export default function InvoicesPage() {
                           title={canDelete(inv) ? 'Select to delete' : 'Only unpaid invoices can be deleted'}
                         />
                       </td>
-                      <td className="px-6 py-4 font-mono text-[13px] text-charcoal-primary">
+                      <td className="px-6 py-4 font-mono text-[13px] font-medium text-charcoal-primary group-hover:text-ember-orange group-hover:underline">
                         {inv.invoiceNumber}
                       </td>
                       <td className="px-6 py-4 text-graphite">
                         <span className="font-medium text-charcoal-primary">Unit {inv.unit?.unitNumber}</span>
                         <span className="ml-1 text-muted-foreground">· {inv.unit?.estate?.name}</span>
                       </td>
-                      <td className="px-6 py-4 text-right font-medium text-charcoal-primary">
+                      <td className="px-6 py-4 text-right font-medium tabular-nums text-charcoal-primary">
                         {formatCurrency(Number(inv.amount))}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{formatDate(inv.dueDate)}</td>
@@ -199,12 +205,10 @@ export default function InvoicesPage() {
                         <Badge variant={statusBadgeMap[inv.status] || 'secondary'}>{inv.status}</Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link
-                          href={`/finance/invoices/${inv.id}`}
-                          className="text-caption font-medium text-ember-orange opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          View →
-                        </Link>
+                        <span className="inline-flex items-center gap-1 text-caption font-medium text-muted-foreground transition-colors group-hover:text-ember-orange">
+                          <span className="hidden sm:inline">View</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </span>
                       </td>
                     </tr>
                   ))}
