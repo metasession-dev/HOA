@@ -43,6 +43,18 @@ export class InvoicesController {
     return this.service.findAll(orgId, query, { userId, role });
   }
 
+  // Dashboard aggregates. Declared before :id so "stats" isn't read as an id.
+  @Get('stats')
+  async stats(
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+    @Query('months') months?: string,
+  ) {
+    const stats = await this.service.stats(orgId, { userId, role }, { months: months ? Number(months) : undefined });
+    return successResponse(stats);
+  }
+
   @Get(':id')
   async findById(
     @Param('id') id: string,

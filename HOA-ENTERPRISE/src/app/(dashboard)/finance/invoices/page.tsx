@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
+import { InvoiceStats } from '@/components/finance/invoice-stats';
 
 // An invoice can be deleted only if no money has been received against it.
 const canDelete = (inv: any) => Number(inv.amountPaid ?? 0) === 0 && inv.status !== 'paid' && inv.status !== 'partial';
@@ -105,6 +106,8 @@ export default function InvoicesPage() {
           </Button>
         </Link>
       </header>
+
+      <InvoiceStats />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative max-w-sm flex-1">
