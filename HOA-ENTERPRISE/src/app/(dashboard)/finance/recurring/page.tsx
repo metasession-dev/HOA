@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw, Plus, Play, Eye } from 'lucide-react';
+import { RefreshCw, Plus, Play, Eye, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { formatDate, getOrgCurrency } from '@/lib/utils';
+import { formatDate, getOrgCurrency, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,23 @@ const selectClass = cn(
   'focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40',
 );
 
+// Same presets as the manual invoice form so recurring schedules read identically.
+const LINE_ITEM_PRESETS = [
+  'Monthly levy',
+  'Special levy',
+  'Reserve fund contribution',
+  'Water charge',
+  'Electricity charge',
+  'Sewerage charge',
+  'Refuse / waste collection',
+  'Security levy',
+  'Maintenance fee',
+  'Insurance contribution',
+  'Administration fee',
+];
+
+type RecurringLineItem = { description: string; amount: number; quantity: number };
+
 export default function RecurringSchedulesPage() {
   const confirm = useConfirm();
   const [items, setItems] = useState<Schedule[]>([]);
@@ -50,8 +67,19 @@ export default function RecurringSchedulesPage() {
   const [busy, setBusy] = useState(false);
   const [showNew, setShowNew] = useState(false);
   // Currency is taken from org Settings at save time — see `create()`.
-  const [form, setForm] = useState({ name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', amount: '', description: '' });
+  const [form, setForm] = useState({ name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '' });
+  // Line items the generated invoices carry. Previously the form only sent a
+  // flat `amount`, so generated invoices had an amount but no itemisation —
+  // this is the "line item is missing" bug.
+  const [lineItems, setLineItems] = useState<RecurringLineItem[]>([{ description: 'Monthly levy', amount: 0, quantity: 1 }]);
   const [previewing, setPreviewing] = useState<{ id: string; data: any } | null>(null);
+
+  const blankForm = { name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '' };
+  const addLineItem = () => setLineItems((li) => [...li, { description: '', amount: 0, quantity: 1 }]);
+  const removeLineItem = (idx: number) => setLineItems((li) => li.filter((_, i) => i !== idx));
+  const updateLineItem = (idx: number, field: keyof RecurringLineItem, value: any) =>
+    setLineItems((li) => li.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+  const lineItemsTotal = lineItems.reduce((sum, li) => sum + (Number(li.amount) || 0) * (li.quantity || 1), 0);
 
   const load = () => {
     setLoading(true);
@@ -63,6 +91,18 @@ export default function RecurringSchedulesPage() {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate line items before showing the busy state so feedback is instant.
+    const cleanItems = lineItems
+      .map((li) => ({ description: li.description.trim(), amount: Number(li.amount) || 0, quantity: li.quantity || 1 }))
+      .filter((li) => li.description);
+    if (cleanItems.length === 0) {
+      toast({ variant: 'error', title: 'Add a line item', description: 'Each schedule needs at least one line item with a description.' });
+      return;
+    }
+    if (cleanItems.some((li) => !(li.amount > 0))) {
+      toast({ variant: 'error', title: 'Check the amounts', description: 'Each line item needs an amount greater than zero.' });
+      return;
+    }
     setBusy(true);
     try {
       await api.post('/billing/recurring', {
@@ -70,14 +110,17 @@ export default function RecurringSchedulesPage() {
         frequency: form.frequency,
         billingDayOfMonth: Number(form.billingDayOfMonth),
         dueDays: Number(form.dueDays),
-        amount: form.amount ? Number(form.amount) : undefined,
+        // Generated invoices carry these line items (the API derives the
+        // invoice total as the sum of amount × quantity).
+        lineItems: cleanItems,
         // Always use the org currency from Settings — no per-form override.
         currency: getOrgCurrency(),
         description: form.description || undefined,
       });
       toast({ variant: 'success', title: 'Schedule created' });
       setShowNew(false);
-      setForm({ name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', amount: '', description: '' });
+      setForm(blankForm);
+      setLineItems([{ description: 'Monthly levy', amount: 0, quantity: 1 }]);
       load();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Failed', description: err.message });
@@ -200,22 +243,65 @@ export default function RecurringSchedulesPage() {
                   <Input id="sd" type="number" min="1" max="31" value={form.billingDayOfMonth} onChange={(e) => setForm({ ...form, billingDayOfMonth: e.target.value })} />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sa">Amount</Label>
-                <Input
-                  id="sa"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  required
-                />
-                {/*
-                 * No currency input here — the org currency from Settings is
-                 * applied on save (see `currency: getOrgCurrency()` in the
-                 * submit payload below). One less field to mis-key.
-                 */}
+              {/*
+               * Line items — generated invoices copy these verbatim and the
+               * API derives the invoice total from them. No currency input:
+               * the org currency from Settings is applied on save.
+               */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Line items</Label>
+                  <Button type="button" variant="ghost" size="sm" onClick={addLineItem}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />Add
+                  </Button>
+                </div>
+                <datalist id="recurring-line-items">
+                  {LINE_ITEM_PRESETS.map((o) => <option key={o} value={o} />)}
+                </datalist>
+                {lineItems.map((item, idx) => (
+                  <div key={idx} className="space-y-2 rounded-lg border border-stone-surface p-2.5">
+                    <Input
+                      placeholder="Description…"
+                      list="recurring-line-items"
+                      autoComplete="off"
+                      value={item.description}
+                      onChange={(e) => updateLineItem(idx, 'description', e.target.value)}
+                      required
+                    />
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-caption text-muted-foreground">Amount</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={item.amount || ''}
+                          onChange={(e) => updateLineItem(idx, 'amount', parseFloat(e.target.value) || 0)}
+                          required
+                        />
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-caption text-muted-foreground">Qty</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateLineItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                      {lineItems.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeLineItem(idx)} title="Remove line">
+                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-coral-red" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-stone-surface pt-2">
+                  <span className="text-caption text-muted-foreground">Total per invoice</span>
+                  <span className="font-medium tabular-nums text-charcoal-primary">{formatCurrency(lineItemsTotal, getOrgCurrency())}</span>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sdue">Due in (days)</Label>

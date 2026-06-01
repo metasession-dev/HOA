@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, FileText, Trophy } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,12 +20,6 @@ const textareaClass = cn(
   'flex w-full rounded-lg bg-card px-3 py-2 text-sm text-foreground shadow-inset-stone',
   'focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40',
 );
-
-function resolveFileUrl(url: string): string {
-  if (!url) return url;
-  if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
-}
 
 export default function VendorTenderDetailPage() {
   const params = useParams();
@@ -116,9 +111,9 @@ export default function VendorTenderDetailPage() {
                 <ul className="space-y-1">
                   {t.attachments.map((a: any, i: number) => (
                     <li key={i}>
-                      <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-graphite hover:text-ember-orange">
+                      <button type="button" onClick={() => downloadAttachment(a)} className="inline-flex items-center gap-2 text-graphite hover:text-ember-orange text-left">
                         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />{a.filename}
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>

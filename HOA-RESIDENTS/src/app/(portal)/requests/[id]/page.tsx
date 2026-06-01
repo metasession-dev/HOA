@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, MessageSquare, CheckCircle2, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment, freshDownloadUrl } from '@/lib/files';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,25 +27,37 @@ function resolveFileUrl(url: string): string {
 }
 
 function AttachmentList({ items }: { items: Attachment[] }) {
+  // Persisted attachment URLs are short-lived signed links. Re-mint fresh URLs
+  // on mount so inline images/videos load (they auto-fetch and can't wait for a
+  // click), and re-sign downloads on click via downloadAttachment.
+  const [urls, setUrls] = useState<(string | undefined)[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all((items || []).map((a) => freshDownloadUrl(a))).then((r) => { if (!cancelled) setUrls(r); });
+    return () => { cancelled = true; };
+  }, [items]);
   if (!items || items.length === 0) return null;
   return (
     <ul className="mt-3 space-y-2">
-      {items.map((a, i) => (
-        <li key={i}>
-          {a.contentType?.startsWith('video/') ? (
-            <video controls className="w-full max-w-md rounded-lg" src={resolveFileUrl(a.url)} />
-          ) : a.contentType?.startsWith('image/') ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer">
-              <img src={resolveFileUrl(a.url)} alt={a.filename} className="max-h-64 rounded-lg object-contain ring-1 ring-stone-surface" />
-            </a>
-          ) : (
-            <a href={resolveFileUrl(a.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-graphite hover:text-ember-orange">
-              <FileText className="h-4 w-4" /> {a.filename}
-            </a>
-          )}
-        </li>
-      ))}
+      {items.map((a, i) => {
+        const href = urls[i] || resolveFileUrl(a.url);
+        return (
+          <li key={i}>
+            {a.contentType?.startsWith('video/') ? (
+              <video controls className="w-full max-w-md rounded-lg" src={href} />
+            ) : a.contentType?.startsWith('image/') ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <button type="button" onClick={() => downloadAttachment(a)} className="block">
+                <img src={href} alt={a.filename} className="max-h-64 rounded-lg object-contain ring-1 ring-stone-surface" />
+              </button>
+            ) : (
+              <button type="button" onClick={() => downloadAttachment(a)} className="inline-flex items-center gap-2 text-sm text-graphite hover:text-ember-orange text-left">
+                <FileText className="h-4 w-4" /> {a.filename}
+              </button>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

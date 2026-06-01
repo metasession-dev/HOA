@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { FolderOpen, FileText, Upload, Trash2, Loader2, Download, Search } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -170,11 +171,9 @@ export default function DocumentsPage() {
       toast({ variant: 'error', title: 'No file attached' });
       return;
     }
-    // Signed URLs are relative paths from the API (e.g. /api/files/:id/download?...);
-    // resolve against the API base.
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
-    const url = doc.fileUrl.startsWith('http') ? doc.fileUrl : `${apiBase}${doc.fileUrl}`;
-    window.open(url, '_blank', 'noopener');
+    // The persisted fileUrl is a short-lived signed link that may have expired;
+    // re-mint a fresh one on click so the download never 403s.
+    downloadAttachment({ url: doc.fileUrl, storedFileId: doc.storedFileId });
   };
 
   return (

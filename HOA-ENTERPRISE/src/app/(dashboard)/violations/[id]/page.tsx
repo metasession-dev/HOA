@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Send, DollarSign, CheckCircle2, XCircle, MessageSquare, Calendar, Building2, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardWarm } from '@/components/ui/card';
@@ -196,9 +197,9 @@ export default function ViolationDetailPage() {
               <p className="text-caption uppercase tracking-wider text-muted-foreground mb-2">Photo evidence ({v.photos.length})</p>
               <div className="flex flex-wrap gap-2">
                 {v.photos.map((p: any, i: number) => (
-                  <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="text-caption text-ember-orange hover:underline truncate max-w-xs">
+                  <button key={i} type="button" onClick={() => downloadAttachment(p)} className="text-caption text-ember-orange hover:underline truncate max-w-xs">
                     {p.filename}
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

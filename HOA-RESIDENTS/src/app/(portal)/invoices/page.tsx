@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Receipt } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { residentInvoiceStatus } from '@/lib/invoice-status';
 
 export default function MyInvoicesPage() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,7 +93,7 @@ export default function MyInvoicesPage() {
                         'cursor-pointer transition-colors hover:bg-stone-surface/50',
                         idx !== invoices.length - 1 && 'border-b border-stone-surface',
                       )}
-                      onClick={() => window.location.assign(`/invoices/${inv.id}`)}
+                      onClick={() => router.push(`/invoices/${inv.id}`)}
                     >
                       <td className="px-6 py-4 font-mono text-[13px] text-charcoal-primary">
                         <Link href={`/invoices/${inv.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>

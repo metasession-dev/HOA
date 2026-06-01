@@ -136,11 +136,18 @@ export default function AdminVoteDetail() {
 
       <Card><CardContent className="p-6">
         <h3 className="text-heading-sm font-display font-medium text-charcoal-primary mb-3">Options</h3>
-        <ul className="space-y-1.5">
-          {options.map((o: any) => (
-            <li key={o.id} className="flex items-center gap-2 text-sm">
-              <span className="font-mono text-caption text-muted-foreground w-16 shrink-0">{o.id}</span>
-              <span className="text-graphite">{o.label}</span>
+        {/* Internal option ids are deliberately hidden — residents/admins only
+            need to read the choice. Numbered rows keep the list scannable. */}
+        <ul className="space-y-2">
+          {options.map((o: any, i: number) => (
+            <li
+              key={o.id}
+              className="flex items-center gap-3 rounded-lg border border-stone-surface bg-card px-3 py-2.5"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-stone-surface text-caption font-medium text-graphite tabular-nums">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 text-sm text-graphite">{o.label}</span>
             </li>
           ))}
         </ul>

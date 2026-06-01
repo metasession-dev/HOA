@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, FileText, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,12 +28,6 @@ const statusLabel: Record<string, string> = {
   rejected: 'Rejected',
   cancelled: 'Cancelled',
 };
-
-function resolveFileUrl(url: string): string {
-  if (!url) return url;
-  if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
-}
 
 export default function VendorInvoiceDetailPage() {
   const params = useParams();
@@ -125,15 +120,14 @@ export default function VendorInvoiceDetailPage() {
                 <ul className="space-y-1.5">
                   {inv.attachments.map((a: any, i: number) => (
                     <li key={i}>
-                      <a
-                        href={resolveFileUrl(a.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-graphite hover:text-ember-orange"
+                      <button
+                        type="button"
+                        onClick={() => downloadAttachment(a)}
+                        className="inline-flex items-center gap-2 text-graphite hover:text-ember-orange text-left"
                       >
                         <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="truncate">{a.filename}</span>
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>

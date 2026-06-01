@@ -37,12 +37,14 @@ export default function ResidentDashboard() {
 
       <Card className="overflow-hidden">
         <CardContent className="flex flex-wrap items-end justify-between gap-6 p-8">
-          <div>
+          <div className="min-w-0 max-w-full">
             <p className="text-caption uppercase tracking-wider text-muted-foreground">Outstanding balance</p>
             {/* Switched from <p> to <div> so the loading Skeleton (a div) can
-                nest inside without tripping React's validateDOMNesting. The
-                styling is unchanged. */}
-            <div className="mt-2 font-display text-[52px] leading-none font-medium tracking-tight text-charcoal-primary">
+                nest inside without tripping React's validateDOMNesting.
+                Font scales with viewport (clamp) and the container can shrink
+                (min-w-0 + break-words) so a large balance never overflows the
+                card on narrow screens. */}
+            <div className="mt-2 font-display text-[clamp(2rem,9vw,52px)] leading-none font-medium tracking-tight tabular-nums break-words text-charcoal-primary">
               {loading ? <Skeleton className="h-12 w-48 inline-block" /> : formatCurrency(stats.totalOutstanding)}
             </div>
             <p className="mt-2 text-caption text-muted-foreground">{stats.invoicesDue} invoice(s) awaiting payment</p>

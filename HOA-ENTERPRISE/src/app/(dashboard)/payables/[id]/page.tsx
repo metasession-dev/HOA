@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, CheckCircle2, XCircle, Banknote, Clock, FileText, Paperclip } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -167,10 +168,10 @@ export default function VendorInvoiceDetail() {
             <p className="text-caption text-muted-foreground mb-2 flex items-center gap-1"><Paperclip className="h-3 w-3" /> Attachments ({attachments.length})</p>
             <div className="space-y-1.5">
               {attachments.map((a: any, i: number) => (
-                <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg p-2 bg-stone-surface/50 hover:bg-stone-surface text-sm text-graphite">
+                <button key={i} type="button" onClick={() => downloadAttachment(a)} className="flex w-full items-center gap-2 rounded-lg p-2 bg-stone-surface/50 hover:bg-stone-surface text-sm text-graphite text-left">
                   <FileText className="h-3.5 w-3.5" /> {a.filename}
                   <span className="ml-auto text-caption text-muted-foreground">{Math.round((a.size || 0) / 1024)} KB</span>
-                </a>
+                </button>
               ))}
             </div>
           </div>

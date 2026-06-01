@@ -3,41 +3,29 @@
 import { useEffect, useState } from 'react';
 import { Bell, FileText, Video, Download, Paperclip, ChevronLeft, Inbox } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment, freshDownloadUrl, resolveFileUrl } from '@/lib/files';
 import { formatDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-function resolveFileUrl(url: string): string {
-  if (!url) return url;
-  if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
-}
-
-/** Download via a fresh signed URL (re-signed through /files/:id) so links
- *  never 403 from expiry; falls back to the stored url for legacy items. */
-async function downloadAttachment(att: any) {
-  try {
-    if (att.storedFileId) {
-      const r = await api.get<any>(`/files/${att.storedFileId}`);
-      const url = r.data?.downloadUrl;
-      if (url) { window.open(resolveFileUrl(url), '_blank'); return; }
-    }
-    window.open(resolveFileUrl(att.url), '_blank');
-  } catch {
-    window.open(resolveFileUrl(att.url), '_blank');
-  }
-}
-
 function AttachmentRow({ att }: { att: any }) {
   const isImage = att.contentType?.startsWith('image/');
   const isVideo = att.contentType?.startsWith('video/');
   const Icon = isVideo ? Video : FileText;
+  // Re-mint a fresh signed URL on mount so the thumbnail doesn't 403 from expiry.
+  const [thumb, setThumb] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!isImage) return;
+    let cancelled = false;
+    freshDownloadUrl(att).then((u) => { if (!cancelled) setThumb(u); });
+    return () => { cancelled = true; };
+  }, [att, isImage]);
   return (
     <div className="flex items-center gap-3 rounded-lg border border-stone-surface bg-card p-2.5">
       {isImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={resolveFileUrl(att.url)} alt={att.filename} className="h-10 w-10 rounded object-cover ring-1 ring-stone-surface" />
+        <img src={thumb || resolveFileUrl(att.url)} alt={att.filename} className="h-10 w-10 rounded object-cover ring-1 ring-stone-surface" />
       ) : (
         <span className="flex h-10 w-10 items-center justify-center rounded bg-stone-surface text-graphite"><Icon className="h-5 w-5" /></span>
       )}

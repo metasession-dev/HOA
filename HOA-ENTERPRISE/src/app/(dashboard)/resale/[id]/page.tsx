@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, RefreshCw, Send, Ban, Link as LinkIcon, Copy, FileText, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { downloadAttachment } from '@/lib/files';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -233,10 +234,10 @@ export default function ResaleDetailPage() {
           <h3 className="text-heading-sm font-display font-medium text-charcoal-primary mb-3">Attachments</h3>
           <div className="space-y-1.5">
             {attachments.map((a: any, i: number) => (
-              <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg p-2 bg-stone-surface/50 hover:bg-stone-surface text-sm text-graphite">
+              <button key={i} type="button" onClick={() => downloadAttachment(a)} className="flex w-full items-center gap-2 rounded-lg p-2 bg-stone-surface/50 hover:bg-stone-surface text-sm text-graphite text-left">
                 <FileText className="h-3.5 w-3.5" /> {a.filename}
                 {a.label && <span className="text-caption text-muted-foreground">· {a.label}</span>}
-              </a>
+              </button>
             ))}
           </div>
         </CardContent></Card>
