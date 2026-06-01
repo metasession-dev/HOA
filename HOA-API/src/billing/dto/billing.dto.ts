@@ -211,3 +211,158 @@ export class CancelPaymentPlanDto {
   @MaxLength(500)
   reason?: string;
 }
+
+// ============ Billing catalog (Phase 1 of unit-default-billing) ============
+
+// `baseTerm` is the PRICING unit, not a cron cadence (see SPEC §4). daily/weekly
+// are valid pricing units but are prepay-only as schedules in v1.
+export const BILLING_TERMS = ['daily', 'weekly', 'monthly', 'quarterly', 'biannual', 'annual'];
+export const PRORATION_MODES = ['whole_period', 'calendar_day', 'thirty_day'];
+export const ROUNDING_MODES = ['half_up', 'bankers'];
+
+export class CreateBillingTypeDto {
+  // Stable slug, immutable after create. Optional on create — derived from `name`
+  // when omitted (the service slugifies + de-dupes).
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  key?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(80)
+  name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  description?: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @Min(0)
+  defaultAmount!: number;
+
+  @ApiProperty({ enum: BILLING_TERMS })
+  @IsIn(BILLING_TERMS)
+  baseTerm!: string;
+
+  @ApiPropertyOptional({ description: 'null/omitted = inherit org currency' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string | null;
+
+  @ApiPropertyOptional({ enum: PRORATION_MODES, default: 'whole_period' })
+  @IsOptional()
+  @IsIn(PRORATION_MODES)
+  prorationMode?: string;
+
+  @ApiPropertyOptional({ enum: ROUNDING_MODES, default: 'half_up' })
+  @IsOptional()
+  @IsIn(ROUNDING_MODES)
+  roundingMode?: string;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minChargeMinor?: number;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  allowResidentPrepay?: boolean;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  attachByDefault?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  glAccountId?: string | null;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+// `key` is intentionally omitted — it is immutable after create.
+export class UpdateBillingTypeDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  defaultAmount?: number;
+
+  @ApiPropertyOptional({ enum: BILLING_TERMS })
+  @IsOptional()
+  @IsIn(BILLING_TERMS)
+  baseTerm?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string | null;
+
+  @ApiPropertyOptional({ enum: PRORATION_MODES })
+  @IsOptional()
+  @IsIn(PRORATION_MODES)
+  prorationMode?: string;
+
+  @ApiPropertyOptional({ enum: ROUNDING_MODES })
+  @IsOptional()
+  @IsIn(ROUNDING_MODES)
+  roundingMode?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minChargeMinor?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  allowResidentPrepay?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  attachByDefault?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  glAccountId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}

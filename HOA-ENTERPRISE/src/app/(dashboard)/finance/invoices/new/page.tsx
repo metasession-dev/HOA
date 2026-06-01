@@ -61,6 +61,9 @@ export default function NewInvoicePage() {
   const [form, setForm] = useState({ unitId: '', dueDate: '', notes: '', type: 'levy' });
   const [lineItems, setLineItems] = useState([{ description: 'Monthly Levy', unitPrice: 0, quantity: 1 }]);
   const [loading, setLoading] = useState(false);
+  // Billing catalog names feed the line-item suggestions (Phase 1 of
+  // unit-default-billing). Falls back to the static presets when empty.
+  const [catalogNames, setCatalogNames] = useState<string[]>([]);
 
   useEffect(() => {
     api.get<any>('/estates').then((res) => {
@@ -68,6 +71,14 @@ export default function NewInvoicePage() {
       if (first) setSelectedEstateId(first.id);
     });
   }, []);
+
+  useEffect(() => {
+    api.get<any>('/billing/catalog')
+      .then((r) => setCatalogNames((r.data || []).filter((t: any) => t.isActive).map((t: any) => t.name)))
+      .catch(() => { /* suggestions are best-effort */ });
+  }, []);
+
+  const lineItemOptions = Array.from(new Set([...catalogNames, ...LINE_ITEM_PRESETS]));
 
   useEffect(() => {
     if (selectedEstateId) {
@@ -212,7 +223,7 @@ export default function NewInvoicePage() {
             </div>
 
             <datalist id="invoice-line-items">
-              {LINE_ITEM_PRESETS.map((o) => (
+              {lineItemOptions.map((o) => (
                 <option key={o} value={o} />
               ))}
             </datalist>

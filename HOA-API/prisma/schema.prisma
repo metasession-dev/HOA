@@ -181,6 +181,7 @@ model Organization {
   storedFiles           StoredFile[]
   meetings              Meeting[]
   paystackConfig        PaystackConfig?
+  billingTypes          BillingType[]
 
   @@map("organizations")
 }
@@ -2086,6 +2087,51 @@ model LateFeeConfig {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("late_fee_configs")
+}
+
+// ==================== BILLING CATALOG (Phase 1 of unit-default-billing) ====================
+// Per-org catalog of the recurring charges a unit can carry (water, service
+// charge, association dues, …). `defaultAmount` is the canonical price, understood
+// PER `baseTerm`; any other term a resident chooses is derived from it (see
+// HOA-DOCS/SPEC-unit-default-billing.md §4). `baseTerm` is a PRICING unit, not a
+// cron cadence. Soft-archived via `isActive` — never hard-deleted once units
+// reference it (Phase 2 adds UnitBilling with onDelete: Restrict).
+model BillingType {
+  id             String   @id @default(cuid())
+  organizationId String
+  // Stable slug, immutable after create (e.g. "water", "service_charge",
+  // "association_dues", or a custom slug). Used as the dedupe + reporting key.
+  key            String
+  name           String
+  description    String?
+  defaultAmount  Decimal  @db.Decimal(12, 2)
+  // daily | weekly | monthly | quarterly | biannual | annual
+  baseTerm       String
+  // null => inherit Organization.currency at use time (matches the per-org
+  // currency model from commit c871cfb).
+  currency       String?
+  // whole_period | calendar_day | thirty_day
+  prorationMode  String   @default("whole_period")
+  // half_up | bankers
+  roundingMode   String   @default("half_up")
+  // Floor (in minor units) for prorated quotes; 0 = no floor.
+  minChargeMinor Int      @default(0)
+  // Whether residents may prepay arbitrary terms of this charge (Req 5 gate).
+  allowResidentPrepay Boolean @default(true)
+  // Whether this type is auto-attached to a unit when the unit is created (Req 1).
+  attachByDefault     Boolean @default(true)
+  glAccountId    String?
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@index([organizationId, isActive])
+  @@map("billing_types")
 }
 
 // A payment plan rolls one or more overdue invoices into a series of

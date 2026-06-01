@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CreditCard, ChevronRight } from 'lucide-react';
+import { CreditCard, ChevronRight, Tags } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -280,6 +280,23 @@ export default function SettingsPage() {
               <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">Payment configuration</h3>
               <p className="text-caption text-muted-foreground">
                 Connect your Paystack account so residents can pay levies online into your HOA&rsquo;s account.
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href="/settings/billing-catalog" className="block">
+        <Card className="transition-shadow hover:shadow-soft">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-surface text-graphite">
+              <Tags className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">Billing catalog</h3>
+              <p className="text-caption text-muted-foreground">
+                Define the recurring charges units carry — water, service charge, association dues — and their price and term.
               </p>
             </div>
             <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
