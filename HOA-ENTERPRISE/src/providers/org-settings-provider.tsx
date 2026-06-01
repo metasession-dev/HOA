@@ -28,7 +28,7 @@ interface OrgSettings {
 
 const FALLBACK: OrgSettings = {
   id: '', name: 'HOA.africa', slug: '',
-  country: 'ZA', currency: 'ZAR', timezone: 'Africa/Johannesburg', language: 'en',
+  country: 'NG', currency: 'USD', timezone: 'Africa/Lagos', language: 'en',
   logoUrl: null, accentColor: null, brandingTagline: null,
 };
 

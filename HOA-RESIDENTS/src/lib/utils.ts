@@ -10,8 +10,10 @@ export function cn(...inputs: ClassValue[]) {
  * login so every legacy `formatCurrency(amount)` call automatically picks up
  * the right currency + timezone — kept in sync with the admin app's util.
  */
-let _orgCurrency = 'ZAR';
-let _orgTimezone = 'Africa/Johannesburg';
+// Platform defaults when the org hasn't set them yet — USD (never ZAR/R),
+// Africa/Lagos, English.
+let _orgCurrency = 'USD';
+let _orgTimezone = 'Africa/Lagos';
 let _orgLanguage = 'en';
 
 export function setOrgSettings(opts: { currency?: string; timezone?: string; language?: string }) {
