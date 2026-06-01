@@ -174,7 +174,7 @@ export default function PersonDetailPage() {
                     {own.unit?.estate?.name && (
                       <p className="mt-0.5 flex items-center gap-1.5 text-caption text-muted-foreground"><MapPin className="h-3 w-3" />{own.unit.estate.name}</p>
                     )}
-                    <p className="mt-2 inline-flex items-center gap-1.5 text-caption text-muted-foreground"><Calendar className="h-3 w-3" />Owner since {formatDate(own.startDate)}</p>
+                    <p className="mt-2 flex items-center gap-1.5 text-caption text-muted-foreground"><Calendar className="h-3 w-3" />Owner since {formatDate(own.startDate)}</p>
                     {tenant && (
                       <p className="mt-2 text-caption text-muted-foreground">Tenant:{' '}
                         <Link href={`/admin/people/${tenant.person.id}`} className="font-medium text-graphite hover:text-ember-orange">{tenant.person.firstName} {tenant.person.lastName}</Link>
@@ -287,7 +287,7 @@ function OccupancyCard({ occ }: { occ: any }) {
           Unit {unit?.unitNumber}{unit?.block && <span className="text-muted-foreground"> · Block {unit.block}</span>}
         </p>
         {estate?.name && <p className="mt-0.5 flex items-center gap-1.5 text-caption text-muted-foreground"><MapPin className="h-3 w-3" />{estate.name}</p>}
-        <p className="mt-2 inline-flex items-center gap-1.5 text-caption text-muted-foreground"><Calendar className="h-3 w-3" />Since {formatDate(occ.startDate)}</p>
+        <p className="mt-2 flex items-center gap-1.5 text-caption text-muted-foreground"><Calendar className="h-3 w-3" />Since {formatDate(occ.startDate)}</p>
         {occ.role === 'tenant' && otherOwner && (
           <p className="mt-2 text-caption text-muted-foreground">Landlord:{' '}
             <Link href={`/admin/people/${otherOwner.person.id}`} className="font-medium text-graphite hover:text-ember-orange">{otherOwner.person.firstName} {otherOwner.person.lastName}</Link>

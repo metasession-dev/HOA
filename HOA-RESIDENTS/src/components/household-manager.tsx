@@ -22,6 +22,9 @@ import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { cn, getInitials } from '@/lib/utils';
+import {
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter, DrawerClose,
+} from '@/components/ui/drawer';
 
 const RELATIONSHIPS = ['spouse', 'partner', 'child', 'parent', 'sibling', 'relative', 'domestic_staff', 'other'];
 const GENDERS = ['male', 'female', 'other', 'undisclosed'];
@@ -177,7 +180,7 @@ export function HouseholdManager() {
               Family members and others living in your unit. Visible to your HOA for access and safety.
             </p>
           </div>
-          {units.length > 0 && !open && (
+          {units.length > 0 && (
             <Button size="sm" variant="secondary" onClick={startAdd}>
               <UserPlus className="mr-1 h-3.5 w-3.5" /> Add
             </Button>
@@ -192,7 +195,7 @@ export function HouseholdManager() {
           </p>
         ) : (
           <>
-            {members.length === 0 && !open ? (
+            {members.length === 0 ? (
               <div className="rounded-lg bg-stone-surface/40 p-6 text-center">
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-surface">
                   <Users className="h-5 w-5 text-graphite" />
@@ -233,100 +236,106 @@ export function HouseholdManager() {
               </ul>
             )}
 
-            {open && (
-              <form onSubmit={save} className="space-y-4 rounded-lg border border-stone-surface p-4">
-                <p className="text-sm font-medium text-charcoal-primary">
-                  {editingId ? 'Edit household member' : 'Add household member'}
-                </p>
-
-                {!editingId && units.length > 1 && (
-                  <div className="space-y-1.5">
-                    <Label>Unit</Label>
-                    <select className={selectClass} value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
-                      {units.map((u) => (
-                        <option key={u.unit.id} value={u.unit.id}>
-                          Unit {u.unit.unitNumber}{u.unit.block ? ` · Block ${u.unit.block}` : ''} · {u.unit.estate.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>First name</Label>
-                    <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Last name</Label>
-                    <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <Label>Relationship</Label>
-                    <select className={selectClass} value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })}>
-                      <option value="">—</option>
-                      {RELATIONSHIPS.map((r) => <option key={r} value={r}>{title(r)}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Age group</Label>
-                    <select className={selectClass} value={form.ageGroup} onChange={(e) => setForm({ ...form, ageGroup: e.target.value })}>
-                      <option value="">—</option>
-                      {AGE_GROUPS.map((a) => <option key={a} value={a}>{title(a)}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Gender</Label>
-                    <select className={selectClass} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-                      <option value="">—</option>
-                      {GENDERS.map((g) => <option key={g} value={g}>{title(g)}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label>Email (optional)</Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Phone (optional)</Label>
-                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Notes (optional)</Label>
-                  <textarea
-                    className="flex min-h-[70px] w-full rounded-lg bg-card px-3 py-2.5 text-sm text-foreground shadow-inset-stone focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40"
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    maxLength={1000}
-                  />
-                </div>
-
-                <FileUpload
-                  value={photo}
-                  onChange={setPhoto}
-                  maxFiles={1}
-                  kind="user_avatar"
-                  accept={['image/jpeg', 'image/png', 'image/webp']}
-                  label="Photo (optional)"
-                  helpText="PNG, JPG or WebP."
-                />
-
-                <div className="flex justify-end gap-2">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-                  <Button type="submit" size="sm" loading={saving}>{editingId ? 'Save' : 'Add member'}</Button>
-                </div>
-              </form>
-            )}
           </>
         )}
       </CardContent>
+
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerContent size="md">
+          <form onSubmit={save} className="flex h-full flex-col">
+            <DrawerHeader>
+              <DrawerTitle>{editingId ? 'Edit household member' : 'Add household member'}</DrawerTitle>
+              <DrawerDescription>Occupants are visible to your HOA for access and safety.</DrawerDescription>
+            </DrawerHeader>
+            <DrawerBody className="space-y-4">
+              {!editingId && units.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label>Unit</Label>
+                  <select className={selectClass} value={form.unitId} onChange={(e) => setForm({ ...form, unitId: e.target.value })}>
+                    {units.map((u) => (
+                      <option key={u.unit.id} value={u.unit.id}>
+                        Unit {u.unit.unitNumber}{u.unit.block ? ` · Block ${u.unit.block}` : ''} · {u.unit.estate.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>First name</Label>
+                  <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Last name</Label>
+                  <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Relationship</Label>
+                  <select className={selectClass} value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })}>
+                    <option value="">—</option>
+                    {RELATIONSHIPS.map((r) => <option key={r} value={r}>{title(r)}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Age group</Label>
+                  <select className={selectClass} value={form.ageGroup} onChange={(e) => setForm({ ...form, ageGroup: e.target.value })}>
+                    <option value="">—</option>
+                    {AGE_GROUPS.map((a) => <option key={a} value={a}>{title(a)}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Gender</Label>
+                  <select className={selectClass} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                    <option value="">—</option>
+                    {GENDERS.map((g) => <option key={g} value={g}>{title(g)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Email (optional)</Label>
+                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone (optional)</Label>
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Notes (optional)</Label>
+                <textarea
+                  className="flex min-h-[70px] w-full rounded-lg bg-card px-3 py-2.5 text-sm text-foreground shadow-inset-stone focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  maxLength={1000}
+                />
+              </div>
+
+              <FileUpload
+                value={photo}
+                onChange={setPhoto}
+                maxFiles={1}
+                kind="user_avatar"
+                accept={['image/jpeg', 'image/png', 'image/webp']}
+                label="Photo (optional)"
+                helpText="PNG, JPG or WebP."
+              />
+            </DrawerBody>
+            <DrawerFooter>
+              <Button type="submit" loading={saving}>{editingId ? 'Save changes' : 'Add member'}</Button>
+              <DrawerClose asChild>
+                <Button type="button" variant="secondary">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </form>
+        </DrawerContent>
+      </Drawer>
     </Card>
   );
 }
