@@ -53,13 +53,16 @@ export class OrganizationsController {
   @Roles('hoa_admin')
   async updateBranding(
     @CurrentUser('organizationId') orgId: string,
-    @Body() body: { logoUrl?: string | null; accentColor?: string | null; brandingTagline?: string | null },
+    @Body() body: {
+      logoUrl?: string | null; accentColor?: string | null; brandingTagline?: string | null;
+      emailFromName?: string | null; emailFromEmail?: string | null;
+    },
   ) {
     try {
       const out = await this.service.updateBranding(orgId, body);
       return successResponse(out);
     } catch (err: any) {
-      if (err?.message?.includes('accentColor')) throw new BadRequestException(err.message);
+      if (err?.message?.includes('accentColor') || err?.message?.includes('email')) throw new BadRequestException(err.message);
       throw err;
     }
   }

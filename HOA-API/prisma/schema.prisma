@@ -121,6 +121,10 @@ model Organization {
   // Phase 10.2: per-HOA branding the resident PWA + admin app theme to.
   accentColor      String?  // hex like #2563EB; null = use platform default
   brandingTagline  String?  // appears under the logo on the resident login + topbar
+  // Per-org email sender (Resend "from"). When unset, emails fall back to the
+  // org name + the platform MAIL_FROM address (and finally the env default).
+  emailFromName    String?  // display name on outgoing emails (else org name)
+  emailFromEmail   String?  // sender address (must be on a Resend-verified domain)
   isActive  Boolean  @default(true)
   // Set when the "finish setting up" nudge email has been sent (once per org).
   onboardingNudgeAt DateTime?

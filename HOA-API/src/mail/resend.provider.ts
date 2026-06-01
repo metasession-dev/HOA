@@ -42,6 +42,29 @@ export class ResendProvider {
     return process.env.MAIL_FROM || 'HOA.africa <noreply@metasession.co>';
   }
 
+  /** Split the env MAIL_FROM ("Name <addr>") into its name + address parts. */
+  defaultFromParts(): { name: string; email: string } {
+    const raw = this.defaultFrom();
+    const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+    if (m) return { name: m[1] || 'HOA.africa', email: m[2].trim() };
+    return { name: 'HOA.africa', email: raw.trim() };
+  }
+
+  /**
+   * Compose a Resend "from" header from optional per-org overrides, falling back
+   * to the env defaults for whichever part the org hasn't set:
+   *   name  ← org from-name (or org name)  → else env name
+   *   email ← org from-email               → else env address
+   */
+  composeFrom(opts: { name?: string | null; email?: string | null }): string {
+    const def = this.defaultFromParts();
+    const name = (opts.name && opts.name.trim()) || def.name;
+    const email = (opts.email && opts.email.trim()) || def.email;
+    // Quote the display name when it contains characters that would break the header.
+    const safeName = /[",<>]/.test(name) ? `"${name.replace(/"/g, '')}"` : name;
+    return `${safeName} <${email}>`;
+  }
+
   async send(input: SendInput): Promise<{ id: string }> {
     const key = process.env.RESEND_API_KEY;
     if (!key) throw new BadRequestException('Resend not configured');

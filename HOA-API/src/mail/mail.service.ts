@@ -56,7 +56,9 @@ export class MailService {
     if (!input.to || !/^[^@]+@[^@]+\.[^@]+$/.test(input.to)) {
       throw new BadRequestException('Invalid recipient email');
     }
-    const render = await renderTemplate(input.templateKey, input.data as any);
+    // Brand the email with the sending org's name / logo / accent colour.
+    const branding = await this.loadBranding(input.organizationId);
+    const render = await renderTemplate(input.templateKey, input.data as any, branding);
 
     // Dedup on the unique index (returns the existing row if it already exists).
     const existing = await this.prisma.emailDelivery.findFirst({
@@ -123,6 +125,38 @@ export class MailService {
     return { id: row.id };
   }
 
+  /** Load the sending org's branding for the email header (null if no org). */
+  private async loadBranding(orgId?: string | null) {
+    if (!orgId) return null;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, logoUrl: true, accentColor: true, brandingTagline: true },
+    });
+    if (!org) return null;
+    // Only include accentColor when set, so the template default applies otherwise.
+    const branding: { orgName: string; logoUrl: string | null; tagline: string | null; accentColor?: string } = {
+      orgName: org.name,
+      logoUrl: org.logoUrl ?? null,
+      tagline: org.brandingTagline ?? null,
+    };
+    if (org.accentColor) branding.accentColor = org.accentColor;
+    return branding;
+  }
+
+  /** Resolve the per-org "from" header, falling back to env defaults. */
+  private async resolveFrom(orgId?: string | null): Promise<string | undefined> {
+    if (!orgId) return undefined;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, emailFromName: true, emailFromEmail: true },
+    });
+    if (!org) return undefined;
+    return this.resend.composeFrom({
+      name: org.emailFromName || org.name,
+      email: org.emailFromEmail,
+    });
+  }
+
   /**
    * Worker entrypoint. Per `deliveryId`, take the row if still pending,
    * dispatch via the provider, persist sent/failed status. Designed to be
@@ -144,7 +178,11 @@ export class MailService {
       let providerMessageId: string | null = null;
       if (provider === 'resend') {
         const atts = Array.isArray(row.attachments) ? (row.attachments as any[]) : [];
+        // Per-org "from": custom from-name/email if set, else the org name with
+        // the env address, else the env default entirely.
+        const from = await this.resolveFrom(row.organizationId);
         const r = await this.resend.send({
+          from,
           to: row.recipientEmail,
           toName: row.recipientName || undefined,
           subject: row.subject,

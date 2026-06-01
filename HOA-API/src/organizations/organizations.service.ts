@@ -144,10 +144,16 @@ export class OrganizationsService {
    */
   async updateBranding(
     id: string,
-    data: { logoUrl?: string | null; accentColor?: string | null; brandingTagline?: string | null },
+    data: {
+      logoUrl?: string | null; accentColor?: string | null; brandingTagline?: string | null;
+      emailFromName?: string | null; emailFromEmail?: string | null;
+    },
   ) {
     if (data.accentColor && !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(data.accentColor)) {
       throw new Error('accentColor must be a hex value like #RRGGBB');
+    }
+    if (data.emailFromEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.emailFromEmail)) {
+      throw new Error('emailFromEmail must be a valid email address');
     }
     return this.prisma.organization.update({
       where: { id },
@@ -155,10 +161,13 @@ export class OrganizationsService {
         logoUrl: data.logoUrl === undefined ? undefined : data.logoUrl,
         accentColor: data.accentColor === undefined ? undefined : data.accentColor,
         brandingTagline: data.brandingTagline === undefined ? undefined : data.brandingTagline,
+        emailFromName: data.emailFromName === undefined ? undefined : (data.emailFromName?.trim() || null),
+        emailFromEmail: data.emailFromEmail === undefined ? undefined : (data.emailFromEmail?.trim().toLowerCase() || null),
       },
       select: {
         id: true, name: true, slug: true,
         logoUrl: true, accentColor: true, brandingTagline: true,
+        emailFromName: true, emailFromEmail: true,
       },
     });
   }

@@ -47,6 +47,8 @@ export default function SettingsPage() {
         logoUrl: logoFiles[0]?.url ?? null,
         accentColor: org.accentColor || null,
         brandingTagline: org.brandingTagline?.trim() || null,
+        emailFromName: org.emailFromName?.trim() || null,
+        emailFromEmail: org.emailFromEmail?.trim() || null,
       });
       await reloadOrgSettings();
       toast({ variant: 'success', title: 'Branding saved' });
@@ -259,6 +261,39 @@ export default function SettingsPage() {
                 onChange={(e) => setOrg({ ...org, brandingTagline: e.target.value })}
                 placeholder="e.g. A community that cares"
               />
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-stone-surface bg-stone-surface/30 p-4">
+            <div>
+              <h4 className="text-body font-medium text-charcoal-primary">Email sender</h4>
+              <p className="text-caption text-muted-foreground">
+                What residents see in the “from” line of your emails. Leave blank to use your organisation name with the platform address.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="fromName">From name</Label>
+                <Input
+                  id="fromName"
+                  value={org.emailFromName || ''}
+                  onChange={(e) => setOrg({ ...org, emailFromName: e.target.value })}
+                  placeholder={org.name || 'Your organisation'}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="fromEmail">From email</Label>
+                <Input
+                  id="fromEmail"
+                  type="email"
+                  value={org.emailFromEmail || ''}
+                  onChange={(e) => setOrg({ ...org, emailFromEmail: e.target.value })}
+                  placeholder="noreply@metasession.co"
+                />
+                <p className="text-caption text-muted-foreground">
+                  Must be on a domain verified in Resend, or delivery will fail.
+                </p>
+              </div>
             </div>
           </div>
 
