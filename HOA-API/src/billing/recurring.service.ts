@@ -6,6 +6,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { MailService } from '../mail/mail.service';
+import { reserveInvoiceNumbers } from '../common/invoice-number';
 
 const FREQUENCIES = ['monthly', 'quarterly', 'annual'] as const;
 type Frequency = typeof FREQUENCIES[number];
@@ -246,17 +247,16 @@ export class RecurringInvoicesService {
       ? scheduleLineItems
       : [{ description: s.name, amount: Number(baseAmount.toString()), quantity: 1 }];
 
-    // Compute the human-facing invoice numbers in batch — we increment a
-    // counter under a transaction to avoid concurrent runs colliding.
+    // Reserve a contiguous block of invoice numbers from the per-org sequence.
     return this.prisma.$transaction(async (tx) => {
-      const currentCount = await tx.invoice.count({ where: { organizationId: orgId } });
+      const invoiceNumbers = await reserveInvoiceNumbers(tx, orgId, fresh.length);
       const issueDate = new Date();
       const dueDate = new Date(issueDate.getTime() + (s.dueDays ?? 30) * 86400000);
 
       const inserts = fresh.map((u, i) => ({
         organizationId: orgId,
         unitId: u.id,
-        invoiceNumber: `INV-${String(currentCount + 1 + i).padStart(5, '0')}`,
+        invoiceNumber: invoiceNumbers[i],
         type: 'recurring',
         amount: baseAmount,
         originalAmount: baseAmount,

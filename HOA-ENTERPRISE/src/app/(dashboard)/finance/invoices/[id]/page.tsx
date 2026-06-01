@@ -96,8 +96,10 @@ export default function InvoiceDetailPage() {
   }
 
   const lineItems = (invoice.lineItems as any[]) || [];
-  const totalPaid = (invoice.payments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-  const outstanding = Number(invoice.amount) - totalPaid;
+  // Server-authoritative paid amount (the maintained ledger cache), not a
+  // client-side sum of payment rows (which would double-count reversed ones).
+  const totalPaid = Number(invoice.amountPaid ?? 0);
+  const outstanding = Math.max(Number(invoice.amount) - totalPaid, 0);
 
   return (
     <div className="space-y-6">

@@ -199,7 +199,7 @@ export class BankTransactionsService {
         suggestions.push({
           entityType: 'Payment',
           entityId: p.id,
-          label: `Payment on invoice ${p.invoice.invoiceNumber} (Unit ${p.invoice.unit.unitNumber})`,
+          label: `Payment on invoice ${p.invoice?.invoiceNumber ?? '—'} (Unit ${p.invoice?.unit?.unitNumber ?? '—'})`,
           confidence: 'high',
           amount: Number(p.amount.toString()),
           date: (p.processedAt ?? p.createdAt).toISOString(),

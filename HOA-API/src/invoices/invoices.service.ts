@@ -5,6 +5,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { Actor, scopeInvoiceWhere } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { nextInvoiceNumber } from '../common/invoice-number';
 
 const RESIDENT_BASE = (
   process.env.APP_RESIDENTS_URL ||
@@ -82,8 +83,7 @@ export class InvoicesService {
     const amount = lineItems.reduce((sum: number, item: any) =>
       sum + ((Number(item.unitPrice) || 0) * (Number(item.quantity) || 1)), 0);
 
-    const count = await this.prisma.invoice.count({ where: { organizationId: orgId } });
-    const invoiceNumber = `INV-${String(count + 1).padStart(5, '0')}`;
+    const invoiceNumber = await nextInvoiceNumber(this.prisma, orgId);
 
     const org = await this.prisma.organization.findUniqueOrThrow({
       where: { id: orgId },

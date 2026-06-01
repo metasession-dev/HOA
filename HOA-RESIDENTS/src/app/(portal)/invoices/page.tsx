@@ -25,9 +25,11 @@ export default function MyInvoicesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Balance is server-authoritative: amount − amountPaid (the maintained ledger
+  // cache). Never just sum invoice amounts — that ignores partial payments.
   const outstanding = invoices
     .filter((i) => i.status !== 'paid' && i.status !== 'voided')
-    .reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    .reduce((sum, i) => sum + Math.max(Number(i.amount || 0) - Number(i.amountPaid || 0), 0), 0);
 
   return (
     <div className="space-y-6">

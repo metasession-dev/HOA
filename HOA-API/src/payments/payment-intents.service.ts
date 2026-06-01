@@ -200,6 +200,25 @@ export class PaymentIntentsService {
     }
     const event = String(payload.event || '');
     const data = payload.data;
+
+    // Refund events reference the ORIGINAL transaction, and arrive AFTER the
+    // intent is already 'success' — so handle them before the success
+    // short-circuit below. A processed refund reverses the matching payment.
+    if (event.startsWith('refund')) {
+      const txRef = data?.transaction?.reference || data?.transaction_reference || data?.reference;
+      if (!txRef) return { ok: true, ignored: true, event };
+      const refIntent = await this.prisma.paymentIntent.findUnique({
+        where: { providerReference: txRef },
+        select: { organizationId: true },
+      });
+      if (!refIntent) return { ok: true, ignored: true, event };
+      if (event === 'refund.processed') {
+        const reversed = await this.payments.reverseByReference(refIntent.organizationId, txRef, 'paystack_refund');
+        return { ok: true, refunded: !!reversed };
+      }
+      return { ok: true, ignored: true, event };
+    }
+
     const reference = data?.reference;
     if (!reference) {
       this.logger.warn(`Webhook missing reference: ${event}`);
@@ -241,6 +260,17 @@ export class PaymentIntentsService {
         data: { status: 'failed', failureReason: 'amount_mismatch', providerMetadata: this.scrub(data) as any },
       });
       return { ok: false, reason: 'amount-mismatch' };
+    }
+
+    // Reject a currency mismatch outright — never settle an invoice with money
+    // charged in a different currency than the intent.
+    if (data?.currency && String(data.currency).toUpperCase() !== String(intent.currency).toUpperCase()) {
+      this.logger.error(`Currency mismatch on ${intent.providerReference}: expected ${intent.currency} got ${data.currency}`);
+      await this.prisma.paymentIntent.update({
+        where: { id: intent.id },
+        data: { status: 'failed', failureReason: 'currency_mismatch', providerMetadata: this.scrub(data) as any },
+      });
+      return { ok: false, reason: 'currency-mismatch' };
     }
 
     await this.prisma.paymentIntent.update({
