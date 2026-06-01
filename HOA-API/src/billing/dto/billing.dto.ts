@@ -97,6 +97,13 @@ export class CreateRecurringScheduleDto {
   @MaxLength(2000)
   notes?: string;
 
+  // Optional link to a catalog charge (BillingType). When set, the system blocks
+  // billing the same charge per-unit, so the two paths can never double-bill.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  billingTypeId?: string | null;
+
   @ApiPropertyOptional({ type: UnitFilterDto })
   @IsOptional()
   @ValidateNested()
