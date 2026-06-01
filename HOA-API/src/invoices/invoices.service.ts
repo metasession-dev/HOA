@@ -56,6 +56,84 @@ export class InvoicesService {
     return paginatedResponse(data, total, page, limit);
   }
 
+  /**
+   * Aggregate figures for the Invoices dashboard: headline totals plus a
+   * per-month time series of billed / collected / outstanding. Voided invoices
+   * are excluded from every figure. Amounts are summed in the org's currency
+   * (the app bills in a single org currency), matching how the UI formats them.
+   *
+   * Scoped to the actor (estate managers only see their estates) via the same
+   * `scopeInvoiceWhere` used by the list, so the dashboard never leaks across
+   * scope.
+   */
+  async stats(orgId: string, actor?: Actor, opts: { months?: number } = {}) {
+    const months = Math.min(Math.max(opts.months ?? 12, 1), 36);
+    let where: any = { organizationId: orgId, status: { not: 'voided' } };
+    if (actor) where = scopeInvoiceWhere(where, actor);
+
+    const rows = await this.prisma.invoice.findMany({
+      where,
+      select: { amount: true, amountPaid: true, status: true, dueDate: true, createdAt: true },
+    });
+
+    const now = new Date();
+    // Build the trailing window of month buckets (oldest -> newest) up front so
+    // empty months still appear on the chart.
+    const buckets: { period: string; label: string; total: number; paid: number; unpaid: number; count: number }[] = [];
+    const indexByPeriod = new Map<string, number>();
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+      indexByPeriod.set(period, buckets.length);
+      buckets.push({ period, label, total: 0, paid: 0, unpaid: 0, count: 0 });
+    }
+
+    let totalAmount = 0, totalPaid = 0, count = 0, paidCount = 0, unpaidCount = 0, overdueCount = 0;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    for (const r of rows) {
+      const amt = Number(r.amount as any) || 0;
+      const paid = Number(r.amountPaid as any) || 0;
+      const outstanding = Math.max(amt - paid, 0);
+      count += 1;
+      totalAmount += amt;
+      totalPaid += paid;
+      if (outstanding <= 0.005) paidCount += 1; else unpaidCount += 1;
+      if (outstanding > 0.005 && r.dueDate && new Date(r.dueDate) < today) overdueCount += 1;
+
+      const d = new Date(r.createdAt);
+      const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const idx = indexByPeriod.get(period);
+      if (idx !== undefined) {
+        buckets[idx].total += amt;
+        buckets[idx].paid += paid;
+        buckets[idx].unpaid += outstanding;
+        buckets[idx].count += 1;
+      }
+    }
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    return {
+      totals: {
+        count,
+        amount: round(totalAmount),
+        paid: round(totalPaid),
+        outstanding: round(totalAmount - totalPaid),
+        paidCount,
+        unpaidCount,
+        overdueCount,
+      },
+      series: buckets.map((b) => ({
+        period: b.period,
+        label: b.label,
+        total: round(b.total),
+        paid: round(b.paid),
+        unpaid: round(b.unpaid),
+        count: b.count,
+      })),
+    };
+  }
+
   async findById(id: string, orgId: string, actor?: Actor) {
     const baseWhere: any = { id, organizationId: orgId };
     const where = actor ? scopeInvoiceWhere(baseWhere, actor) : baseWhere;
