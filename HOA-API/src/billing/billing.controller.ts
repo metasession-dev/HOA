@@ -1,13 +1,15 @@
 import {
-  Controller, Get, Post, Put, Body, Param, Query, UseInterceptors,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RecurringInvoicesService } from './recurring.service';
 import { LateFeesService } from './late-fees.service';
 import { PaymentPlansService } from './payment-plans.service';
+import { BillingCatalogService } from './billing-catalog.service';
 import {
   CreateRecurringScheduleDto, UpdateRecurringScheduleDto, UpsertLateFeeConfigDto,
   CreatePaymentPlanDto, CancelPaymentPlanDto,
+  CreateBillingTypeDto, UpdateBillingTypeDto,
 } from './dto/billing.dto';
 import { CurrentUser, Roles } from '../common/decorators';
 import { successResponse } from '../common/dto';
@@ -22,7 +24,50 @@ export class BillingController {
     private recurring: RecurringInvoicesService,
     private lateFees: LateFeesService,
     private plans: PaymentPlansService,
+    private catalog: BillingCatalogService,
   ) {}
+
+  // ============ Billing catalog (Phase 1 of unit-default-billing) ============
+
+  @Get('catalog')
+  @Roles('hoa_admin', 'finance_officer', 'property_manager', 'super_admin')
+  async listBillingTypes(@CurrentUser('organizationId') orgId: string) {
+    return successResponse(await this.catalog.list(orgId));
+  }
+
+  @Post('catalog')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async createBillingType(
+    @Body() dto: CreateBillingTypeDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.catalog.create(orgId, { userId, role }, dto as any));
+  }
+
+  @Put('catalog/:id')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async updateBillingType(
+    @Param('id') id: string,
+    @Body() dto: UpdateBillingTypeDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.catalog.update(orgId, { userId, role }, id, dto as any));
+  }
+
+  @Delete('catalog/:id')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async archiveBillingType(
+    @Param('id') id: string,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.catalog.archive(orgId, { userId, role }, id));
+  }
 
   // ============ Recurring schedules ============
 

@@ -73,6 +73,9 @@ export default function RecurringSchedulesPage() {
   // this is the "line item is missing" bug.
   const [lineItems, setLineItems] = useState<RecurringLineItem[]>([{ description: 'Monthly levy', amount: 0, quantity: 1 }]);
   const [previewing, setPreviewing] = useState<{ id: string; data: any } | null>(null);
+  // Billing catalog names feed the line-item suggestions (Phase 1 of
+  // unit-default-billing). Falls back to the static presets when empty.
+  const [catalogNames, setCatalogNames] = useState<string[]>([]);
 
   const blankForm = { name: '', frequency: 'monthly', billingDayOfMonth: '1', dueDays: '30', description: '' };
   const addLineItem = () => setLineItems((li) => [...li, { description: '', amount: 0, quantity: 1 }]);
@@ -88,6 +91,12 @@ export default function RecurringSchedulesPage() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    api.get<any>('/billing/catalog')
+      .then((r) => setCatalogNames((r.data || []).filter((t: any) => t.isActive).map((t: any) => t.name)))
+      .catch(() => { /* suggestions are best-effort */ });
+  }, []);
+  const lineItemOptions = Array.from(new Set([...catalogNames, ...LINE_ITEM_PRESETS]));
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,7 +265,7 @@ export default function RecurringSchedulesPage() {
                   </Button>
                 </div>
                 <datalist id="recurring-line-items">
-                  {LINE_ITEM_PRESETS.map((o) => <option key={o} value={o} />)}
+                  {lineItemOptions.map((o) => <option key={o} value={o} />)}
                 </datalist>
                 {lineItems.map((item, idx) => (
                   <div key={idx} className="space-y-2 rounded-lg border border-stone-surface p-2.5">
