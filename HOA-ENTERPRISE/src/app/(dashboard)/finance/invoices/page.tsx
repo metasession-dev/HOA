@@ -19,6 +19,11 @@ import { InvoiceStats } from '@/components/finance/invoice-stats';
 // An invoice can be deleted only if no money has been received against it.
 const canDelete = (inv: any) => Number(inv.amountPaid ?? 0) === 0 && inv.status !== 'paid' && inv.status !== 'partial';
 
+const selectClass = cn(
+  'flex h-10 rounded-lg bg-card px-3 text-sm text-foreground shadow-inset-stone',
+  'focus-visible:outline-none focus-visible:shadow-inset-stone-2 focus-visible:ring-2 focus-visible:ring-ring/40',
+);
+
 const statusBadgeMap: Record<string, 'muted' | 'info' | 'warning' | 'success' | 'destructive' | 'secondary'> = {
   draft: 'muted',
   sent: 'info',
@@ -36,16 +41,27 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  // Billing-type filter — '' = all, 'none' = ad-hoc/unlinked, else a catalog id.
+  // Applied server-side (the list is paginated) so it filters the full dataset.
+  const [billingTypeId, setBillingTypeId] = useState('');
+  const [catalog, setCatalog] = useState<{ id: string; name: string }[]>([]);
 
-  const load = () => {
+  const load = (typeId = billingTypeId) => {
     setLoading(true);
+    const qs = typeId ? `?billingTypeId=${encodeURIComponent(typeId)}` : '';
     api
-      .get<any>('/invoices')
+      .get<any>(`/invoices${qs}`)
       .then((res) => setInvoices(res.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
+  // Refetch whenever the billing-type filter changes.
+  useEffect(() => { load(billingTypeId); /* eslint-disable-next-line */ }, [billingTypeId]);
+  useEffect(() => {
+    api.get<any>('/billing/catalog')
+      .then((r) => setCatalog((r.data || []).map((t: any) => ({ id: t.id, name: t.name }))))
+      .catch(() => { /* filter options are best-effort */ });
+  }, []);
 
   const filtered = useMemo(() => invoices.filter((inv) => {
     if (!search) return true;
@@ -110,14 +126,26 @@ export default function InvoicesPage() {
       <InvoiceStats />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search invoice #, unit or estate…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex flex-1 flex-wrap items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search invoice #, unit or estate…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            className={cn(selectClass, 'w-auto min-w-[12rem]')}
+            value={billingTypeId}
+            onChange={(e) => setBillingTypeId(e.target.value)}
+            title="Filter by billing type"
+          >
+            <option value="">All billing types</option>
+            {catalog.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="none">Ad-hoc / unlinked</option>
+          </select>
         </div>
         {selected.size > 0 && (
           <Button variant="destructive" disabled={deleting} onClick={deleteSelected}>
@@ -163,6 +191,7 @@ export default function InvoicesPage() {
                     </th>
                     <th className="px-6 py-3">Invoice #</th>
                     <th className="px-6 py-3">Unit</th>
+                    <th className="px-6 py-3">Charge</th>
                     <th className="px-6 py-3 text-right">Amount</th>
                     <th className="px-6 py-3">Due</th>
                     <th className="px-6 py-3">Status</th>
@@ -199,6 +228,11 @@ export default function InvoicesPage() {
                       <td className="px-6 py-4 text-graphite">
                         <span className="font-medium text-charcoal-primary">Unit {inv.unit?.unitNumber}</span>
                         <span className="ml-1 text-muted-foreground">· {inv.unit?.estate?.name}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {inv.billingType?.name
+                          ? <Badge variant="secondary">{inv.billingType.name}</Badge>
+                          : <span className="text-caption text-muted-foreground">{inv.type || 'ad-hoc'}</span>}
                       </td>
                       <td className="px-6 py-4 text-right font-medium tabular-nums text-charcoal-primary">
                         {formatCurrency(Number(inv.amount))}
