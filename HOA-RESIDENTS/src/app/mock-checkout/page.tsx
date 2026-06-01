@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
+import { getOrgCurrency } from '@/lib/utils';
 
 /**
  * Dev-only mock of a Paystack hosted-checkout page. Used when
@@ -23,7 +24,7 @@ function MockCheckoutInner() {
   const params = useSearchParams();
   const reference = params?.get('reference') || '';
   const amount = params?.get('amount') || '0';
-  const currency = params?.get('currency') || 'ZAR';
+  const currency = params?.get('currency') || getOrgCurrency();
   const callback = params?.get('callback') || '/invoices';
   const [busy, setBusy] = useState(false);
 

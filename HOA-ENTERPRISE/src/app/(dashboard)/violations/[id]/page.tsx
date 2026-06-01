@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft, Send, DollarSign, CheckCircle2, XCircle, MessageSquare, Calendar, Building2, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
 import { downloadAttachment } from '@/lib/files';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatCurrency, getOrgCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardWarm } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -283,7 +283,7 @@ export default function ViolationDetailPage() {
           </DrawerHeader>
           <DrawerBody>
             <div className="space-y-1.5">
-              <Label htmlFor="fineAmount">Amount ({v.category?.fineCurrency || 'ZAR'})</Label>
+              <Label htmlFor="fineAmount">Amount ({v.category?.fineCurrency || getOrgCurrency()})</Label>
               <Input
                 id="fineAmount"
                 type="number"

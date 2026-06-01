@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Receipt } from 'lucide-react';
 import { api } from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, getOrgCurrency } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +46,7 @@ export default function MyInvoicesPage() {
                 Outstanding
               </p>
               <p className="mt-1 font-display text-heading-lg font-medium text-charcoal-primary">
-                {formatCurrency(outstanding, invoices[0]?.currency || 'ZAR')}
+                {formatCurrency(outstanding, invoices[0]?.currency || getOrgCurrency())}
               </p>
             </div>
             <div className="text-right">

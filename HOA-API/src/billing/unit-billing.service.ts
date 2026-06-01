@@ -1,11 +1,31 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../common/prisma.service';
 import { Actor } from '../common/scope.util';
+import { FxService } from '../fx/fx.service';
 
 type Target = { unitIds?: string[]; estateIds?: string[] };
+
+// baseTerms that auto-generate one invoice per period. daily/weekly are
+// prepay-only in v1 (confirmed decision) — they never auto-bill.
+const SCHEDULABLE_TERMS = new Set(['monthly', 'quarterly', 'biannual', 'annual']);
+
+/** Period key for a baseTerm at a given date (UTC, deterministic). Mirrors the
+ *  recurring engine's namespaces so reports line up. */
+function periodKeyFor(baseTerm: string, d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth(); // 0-11
+  switch (baseTerm) {
+    case 'quarterly': return `${y}-Q${Math.floor(m / 3) + 1}`;
+    case 'biannual': return `H:${y}-H${m < 6 ? 1 : 2}`;
+    case 'annual': return `${y}`;
+    case 'monthly':
+    default: return `${y}-${String(m + 1).padStart(2, '0')}`;
+  }
+}
 
 /**
  * Per-unit billing attachments (Phase 2 of unit-default-billing — see
@@ -21,7 +41,9 @@ type Target = { unitIds?: string[]; estateIds?: string[] };
  */
 @Injectable()
 export class UnitBillingService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(UnitBillingService.name);
+
+  constructor(private prisma: PrismaService, private fx: FxService) {}
 
   async listForUnit(orgId: string, unitId: string) {
     await this.assertUnitInOrg(orgId, unitId);
@@ -220,6 +242,149 @@ export class UnitBillingService {
       skipDuplicates: true,
     });
     return types.length;
+  }
+
+  // ---- charge generation (Phase 3) ----
+
+  /** Dry-run: how many invoices a generation run for this period would create. */
+  async previewGeneration(orgId: string, billingTypeId: string, opts: { periodOverride?: string } = {}) {
+    const bt = await this.prisma.billingType.findFirst({ where: { id: billingTypeId, organizationId: orgId } });
+    if (!bt) throw new NotFoundException('Billing type not found');
+    this.assertSchedulable(bt.baseTerm);
+    const periodKey = opts.periodOverride || periodKeyFor(bt.baseTerm, new Date());
+    const active = await this.prisma.unitBilling.findMany({
+      where: { billingTypeId, organizationId: orgId, isActive: true },
+      select: { id: true, amount: true },
+    });
+    const billed = await this.prisma.invoice.findMany({
+      where: { unitBillingId: { in: active.map((a) => a.id) }, periodKey },
+      select: { unitBillingId: true },
+    });
+    const billedSet = new Set(billed.map((b) => b.unitBillingId));
+    const fresh = active.filter((a) => !billedSet.has(a.id));
+    const totalAmount = fresh.reduce((s, a) => s.plus(new Decimal(a.amount.toString())), new Decimal(0));
+    const orgCcy = (bt.currency || (await this.orgCurrency(orgId))).toUpperCase();
+    return {
+      periodKey,
+      billingType: { id: bt.id, name: bt.name, baseTerm: bt.baseTerm },
+      currency: orgCcy,
+      totalActive: active.length,
+      alreadyBilled: active.length - fresh.length,
+      toBill: fresh.length,
+      totalAmount: totalAmount.toString(),
+    };
+  }
+
+  /** Generate one invoice per active unit for a billing type + period. Idempotent
+   *  via @@unique([unitBillingId, periodKey]) + skipDuplicates. */
+  async generateForType(orgId: string, actor: Actor, billingTypeId: string, opts: { periodOverride?: string } = {}) {
+    const bt = await this.prisma.billingType.findFirst({ where: { id: billingTypeId, organizationId: orgId } });
+    if (!bt) throw new NotFoundException('Billing type not found');
+    this.assertSchedulable(bt.baseTerm);
+    const periodKey = opts.periodOverride || periodKeyFor(bt.baseTerm, new Date());
+    const orgBaseCcy = (await this.orgCurrency(orgId)).toUpperCase();
+
+    const active = await this.prisma.unitBilling.findMany({
+      where: { billingTypeId, organizationId: orgId, isActive: true },
+      select: { id: true, unitId: true, amount: true, currency: true },
+    });
+    if (active.length === 0) return { periodKey, created: 0, skipped: 0 };
+
+    const billed = await this.prisma.invoice.findMany({
+      where: { unitBillingId: { in: active.map((a) => a.id) }, periodKey },
+      select: { unitBillingId: true },
+    });
+    const billedSet = new Set(billed.map((b) => b.unitBillingId));
+    const fresh = active.filter((a) => !billedSet.has(a.id));
+    if (fresh.length === 0) return { periodKey, created: 0, skipped: active.length };
+
+    // Lock the FX rate per distinct non-base currency once for the batch.
+    const fxByCcy = new Map<string, { lockedRate: Decimal; lockedRateAsOf: Date; baseCurrency: string }>();
+    for (const ccy of new Set(fresh.map((f) => (f.currency || orgBaseCcy).toUpperCase()))) {
+      if (ccy === orgBaseCcy) continue;
+      try {
+        const locked = await this.fx.lockedRateForInvoice(orgId, ccy, orgBaseCcy, new Date());
+        if (locked) fxByCcy.set(ccy, { lockedRate: locked.rate, lockedRateAsOf: locked.asOfDay, baseCurrency: locked.baseCurrency });
+      } catch (err: any) {
+        this.logger.warn(`FX lock skipped for ${bt.name} (${ccy}->${orgBaseCcy}): ${err.message}`);
+      }
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.invoice.count({ where: { organizationId: orgId } });
+      const issue = new Date();
+      const due = new Date(issue.getTime() + 30 * 86400000);
+      const inserts = fresh.map((ub, i) => {
+        const ccy = (ub.currency || orgBaseCcy).toUpperCase();
+        const fxLock = fxByCcy.get(ccy);
+        const amt = new Decimal(ub.amount.toString());
+        return {
+          organizationId: orgId,
+          unitId: ub.unitId,
+          invoiceNumber: `INV-${String(count + 1 + i).padStart(5, '0')}`,
+          type: 'recurring',
+          amount: amt,
+          originalAmount: amt,
+          currency: ccy,
+          dueDate: due,
+          status: 'sent',
+          sentAt: issue,
+          // Org policy: every invoice carries at least one line item.
+          lineItems: [{ description: bt.name, amount: Number(amt.toString()), quantity: 1 }] as any,
+          createdBy: actor.userId,
+          baseCurrency: fxLock?.baseCurrency ?? null,
+          lockedRate: fxLock?.lockedRate ?? null,
+          lockedRateAsOf: fxLock?.lockedRateAsOf ?? null,
+          billingTypeId: bt.id,
+          unitBillingId: ub.id,
+          periodKey,
+        };
+      });
+      const res = await tx.invoice.createMany({ data: inserts as any, skipDuplicates: true });
+      await tx.auditLog.create({
+        data: {
+          organizationId: orgId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'unit_billing_generated',
+          entityType: 'BillingType',
+          entityId: bt.id,
+          changes: { periodKey, created: res.count, targeted: fresh.length } as any,
+        },
+      });
+      return res.count;
+    });
+
+    return { periodKey, created, skipped: active.length - created };
+  }
+
+  /** Generate the current period for every schedulable active billing type in the
+   *  org (admin-triggered now; the cron sweep can call this later). */
+  async generateDue(orgId: string, actor: Actor) {
+    const types = await this.prisma.billingType.findMany({
+      where: { organizationId: orgId, isActive: true },
+    });
+    const schedulable = types.filter((t) => SCHEDULABLE_TERMS.has(t.baseTerm));
+    const results: any[] = [];
+    let totalCreated = 0;
+    for (const t of schedulable) {
+      try {
+        const r = await this.generateForType(orgId, actor, t.id);
+        totalCreated += r.created;
+        results.push({ billingTypeId: t.id, name: t.name, ...r });
+      } catch (err: any) {
+        results.push({ billingTypeId: t.id, name: t.name, error: err.message });
+      }
+    }
+    return { totalCreated, types: results };
+  }
+
+  private assertSchedulable(baseTerm: string) {
+    if (!SCHEDULABLE_TERMS.has(baseTerm)) {
+      throw new BadRequestException(
+        'Daily and weekly charges are billed via resident prepay, not scheduled generation.',
+      );
+    }
   }
 
   // ---- helpers ----

@@ -131,6 +131,42 @@ export class BillingController {
     }));
   }
 
+  // ============ Per-charge generation (Phase 3) ============
+
+  @Post('catalog/:id/generate-preview')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async previewGenerate(
+    @Param('id') id: string,
+    @Body() body: { periodOverride?: string },
+    @CurrentUser('organizationId') orgId: string,
+  ) {
+    return successResponse(await this.unitBilling.previewGeneration(orgId, id, body || {}));
+  }
+
+  @Post('catalog/:id/generate')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  @Idempotent()
+  async generateCharges(
+    @Param('id') id: string,
+    @Body() body: { periodOverride?: string },
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.unitBilling.generateForType(orgId, { userId, role }, id, body || {}));
+  }
+
+  @Post('generate-charges-due')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  @Idempotent()
+  async generateChargesDue(
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.unitBilling.generateDue(orgId, { userId, role }));
+  }
+
   // ============ Recurring schedules ============
 
   @Get('recurring')
