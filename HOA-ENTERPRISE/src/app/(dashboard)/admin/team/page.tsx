@@ -69,12 +69,15 @@ export default function TeamMembersPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Team</h1>
-          <p className="mt-1 text-body text-muted-foreground">Members, role assignments, and login history.</p>
+          <p className="mt-1 text-body text-muted-foreground">
+            Staff &amp; board members, role assignments, and login history. Looking for owners &amp; tenants?{' '}
+            <Link href="/admin/people" className="text-ember-orange hover:underline">People</Link>.
+          </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/team/roles"><Button variant="secondary"><ShieldCheck className="mr-1.5 h-4 w-4" />Custom roles</Button></Link>
+          <Link href="/admin/team/roles"><Button variant="secondary"><ShieldCheck className="mr-1.5 h-4 w-4" />Roles</Button></Link>
           <Link href="/admin/team/invites"><Button variant="secondary"><ClipboardList className="mr-1.5 h-4 w-4" />Invites</Button></Link>
-          <Link href="/admin/team/invites/new"><Button><UserPlus className="mr-1.5 h-4 w-4" />Invite member</Button></Link>
+          <Link href="/admin/team/invites/new"><Button><UserPlus className="mr-1.5 h-4 w-4" />Invite team member</Button></Link>
         </div>
       </header>
 
