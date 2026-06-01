@@ -1,8 +1,13 @@
 'use client';
 
+/**
+ * Resident invitations — owners & tenants who sign into the resident app. This
+ * is the People-domain counterpart to /admin/team/invites (staff). Both share
+ * the same backend; this view is scoped to kind=resident.
+ */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Briefcase, Filter, RotateCcw, X, Copy } from 'lucide-react';
+import { ChevronLeft, Home, Filter, RotateCcw, X, Copy } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,8 +22,9 @@ const statuses = ['all', 'pending', 'redeemed', 'expired', 'revoked'] as const;
 const statusBadge: Record<string, 'muted' | 'info' | 'success' | 'destructive' | 'warning'> = {
   pending: 'warning', redeemed: 'success', expired: 'muted', revoked: 'destructive',
 };
+const residentsBase = () => process.env.NEXT_PUBLIC_RESIDENTS_URL || process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005';
 
-export default function InvitesListPage() {
+export default function ResidentInvitesListPage() {
   const confirm = useConfirm();
   const [invites, setInvites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +32,7 @@ export default function InvitesListPage() {
 
   const load = () => {
     const params = new URLSearchParams();
-    // Team page = staff invites only. Resident invites live under People.
-    params.set('kind', 'team_member');
+    params.set('kind', 'resident');
     if (status !== 'all') params.set('status', status);
     setLoading(true);
     api.get<any>(`/team/invites?${params}`).then((r) => setInvites(r.data || [])).catch(console.error).finally(() => setLoading(false));
@@ -43,8 +48,6 @@ export default function InvitesListPage() {
     });
     if (!ok) return;
     try {
-      // Revoke is @Idempotent on the API side. Time-bucket so a double-click
-      // collapses to one call while later attempts mint fresh keys.
       const idemp = `invite-revoke-${inv.id}-${Math.floor(Date.now() / 30_000)}`;
       await api.post(`/team/invites/${inv.id}/revoke`, {}, idemp);
       toast({ variant: 'success', title: 'Invite revoked' });
@@ -56,15 +59,9 @@ export default function InvitesListPage() {
 
   const resend = async (inv: any) => {
     try {
-      // Resend is gated by @Idempotent() on the API side — must supply a
-      // key so a double-click can't double-rotate the token. Scope the key
-      // by invite id + a short time bucket so the same admin clicking twice
-      // within ~30s collapses to one call; later clicks legitimately mint
-      // a fresh rotation.
       const idemp = `invite-resend-${inv.id}-${Math.floor(Date.now() / 30_000)}`;
       const r = await api.post<any>(`/team/invites/${inv.id}/resend`, {}, idemp);
-      const url = `${process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005'}/invites/${r.data.token}`;
-      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+      try { await navigator.clipboard.writeText(`${residentsBase()}/invites/${r.data.token}`); } catch { /* ignore */ }
       toast({ variant: 'success', title: 'Invite rotated', description: 'New link copied to clipboard · email queued' });
       load();
     } catch (err: any) {
@@ -73,28 +70,24 @@ export default function InvitesListPage() {
   };
 
   const copyLink = (inv: any) => {
-    const url = `${process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005'}/invites/${inv.token}`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(`${residentsBase()}/invites/${inv.token}`);
     toast({ variant: 'success', title: 'Link copied' });
   };
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/team" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
-        <ChevronLeft className="h-3 w-3" />Team
+      <Link href="/admin/people" className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-graphite">
+        <ChevronLeft className="h-3 w-3" />People
       </Link>
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Team invites</h1>
+          <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Resident invites</h1>
           <p className="mt-1 text-body text-muted-foreground">
-            Staff &amp; board invitations. Inviting an owner or tenant?{' '}
-            <Link href="/admin/people/invites" className="text-ember-orange hover:underline">Invite a resident</Link>.
+            Owners &amp; tenants who sign into the resident app. Inviting staff instead?{' '}
+            <Link href="/admin/team/invites" className="text-ember-orange hover:underline">Invite a team member</Link>.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/admin/team/invites/bulk"><Button variant="secondary">Bulk import</Button></Link>
-          <Link href="/admin/team/invites/new"><Button><Briefcase className="mr-1.5 h-4 w-4" />Invite team member</Button></Link>
-        </div>
+        <Link href="/admin/people/invites/new"><Button><Home className="mr-1.5 h-4 w-4" />Invite resident</Button></Link>
       </header>
 
       <div className="flex items-center gap-2">
@@ -112,13 +105,18 @@ export default function InvitesListPage() {
         {loading ? (
           <div className="p-6 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14" />)}</div>
         ) : invites.length === 0 ? (
-          <div className="p-10 text-center"><p className="text-body text-muted-foreground">No invitations in this view.</p></div>
+          <div className="p-10 text-center">
+            <p className="text-body text-charcoal-primary font-medium">No resident invitations in this view</p>
+            <p className="text-caption text-muted-foreground">
+              <Link href="/admin/people/invites/new" className="text-ember-orange hover:underline">Invite a resident</Link> to give them access to their invoices and gate passes.
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-surface text-left text-caption font-medium uppercase tracking-wider text-muted-foreground">
-                  <th className="px-6 py-3">Email</th>
+                  <th className="px-6 py-3">Resident</th>
                   <th className="px-6 py-3">Role</th>
                   <th className="px-6 py-3">Sent</th>
                   <th className="px-6 py-3">Expires</th>
@@ -133,7 +131,10 @@ export default function InvitesListPage() {
                       <p className="font-medium">{inv.email}</p>
                       {(inv.firstName || inv.lastName) && <p className="text-caption text-muted-foreground">{inv.firstName} {inv.lastName}</p>}
                     </td>
-                    <td className="px-6 py-3 text-muted-foreground">{inv.customRole?.displayName || inv.roleName?.replace('_', ' ')}</td>
+                    <td className="px-6 py-3">
+                      <Badge variant={inv.roleName === 'tenant' ? 'info' : 'success'}>{inv.roleName || 'owner'}</Badge>
+                      {inv.enterpriseAccess && <Badge variant="muted" className="ml-1.5">+ admin</Badge>}
+                    </td>
                     <td className="px-6 py-3 text-muted-foreground">{formatDate(inv.createdAt)}</td>
                     <td className="px-6 py-3 text-muted-foreground">{formatDate(inv.tokenExpiresAt)}</td>
                     <td className="px-6 py-3"><Badge variant={statusBadge[inv.status] || 'muted'}>{inv.status}</Badge></td>

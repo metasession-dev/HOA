@@ -30,10 +30,13 @@ export class InvitesService {
 
   async list(
     orgId: string,
-    query: { status?: string; search?: string; bulkImportId?: string },
+    query: { status?: string; search?: string; bulkImportId?: string; kind?: string },
   ) {
     const where: Prisma.InviteWhereInput = { organizationId: orgId };
     if (query.status) where.status = query.status;
+    // Scope to a single invite kind so the Team page (team_member) and the
+    // People page (resident) each show only their own invitations.
+    if (query.kind) where.kind = query.kind;
     if (query.search) {
       where.OR = [
         { email: { contains: query.search, mode: 'insensitive' } },

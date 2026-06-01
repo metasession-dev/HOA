@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Mail, Phone, Search } from 'lucide-react';
+import { Plus, Mail, Phone, Search, ClipboardList } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -146,7 +146,13 @@ export default function PeoplePage() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <ViewToggle value={view} onChange={setView} />
-          <Link href="/admin/team/invites/resident">
+          <Link href="/admin/people/invites">
+            <Button variant="ghost">
+              <ClipboardList className="mr-1.5 h-4 w-4" />
+              Invites
+            </Button>
+          </Link>
+          <Link href="/admin/people/invites/new">
             <Button variant="secondary">
               <Mail className="mr-1.5 h-4 w-4" />
               Invite resident

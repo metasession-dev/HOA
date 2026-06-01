@@ -86,7 +86,7 @@ export default function NewTeamInvitePage() {
           </h1>
           <p className="mt-1 text-body text-muted-foreground">
             Staff who sign into the admin console. Inviting an owner or tenant instead?{' '}
-            <Link href="/admin/team/invites/resident" className="text-ember-orange hover:underline inline-flex items-center gap-1">
+            <Link href="/admin/people/invites/new" className="text-ember-orange hover:underline inline-flex items-center gap-1">
               <Home className="h-3.5 w-3.5" />Invite a resident
             </Link>.
           </p>

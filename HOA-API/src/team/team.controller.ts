@@ -140,7 +140,7 @@ export class TeamController {
   @Roles(...ADMIN_ROLES, ...PM_ROLES)
   async listInvites(
     @CurrentUser('organizationId') orgId: string,
-    @Query() query: { status?: string; search?: string; bulkImportId?: string },
+    @Query() query: { status?: string; search?: string; bulkImportId?: string; kind?: string },
   ) {
     return successResponse(await this.invites.list(orgId, query));
   }
