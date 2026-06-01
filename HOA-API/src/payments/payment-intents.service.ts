@@ -8,6 +8,7 @@ import { Actor, isResidentRole, actorOccupiesUnit, scopeInvoiceWhere } from '../
 import { PaystackService } from './paystack.service';
 import { PaymentsService } from './payments.service';
 import { PaymentConfigService } from './payment-config.service';
+import { UnitBillingService } from '../billing/unit-billing.service';
 
 /**
  * Phase 1.3 PaymentIntents orchestration.
@@ -34,6 +35,7 @@ export class PaymentIntentsService {
     private paystack: PaystackService,
     private payments: PaymentsService,
     private paymentConfig: PaymentConfigService,
+    private unitBilling: UnitBillingService,
   ) {}
 
   /**
@@ -146,6 +148,93 @@ export class PaymentIntentsService {
           entityType: 'PaymentIntent',
           entityId: intent.id,
           changes: { invoiceId: invoice.id, provider, amount: outstanding.toString(), currency: invoice.currency } as any,
+        },
+      });
+      return intent;
+    });
+  }
+
+  /**
+   * Phase 5: resident "pay any term" prepay. Materializes the chosen term's
+   * period invoices, then opens a single checkout that pays them all at once.
+   */
+  async prepay(orgId: string, actor: Actor, unitBillingId: string, request: { periods?: number; days?: number }, opts: { callbackUrl?: string } = {}) {
+    const { invoiceIds } = await this.unitBilling.materializePrepay(actor, unitBillingId, request);
+    return this.createMultiInvoiceIntent(orgId, actor, invoiceIds, opts);
+  }
+
+  /** Open a checkout that settles MANY invoices in one payment. */
+  async createMultiInvoiceIntent(orgId: string, actor: Actor, invoiceIds: string[], opts: { callbackUrl?: string } = {}) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: { id: { in: invoiceIds }, organizationId: orgId },
+      select: { id: true, amount: true, amountPaid: true, currency: true, unitId: true, invoiceNumber: true },
+    });
+    if (invoices.length === 0) throw new NotFoundException('No invoices to pay');
+
+    const currency = invoices[0].currency;
+    let outstanding = new Decimal(0);
+    for (const inv of invoices) {
+      outstanding = outstanding.plus(Decimal.max(new Decimal(inv.amount.toString()).minus(new Decimal(inv.amountPaid.toString())), new Decimal(0)));
+    }
+    if (outstanding.lessThanOrEqualTo(0)) throw new ConflictException('Nothing to pay');
+
+    const actorUser = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { email: true } });
+    const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
+
+    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
+    let provider: 'paystack' | 'mock';
+    if (creds) provider = 'paystack';
+    else if (process.env.NODE_ENV !== 'production') provider = 'mock';
+    else throw new BadRequestException('Online payments are not configured for this organisation.');
+
+    const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
+    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3002/invoices';
+    const callbackUrl = `${callbackBase}?reference=${encodeURIComponent(reference)}&prepay=1`;
+
+    let authorizationUrl: string;
+    if (provider === 'paystack') {
+      const r = await this.paystack.initializeTransaction(
+        {
+          email: actorUser.email,
+          amountMinor,
+          currency,
+          reference,
+          callbackUrl,
+          metadata: { invoiceIds, organizationId: orgId, unitId: invoices[0].unitId, prepay: true },
+          subaccount: creds!.subaccountCode,
+          bearer: creds!.subaccountCode ? creds!.feeBearer : null,
+        },
+        creds!.secretKey,
+      );
+      authorizationUrl = r.authorizationUrl;
+    } else {
+      const mockBase = process.env.MOCK_CHECKOUT_URL || 'http://localhost:3002/mock-checkout';
+      authorizationUrl = `${mockBase}?reference=${encodeURIComponent(reference)}&amount=${amountMinor}&currency=${currency}&callback=${encodeURIComponent(callbackUrl)}`;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const intent = await tx.paymentIntent.create({
+        data: {
+          organizationId: orgId,
+          invoiceId: invoices[0].id,
+          invoiceIds,
+          initiatedByUserId: actor.userId,
+          provider,
+          providerReference: reference,
+          amount: outstanding,
+          currency,
+          authorizationUrl,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: orgId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'payment_intent_created',
+          entityType: 'PaymentIntent',
+          entityId: intent.id,
+          changes: { invoiceIds, provider, amount: outstanding.toString(), currency } as any,
         },
       });
       return intent;
@@ -282,18 +371,36 @@ export class PaymentIntentsService {
       },
     });
 
-    // Defer to the existing Payments path so we inherit all downstream
-    // side-effects (invoice paid/partial, payment-plan completion, webhook
-    // fanout to integrators, audit log).
-    await this.payments.logPayment(
-      {
-        invoiceId: intent.invoiceId,
-        amount: Number(intent.amount.toString()),
-        method: intent.provider,
-        processorReference: intent.providerReference,
-      },
-      intent.initiatedByUserId,
-    );
+    // Defer to the Payments path so we inherit all downstream side-effects. A
+    // multi-invoice (prepay) checkout allocates the lump sum across its invoices;
+    // the common single-invoice case stays on the verified logPayment path.
+    const ids: string[] = (intent.invoiceIds && intent.invoiceIds.length > 0)
+      ? intent.invoiceIds
+      : (intent.invoiceId ? [intent.invoiceId] : []);
+    const single = ids[0];
+    if (ids.length > 1) {
+      await this.payments.logAllocatedPayment(
+        {
+          organizationId: intent.organizationId,
+          invoiceIds: ids,
+          amount: Number(intent.amount.toString()),
+          method: intent.provider,
+          processorReference: intent.providerReference,
+          currency: intent.currency,
+        },
+        intent.initiatedByUserId,
+      );
+    } else if (single) {
+      await this.payments.logPayment(
+        {
+          invoiceId: single,
+          amount: Number(intent.amount.toString()),
+          method: intent.provider,
+          processorReference: intent.providerReference,
+        },
+        intent.initiatedByUserId,
+      );
+    }
 
     return { ok: true };
   }
@@ -320,7 +427,9 @@ export class PaymentIntentsService {
     // Resident scoping: can only verify own intents OR intents against units they occupy.
     if (isResidentRole(actor.role)) {
       if (intent.initiatedByUserId !== actor.userId) {
-        const occupies = await actorOccupiesUnit(this.prisma, actor, intent.invoice.unitId);
+        const occupies = intent.invoice
+          ? await actorOccupiesUnit(this.prisma, actor, intent.invoice.unitId)
+          : false;
         if (!occupies) throw new ForbiddenException('Cannot verify this intent');
       }
     }

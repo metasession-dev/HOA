@@ -3,11 +3,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsDateString, IsIn, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import type { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { PaymentIntentsService } from './payment-intents.service';
 import { PaystackService } from './paystack.service';
+import { UnitBillingService } from '../billing/unit-billing.service';
 import { CurrentUser, Public, Roles } from '../common/decorators';
 import { PaginationDto, successResponse } from '../common/dto';
 import { Idempotent, IdempotencyInterceptor } from '../common/idempotency';
@@ -24,6 +25,13 @@ class LogPaymentDto {
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 
+class PrepayDto {
+  @IsString() unitBillingId: string;
+  @IsOptional() @IsInt() @Min(1) @Max(60) periods?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(366) days?: number;
+  @IsOptional() @IsString() @MaxLength(500) callbackUrl?: string;
+}
+
 @ApiTags('Payments')
 @ApiBearerAuth()
 @Controller('payments')
@@ -33,7 +41,43 @@ export class PaymentsController {
     private service: PaymentsService,
     private intents: PaymentIntentsService,
     private paystack: PaystackService,
+    private unitBilling: UnitBillingService,
   ) {}
+
+  // ============ Resident prepay / choose-your-term (Phase 5) ============
+
+  /** Charges the signed-in resident can prepay across their occupied unit(s). */
+  @Get('prepay/charges')
+  async listPrepayable(@CurrentUser('sub') userId: string) {
+    return successResponse(await this.unitBilling.listPrepayableForUser(userId));
+  }
+
+  /** Dry-run quote for a chosen term (periods for monthly+, days for daily/weekly). */
+  @Get('prepay/charges/:ubId/quote')
+  async prepayQuote(
+    @Param('ubId') ubId: string,
+    @Query('periods') periods: string | undefined,
+    @Query('days') days: string | undefined,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return successResponse(await this.unitBilling.quotePrepay(userId, ubId, {
+      periods: periods ? Number(periods) : undefined,
+      days: days ? Number(days) : undefined,
+    }));
+  }
+
+  /** Materialize the term's invoices and open a single checkout for them. */
+  @Post('prepay')
+  @Idempotent()
+  async prepay(
+    @Body() body: PrepayDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    const intent = await this.intents.prepay(orgId, { userId, role }, body.unitBillingId, { periods: body.periods, days: body.days }, { callbackUrl: body.callbackUrl });
+    return successResponse(intent);
+  }
 
   @Get()
   async findAll(

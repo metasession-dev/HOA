@@ -28,6 +28,47 @@ function periodKeyFor(baseTerm: string, d: Date): string {
   }
 }
 
+// ---- Phase 5 prepay period math ----
+// Canonical days per term for day-prorated (calendar_day) charges.
+const TERM_DAYS: Record<string, number> = { daily: 1, weekly: 7, monthly: 30, quarterly: 91, biannual: 182, annual: 365 };
+// Terms a resident prepays by WHOLE PERIODS (buy N months/quarters/…). daily and
+// weekly are prepaid by DAY span instead.
+const PERIOD_TERMS = new Set(['monthly', 'quarterly', 'biannual', 'annual']);
+
+function startOfUtcDay(d: Date): Date { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); }
+function addUtcDays(d: Date, n: number): Date { return new Date(d.getTime() + n * 86400000); }
+function isoDay(d: Date): string { return d.toISOString().slice(0, 10); }
+
+/** First instant of the period (of `baseTerm`) that contains `d`. */
+function startOfPeriod(baseTerm: string, d: Date): Date {
+  const y = d.getUTCFullYear(); const m = d.getUTCMonth();
+  switch (baseTerm) {
+    case 'quarterly': return new Date(Date.UTC(y, Math.floor(m / 3) * 3, 1));
+    case 'biannual': return new Date(Date.UTC(y, m < 6 ? 0 : 6, 1));
+    case 'annual': return new Date(Date.UTC(y, 0, 1));
+    case 'monthly':
+    default: return new Date(Date.UTC(y, m, 1));
+  }
+}
+
+/** First instant of the period AFTER the one starting at `from`. */
+function nextPeriodStart(baseTerm: string, from: Date): Date {
+  const y = from.getUTCFullYear(); const m = from.getUTCMonth();
+  switch (baseTerm) {
+    case 'quarterly': return new Date(Date.UTC(y, m + 3, 1));
+    case 'biannual': return new Date(Date.UTC(y, m + 6, 1));
+    case 'annual': return new Date(Date.UTC(y + 1, 0, 1));
+    case 'monthly':
+    default: return new Date(Date.UTC(y, m + 1, 1));
+  }
+}
+
+function termUnitLabel(baseTerm: string): string {
+  return ({ daily: 'day', weekly: 'week', monthly: 'month', quarterly: 'quarter', biannual: 'half-year', annual: 'year' } as Record<string, string>)[baseTerm] || baseTerm;
+}
+
+type PrepayPeriod = { periodKey: string; from: Date; to: Date; amountMinor: number };
+
 /**
  * Per-unit billing attachments (Phase 2 of unit-default-billing — see
  * HOA-DOCS/SPEC-unit-default-billing.md).
@@ -386,6 +427,198 @@ export class UnitBillingService {
         'Daily and weekly charges are billed via resident prepay, not scheduled generation.',
       );
     }
+  }
+
+  // ---- resident prepay / choose-your-term (Phase 5) ----
+
+  /** List the charges a resident can prepay across the unit(s) they occupy. */
+  async listPrepayableForUser(userId: string) {
+    const rows = await this.prisma.unitBilling.findMany({
+      where: {
+        isActive: true,
+        billingType: { isActive: true, allowResidentPrepay: true },
+        unit: { occupancies: { some: { isActive: true, person: { userId } } } },
+      },
+      include: {
+        billingType: { select: { id: true, name: true, key: true, baseTerm: true, prorationMode: true } },
+        unit: { select: { id: true, unitNumber: true } },
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      amount: r.amount.toString(),
+      baseTerm: r.baseTerm,
+      currency: r.currency,
+      mode: PERIOD_TERMS.has(r.baseTerm) ? 'period' : 'day',
+      billingType: r.billingType,
+      unit: r.unit,
+    }));
+  }
+
+  /** Resolve a unitBilling the given resident is allowed to prepay, or throw. */
+  private async resolvePrepayUb(userId: string, unitBillingId: string) {
+    const ub = await this.prisma.unitBilling.findFirst({
+      where: {
+        id: unitBillingId,
+        isActive: true,
+        billingType: { isActive: true, allowResidentPrepay: true },
+        unit: { occupancies: { some: { isActive: true, person: { userId } } } },
+      },
+      include: { billingType: true },
+    });
+    if (!ub) throw new NotFoundException('Charge not found or not available for prepayment');
+    return ub;
+  }
+
+  /** Build the set of period invoices a prepay request would create. Pure read. */
+  private async computePrepayPeriods(ub: any, request: { periods?: number; days?: number }): Promise<PrepayPeriod[]> {
+    const baseTerm = ub.baseTerm;
+    const amountMinor = Math.round(Number(ub.amount.toString()) * 100);
+
+    if (PERIOD_TERMS.has(baseTerm)) {
+      const n = Math.max(0, Math.floor(request.periods || 0));
+      if (n < 1) throw new BadRequestException('periods must be at least 1 for this charge');
+      const existing = await this.prisma.invoice.findMany({ where: { unitBillingId: ub.id }, select: { periodKey: true } });
+      const existingKeys = new Set(existing.map((e) => e.periodKey).filter(Boolean) as string[]);
+      const periods: PrepayPeriod[] = [];
+      let cursor = startOfPeriod(baseTerm, new Date());
+      for (let guard = 0; periods.length < n && guard < 600; guard += 1) {
+        const from = cursor;
+        const to = nextPeriodStart(baseTerm, from);
+        const key = periodKeyFor(baseTerm, from);
+        if (!existingKeys.has(key)) periods.push({ periodKey: key, from, to, amountMinor });
+        cursor = to;
+      }
+      return periods;
+    }
+
+    // Day mode (daily / weekly): one invoice spanning the chosen day range,
+    // prorated from the snapshot amount; floor at minChargeMinor.
+    const d = Math.max(0, Math.floor(request.days || 0));
+    if (d < 1) throw new BadRequestException('days must be at least 1 for this charge');
+    const termDays = TERM_DAYS[baseTerm] || 1;
+    let totalMinor = Math.round((amountMinor * d) / termDays);
+    totalMinor = Math.max(totalMinor, ub.billingType.minChargeMinor || 0);
+    // Start the day after any existing coverage, never before today.
+    const today = startOfUtcDay(new Date());
+    const lastCredit = await this.prisma.prepaymentCredit.findFirst({
+      where: { unitBillingId: ub.id }, orderBy: { coverageTo: 'desc' }, select: { coverageTo: true },
+    });
+    let start = today;
+    if (lastCredit && lastCredit.coverageTo.getTime() > today.getTime()) start = startOfUtcDay(lastCredit.coverageTo);
+    const to = addUtcDays(start, d);
+    return [{ periodKey: `D:${isoDay(start)}_${d}`, from: start, to, amountMinor: totalMinor }];
+  }
+
+  private termLabelFor(ub: any, request: { periods?: number; days?: number }): string {
+    if (PERIOD_TERMS.has(ub.baseTerm)) {
+      const n = Math.max(1, Math.floor(request.periods || 1));
+      return `${n} ${termUnitLabel(ub.baseTerm)}${n > 1 ? 's' : ''}`;
+    }
+    const d = Math.max(1, Math.floor(request.days || 1));
+    return `${d} day${d > 1 ? 's' : ''}`;
+  }
+
+  /** Dry-run quote for a resident "pay any term" request. */
+  async quotePrepay(userId: string, unitBillingId: string, request: { periods?: number; days?: number }) {
+    const ub = await this.resolvePrepayUb(userId, unitBillingId);
+    const periods = await this.computePrepayPeriods(ub, request);
+    const totalMinor = periods.reduce((s, p) => s + p.amountMinor, 0);
+    return {
+      unitBillingId: ub.id,
+      billingTypeName: ub.billingType.name,
+      currency: ub.currency,
+      mode: PERIOD_TERMS.has(ub.baseTerm) ? 'period' : 'day',
+      termLabel: this.termLabelFor(ub, request),
+      count: periods.length,
+      totalAmount: totalMinor / 100,
+      periods: periods.map((p) => ({ periodKey: p.periodKey, from: p.from, to: p.to, amount: p.amountMinor / 100 })),
+    };
+  }
+
+  /** Materialize the prepay's period invoices + a PrepaymentCredit record.
+   *  Returns the invoice ids for a multi-invoice checkout. */
+  async materializePrepay(actor: Actor, unitBillingId: string, request: { periods?: number; days?: number }) {
+    const ub = await this.resolvePrepayUb(actor.userId, unitBillingId);
+    const periods = await this.computePrepayPeriods(ub, request);
+    if (periods.length === 0) throw new BadRequestException('Nothing to prepay for this term');
+
+    const orgId = ub.organizationId;
+    const orgBaseCcy = (await this.orgCurrency(orgId)).toUpperCase();
+    const ccy = (ub.currency || orgBaseCcy).toUpperCase();
+    const termLabel = this.termLabelFor(ub, request);
+
+    let fxLock: { lockedRate: Decimal; lockedRateAsOf: Date; baseCurrency: string } | null = null;
+    if (ccy !== orgBaseCcy) {
+      try {
+        const locked = await this.fx.lockedRateForInvoice(orgId, ccy, orgBaseCcy, new Date());
+        if (locked) fxLock = { lockedRate: locked.rate, lockedRateAsOf: locked.asOfDay, baseCurrency: locked.baseCurrency };
+      } catch (err: any) {
+        this.logger.warn(`FX lock skipped for prepay ${ub.billingType.name}: ${err.message}`);
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const numbers = await reserveInvoiceNumbers(tx, orgId, periods.length);
+      const issue = new Date();
+      const invoiceIds: string[] = [];
+      for (let i = 0; i < periods.length; i += 1) {
+        const p = periods[i];
+        const amt = new Decimal(p.amountMinor).div(100);
+        const inv = await tx.invoice.create({
+          data: {
+            organizationId: orgId,
+            unitId: ub.unitId,
+            invoiceNumber: numbers[i],
+            type: 'recurring',
+            amount: amt,
+            originalAmount: amt,
+            currency: ccy,
+            dueDate: p.from,
+            status: 'sent',
+            sentAt: issue,
+            lineItems: [{ description: `${ub.billingType.name} (${p.periodKey})`, amount: Number(amt.toString()), quantity: 1 }] as any,
+            createdBy: actor.userId,
+            baseCurrency: fxLock?.baseCurrency ?? null,
+            lockedRate: fxLock?.lockedRate ?? null,
+            lockedRateAsOf: fxLock?.lockedRateAsOf ?? null,
+            billingTypeId: ub.billingTypeId,
+            unitBillingId: ub.id,
+            periodKey: p.periodKey,
+          },
+        });
+        invoiceIds.push(inv.id);
+      }
+
+      const totalMinor = periods.reduce((s, p) => s + p.amountMinor, 0);
+      await tx.prepaymentCredit.create({
+        data: {
+          organizationId: orgId,
+          unitBillingId: ub.id,
+          coverageFrom: periods[0].from,
+          coverageTo: periods[periods.length - 1].to,
+          termLabel,
+          periodKeys: periods.map((p) => p.periodKey),
+          amount: new Decimal(totalMinor).div(100),
+          currency: ccy,
+          createdBy: actor.userId,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: orgId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'prepay_materialized',
+          entityType: 'UnitBilling',
+          entityId: ub.id,
+          changes: { invoiceIds, periodKeys: periods.map((p) => p.periodKey), termLabel, total: (totalMinor / 100).toString(), currency: ccy } as any,
+        },
+      });
+
+      return { invoiceIds, totalMinor, currency: ccy, organizationId: orgId };
+    });
   }
 
   // ---- helpers ----

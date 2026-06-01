@@ -2209,6 +2209,7 @@ model UnitBilling {
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   billingType BillingType @relation(fields: [billingTypeId], references: [id], onDelete: Restrict)
   invoices    Invoice[]
+  prepaymentCredits PrepaymentCredit[]
 
   @@unique([unitId, billingTypeId])
   @@index([organizationId, isActive])
@@ -2281,7 +2282,13 @@ model PaymentPlanInstallment {
 model PaymentIntent {
   id               String   @id @default(cuid())
   organizationId   String
-  invoiceId        String
+  // Primary invoice for the common single-invoice checkout. Nullable because a
+  // Phase 5 prepay checkout settles MANY invoices at once (see invoiceIds).
+  invoiceId        String?
+  // Phase 5: the full set of invoices this checkout pays (prepay materializes
+  // several future-period invoices and pays them in one go). Single-invoice
+  // checkouts leave this empty and use invoiceId.
+  invoiceIds       String[] @default([])
   initiatedByUserId String
   provider         String   // paystack | flutterwave | mock
   // The Paystack `reference` we sent on init (we generate it so we control
@@ -2302,11 +2309,34 @@ model PaymentIntent {
   updatedAt        DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invoice      Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId, status])
   @@index([organizationId, status])
   @@map("payment_intents")
+}
+
+// Phase 5: audit/receipt record of a resident "pay any term" purchase. Records
+// the span the prepay covered + the exact period-key invoices it materialized.
+// NOT a control field — the materialized invoices themselves are the source of
+// truth (the per-unit period unique makes future scheduled runs no-ops).
+model PrepaymentCredit {
+  id             String   @id @default(cuid())
+  organizationId String
+  unitBillingId  String
+  coverageFrom   DateTime
+  coverageTo     DateTime
+  termLabel      String
+  periodKeys     String[]
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  unitBilling UnitBilling @relation(fields: [unitBillingId], references: [id], onDelete: Cascade)
+
+  @@index([unitBillingId, coverageTo])
+  @@map("prepayment_credits")
 }
 
 // Per-organization Paystack credentials so each HOA settles into its own
