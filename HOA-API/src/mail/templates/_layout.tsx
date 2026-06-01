@@ -1,13 +1,37 @@
 import * as React from 'react';
-import { Html, Head, Body, Container, Section, Text, Hr, Link } from '@react-email/components';
+import { Html, Head, Body, Container, Section, Text, Hr, Link, Img } from '@react-email/components';
+
+/**
+ * Per-org branding injected into every email. Threaded via React context so
+ * individual templates don't each need a `branding` prop — they just render
+ * inside <EmailLayout> which reads the context. Defaults fall back to the
+ * platform brand when an org hasn't set its own.
+ */
+export type EmailBranding = {
+  orgName: string;
+  logoUrl: string | null;
+  accentColor: string;
+  tagline: string | null;
+};
+
+export const DEFAULT_BRANDING: EmailBranding = {
+  orgName: 'HOA.africa',
+  logoUrl: null,
+  accentColor: '#ff3e00',
+  tagline: null,
+};
+
+export const EmailBrandingContext = React.createContext<EmailBranding>(DEFAULT_BRANDING);
 
 /**
  * Phase 2.2 — Shared shell for every transactional email. Inline styles only
- * (no Tailwind / CSS Modules) because email clients are unforgiving. The
- * palette mirrors the in-app Family Design System tokens so the brand
- * carries through.
+ * (no Tailwind / CSS Modules) because email clients are unforgiving. The header
+ * now renders the sending org's logo / name / accent colour (Phase: org email
+ * branding); falls back to the platform brand when unset.
  */
 export function EmailLayout({ children, preheader }: { children?: React.ReactNode; preheader?: string }) {
+  const brand = React.useContext(EmailBrandingContext);
+  const accent = brand.accentColor || DEFAULT_BRANDING.accentColor;
   return (
     <Html>
       <Head>
@@ -18,8 +42,15 @@ export function EmailLayout({ children, preheader }: { children?: React.ReactNod
           <div style={{ display: 'none', maxHeight: 0, overflow: 'hidden', opacity: 0 }}>{preheader}</div>
         )}
         <Container style={containerStyle}>
+          {/* Accent bar in the org's brand colour. */}
+          <div style={{ height: 4, backgroundColor: accent }} />
           <Section style={{ padding: '24px 24px 8px' }}>
-            <Text style={brandStyle}>HOA.africa</Text>
+            {brand.logoUrl ? (
+              <Img src={brand.logoUrl} alt={brand.orgName} height={36} style={{ maxHeight: 36, objectFit: 'contain' }} />
+            ) : (
+              <Text style={{ ...brandStyle, color: accent }}>{brand.orgName}</Text>
+            )}
+            {brand.tagline && <Text style={taglineStyle}>{brand.tagline}</Text>}
           </Section>
           <Section style={{ padding: '8px 24px 24px' }}>
             {children}
@@ -27,8 +58,8 @@ export function EmailLayout({ children, preheader }: { children?: React.ReactNod
           <Hr style={{ borderColor: '#e8e5e1', margin: '0 24px' }} />
           <Section style={{ padding: '16px 24px' }}>
             <Text style={footerStyle}>
-              You're receiving this because your HOA uses HOA.africa.{' '}
-              <Link href="https://hoa.africa" style={linkStyle}>Visit the help center →</Link>
+              You&rsquo;re receiving this because you&rsquo;re a member of {brand.orgName}.{' '}
+              <Link href="https://hoa.africa" style={{ ...linkStyle, color: accent }}>Powered by HOA.africa →</Link>
             </Text>
           </Section>
         </Container>
@@ -51,6 +82,9 @@ const brandStyle: React.CSSProperties = {
 };
 const footerStyle: React.CSSProperties = {
   color: '#7a756e', fontSize: 12, margin: 0,
+};
+const taglineStyle: React.CSSProperties = {
+  color: '#7a756e', fontSize: 13, margin: '2px 0 0',
 };
 const linkStyle: React.CSSProperties = { color: '#ff3e00', textDecoration: 'none' };
 
