@@ -140,7 +140,7 @@ export default function PersonDetailPage() {
           <h2 className="mb-2 inline-flex items-center gap-1.5 text-heading-sm font-display font-medium text-charcoal-primary">
             <Activity className="h-3.5 w-3.5 text-muted-foreground" />Birds-eye view
           </h2>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
             <StatCard label="Units owned" value={activity.summary.unitsOwned} icon={KeyRound} />
             <StatCard label="Occupied" value={activity.summary.unitsOccupied} icon={Home} />
             <StatCard label="Invoices" value={activity.summary.invoices} icon={Receipt} />

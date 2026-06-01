@@ -19,16 +19,14 @@ export default function TeamMembersPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [includeResidents, setIncludeResidents] = useState(false);
 
   const load = () => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    if (includeResidents) params.set('includeResidents', 'true');
     setLoading(true);
     api.get<any>(`/team/members${params.toString() ? `?${params}` : ''}`).then((r) => setMembers(r.data || [])).catch(console.error).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [includeResidents]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const revokeRole = async (m: any, role: any) => {
     const ok = await confirm({
@@ -89,10 +87,6 @@ export default function TeamMembersPage() {
           </div>
           <Button type="submit" variant="secondary">Search</Button>
         </form>
-        <label className="flex items-center gap-2 text-caption text-muted-foreground ml-auto">
-          <input type="checkbox" checked={includeResidents} onChange={(e) => setIncludeResidents(e.target.checked)} />
-          Include residents (owner/tenant)
-        </label>
       </div>
 
       <Card><CardContent className="p-0">
