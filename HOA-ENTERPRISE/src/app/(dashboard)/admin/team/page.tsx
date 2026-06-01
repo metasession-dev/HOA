@@ -14,6 +14,41 @@ import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { cn } from '@/lib/utils';
 
+// Friendly labels for the built-in system roles. Some Role rows were seeded with
+// displayName === the raw slug (e.g. "gate_security"), so we always map from the
+// stable role name here and fall back to a humanized slug.
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  hoa_admin: 'HOA Admin',
+  property_manager: 'Property Manager',
+  finance_officer: 'Finance Officer',
+  exco_member: 'Exco Member',
+  exco_chairperson: 'Exco Chairperson',
+  communications_manager: 'Communications Manager',
+  gate_security: 'Gate / Security',
+  maintenance_coordinator: 'Maintenance Coordinator',
+  external_accountant: 'External Accountant',
+  owner: 'Owner',
+  tenant: 'Tenant',
+  vendor: 'Vendor',
+};
+
+function humanize(s: string): string {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Resolve a user-role assignment to a readable label: custom role name, then the
+// canonical system label, then a humanized fallback — never a raw slug.
+function roleLabel(r: any): string {
+  if (r.customRole?.displayName) return r.customRole.displayName;
+  const name: string = r.role?.name ?? '';
+  if (ROLE_LABELS[name]) return ROLE_LABELS[name];
+  const dn: string = r.role?.displayName ?? '';
+  // If the stored displayName is just the slug, humanize it.
+  if (dn && dn !== name) return dn;
+  return humanize(name || dn || 'role');
+}
+
 export default function TeamMembersPage() {
   const confirm = useConfirm();
   const [members, setMembers] = useState<any[]>([]);
@@ -30,7 +65,7 @@ export default function TeamMembersPage() {
 
   const revokeRole = async (m: any, role: any) => {
     const ok = await confirm({
-      title: `Revoke ${role.role.displayName}?`,
+      title: `Revoke ${roleLabel(role)}?`,
       description: `${m.firstName} ${m.lastName} will lose this role immediately.`,
       confirmText: 'Revoke',
       destructive: true,
@@ -120,10 +155,8 @@ export default function TeamMembersPage() {
                   {m.roles.map((r: any) => {
                     const expired = r.expiresAt && new Date(r.expiresAt) < new Date();
                     return (
-                      <div key={r.userRoleId} className={cn('inline-flex items-center gap-2 rounded-lg bg-stone-surface/50 px-3 py-1.5', expired && 'opacity-60')}>
-                        <span className="text-xs font-medium text-graphite">
-                          {r.customRole ? r.customRole.displayName : r.role.displayName}
-                        </span>
+                      <div key={r.userRoleId} className={cn('inline-flex items-center gap-2 rounded-lg border border-stone-surface bg-card px-3 py-1.5 shadow-inset-stone', expired && 'opacity-60')}>
+                        <Badge variant={r.customRole ? 'info' : 'secondary'}>{roleLabel(r)}</Badge>
                         {r.expiresAt && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                             <Clock className="h-3 w-3" />{expired ? 'expired' : `expires ${formatDate(r.expiresAt)}`}
@@ -137,7 +170,7 @@ export default function TeamMembersPage() {
                         {r.approvalLimit !== null && r.approvalLimit !== undefined && (
                           <span className="text-[11px] text-muted-foreground tabular-nums">≤ R {Number(r.approvalLimit).toLocaleString()}</span>
                         )}
-                        <button onClick={() => revokeRole(m, r)} className="ml-1 text-coral-red/70 hover:text-coral-red text-[11px]">Revoke</button>
+                        <button onClick={() => revokeRole(m, r)} className="ml-1 text-coral-red/70 hover:text-coral-red text-[11px] font-medium">Revoke</button>
                       </div>
                     );
                   })}
