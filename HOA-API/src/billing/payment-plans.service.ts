@@ -4,6 +4,7 @@ import {
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole, scopeInvoiceWhere } from '../common/scope.util';
+import { nextInvoiceNumber } from '../common/invoice-number';
 
 const CADENCES = ['weekly', 'biweekly', 'monthly'] as const;
 type Cadence = typeof CADENCES[number];
@@ -384,8 +385,7 @@ export class PaymentPlansService {
 
   private async materializeInstallmentInvoice(tx: any, orgId: string, plan: any, installment: any, actor: Actor) {
     if (installment.status !== 'pending') return;
-    const count = await tx.invoice.count({ where: { organizationId: orgId } });
-    const invoiceNumber = `INV-${String(count + 1).padStart(5, '0')}`;
+    const invoiceNumber = await nextInvoiceNumber(tx, orgId);
     const dueDate = new Date(installment.dueDate);
     const inv = await tx.invoice.create({
       data: {

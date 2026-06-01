@@ -751,7 +751,9 @@ export class AssistantService {
           _sum: { amount: true },
         });
     const paidByInvoice = new Map<string, Decimal>(
-      payments.map((p) => [p.invoiceId, new Decimal(p._sum.amount?.toString() ?? '0')]),
+      payments
+        .filter((p): p is typeof p & { invoiceId: string } => !!p.invoiceId)
+        .map((p) => [p.invoiceId, new Decimal(p._sum.amount?.toString() ?? '0')]),
     );
     let totalArrears = new Decimal(0);
     const perUnit = new Map<string, { unitNumber: string; balance: Decimal }>();

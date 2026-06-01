@@ -184,6 +184,7 @@ export class AnomalyService {
     });
     const paidByInvoice = new Map<string, Decimal>();
     for (const p of payments) {
+      if (!p.invoiceId) continue;
       paidByInvoice.set(p.invoiceId, (paidByInvoice.get(p.invoiceId) ?? new Decimal(0)).add(new Decimal(p.amount.toString())));
     }
     let currentMonthArrears = new Decimal(0);

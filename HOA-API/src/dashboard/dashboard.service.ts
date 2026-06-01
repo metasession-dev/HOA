@@ -117,8 +117,8 @@ export class DashboardService {
         })),
         recentPayments: recentPayments.map((p) => ({
           id: p.id,
-          invoiceNumber: p.invoice.invoiceNumber,
-          unitNumber: p.invoice.unit.unitNumber,
+          invoiceNumber: p.invoice?.invoiceNumber ?? '—',
+          unitNumber: p.invoice?.unit?.unitNumber ?? '—',
           amount: Number(p.amount.toString()),
           status: p.status, method: p.method,
           at: p.processedAt ?? p.createdAt,

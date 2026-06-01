@@ -127,6 +127,9 @@ model Organization {
   mfaRequiredRoles String[] @default([])
   // CIDR allowlist applied to authenticated requests. Empty = unrestricted.
   ipAllowlist      String[] @default([])
+  // Phase 4: monotonic per-org invoice number sequence. Incremented FOR UPDATE
+  // so concurrent issuance never collides (replaces count-based numbering).
+  invoiceSeq       Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -182,6 +185,7 @@ model Organization {
   meetings              Meeting[]
   paystackConfig        PaystackConfig?
   billingTypes          BillingType[]
+  payments              Payment[]
 
   @@map("organizations")
 }
@@ -434,6 +438,10 @@ model Invoice {
   // for the per-unit dedupe unique below.
   billingTypeId    String?
   unitBillingId    String?
+  // Phase 4: server-authoritative cache of SUM(PaymentAllocation.amount).
+  // balanceDue = amount − amountPaid. Maintained only inside the locked
+  // logPayment transaction; never computed on the client.
+  amountPaid       Decimal   @db.Decimal(12, 2) @default(0)
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -441,6 +449,7 @@ model Invoice {
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   unit             Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
   payments         Payment[]
+  allocations      PaymentAllocation[]
   violationFineFor Violation?
   parentSchedule   RecurringInvoiceSchedule? @relation(fields: [parentScheduleId], references: [id])
   paymentPlanInstallment PaymentPlanInstallment? @relation(fields: [paymentPlanInstallmentId], references: [id])
@@ -455,10 +464,20 @@ model Invoice {
   @@map("invoices")
 }
 
+// Phase 4 (unit-default-billing): Payment is now a RECEIPT HEADER. The money it
+// settles is recorded in PaymentAllocation rows (the ledger). `invoiceId` is the
+// legacy single-invoice link (kept for back-compat + the common 1:1 case);
+// allocations are the source of truth. `amountUnallocated` is overpayment /
+// credit left after allocation. The (org, method, processorReference) unique is
+// the exactly-once idempotency key for Paystack webhook retries.
 model Payment {
   id                 String    @id @default(cuid())
-  invoiceId          String
+  // Nullable: a multi-invoice / pure-credit receipt has no single invoice.
+  invoiceId          String?
+  // Backfilled for legacy rows; required going forward (set in logPayment).
+  organizationId     String?
   amount             Decimal   @db.Decimal(12, 2)
+  amountUnallocated  Decimal   @db.Decimal(12, 2) @default(0)
   currency           String    @default("ZAR")
   method             String
   processorReference String?
@@ -467,9 +486,32 @@ model Payment {
   loggedBy           String?
   createdAt          DateTime  @default(now())
 
+  invoice      Invoice?            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  organization Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  allocations  PaymentAllocation[]
+
+  @@unique([organizationId, method, processorReference])
+  @@index([invoiceId])
+  @@index([organizationId])
+  @@map("payments")
+}
+
+// The allocation ledger — the source of truth for what money landed on which
+// invoice. A payment is applied to a given invoice at most once (unique →
+// replay-safe). `amountPaid` on Invoice is a maintained cache of SUM(amount).
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  invoiceId String
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  @@map("payments")
+  @@unique([paymentId, invoiceId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
 }
 
 model GLAccount {

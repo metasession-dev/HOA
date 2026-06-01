@@ -6,6 +6,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../common/prisma.service';
 import { Actor } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
+import { reserveInvoiceNumbers } from '../common/invoice-number';
 
 type Target = { unitIds?: string[]; estateIds?: string[] };
 
@@ -311,7 +312,7 @@ export class UnitBillingService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.invoice.count({ where: { organizationId: orgId } });
+      const invoiceNumbers = await reserveInvoiceNumbers(tx, orgId, fresh.length);
       const issue = new Date();
       const due = new Date(issue.getTime() + 30 * 86400000);
       const inserts = fresh.map((ub, i) => {
@@ -321,7 +322,7 @@ export class UnitBillingService {
         return {
           organizationId: orgId,
           unitId: ub.unitId,
-          invoiceNumber: `INV-${String(count + 1 + i).padStart(5, '0')}`,
+          invoiceNumber: invoiceNumbers[i],
           type: 'recurring',
           amount: amt,
           originalAmount: amt,

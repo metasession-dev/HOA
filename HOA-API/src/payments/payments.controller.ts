@@ -52,6 +52,26 @@ export class PaymentsController {
     return successResponse(payment);
   }
 
+  // Reverse a payment (refund / chargeback / mistaken entry). Removes its
+  // allocations and restores the affected invoices' balances.
+  @Roles('finance_officer', 'hoa_admin', 'super_admin')
+  @Post(':id/reverse')
+  async reverse(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return successResponse(await this.service.reversePayment(orgId, userId, id, body?.reason));
+  }
+
+  // Manually re-run the idempotent ledger backfill (also runs at boot).
+  @Roles('super_admin')
+  @Post('admin/backfill-ledger')
+  async backfillLedger() {
+    return successResponse(await this.service.backfillLedger());
+  }
+
   // ============ Payment intents (Phase 1.3) ============
 
   /**

@@ -156,7 +156,7 @@ export class QueryResolver {
       method: p.method, status: p.status,
       processedAt: p.processedAt?.toISOString() ?? null,
       processorReference: p.processorReference ?? null,
-      invoiceId: p.invoiceId,
+      invoiceId: p.invoiceId ?? '',
     }));
   }
 

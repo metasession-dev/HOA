@@ -73,7 +73,7 @@ export class SnapshotService {
         totalPaid = totalPaid.add(p.amount);
         allPayments.push({
           id: p.id,
-          invoiceId: p.invoiceId,
+          invoiceId: p.invoiceId ?? inv.id,
           reference: p.processorReference ?? '',
           receivedDate: (p.processedAt ?? p.createdAt).toISOString(),
           amount: Number(p.amount.toString()),
