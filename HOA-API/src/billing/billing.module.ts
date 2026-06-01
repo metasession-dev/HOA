@@ -4,13 +4,14 @@ import { RecurringInvoicesService } from './recurring.service';
 import { LateFeesService } from './late-fees.service';
 import { PaymentPlansService } from './payment-plans.service';
 import { BillingCatalogService } from './billing-catalog.service';
+import { UnitBillingService } from './unit-billing.service';
 import { PrismaService } from '../common/prisma.service';
 import { FxModule } from '../fx/fx.module';
 
 @Module({
   imports: [FxModule],
   controllers: [BillingController],
-  providers: [RecurringInvoicesService, LateFeesService, PaymentPlansService, BillingCatalogService, PrismaService],
-  exports: [RecurringInvoicesService, LateFeesService, PaymentPlansService, BillingCatalogService],
+  providers: [RecurringInvoicesService, LateFeesService, PaymentPlansService, BillingCatalogService, UnitBillingService, PrismaService],
+  exports: [RecurringInvoicesService, LateFeesService, PaymentPlansService, BillingCatalogService, UnitBillingService],
 })
 export class BillingModule {}
