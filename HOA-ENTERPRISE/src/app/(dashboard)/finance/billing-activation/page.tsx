@@ -28,7 +28,6 @@ const selectClass = cn(
 
 export default function BillingActivationPage() {
   const [billingTypes, setBillingTypes] = useState<any[]>([]);
-  const [estates, setEstates] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,8 +48,8 @@ export default function BillingActivationPage() {
     ])
       .then(([types, est]) => {
         setBillingTypes(types);
-        setEstates(est);
         if (types[0]) setBillingTypeId(types[0].id);
+        // Single estate per enterprise — auto-select it (no UI field needed).
         if (est[0]) setEstateId(est[0].id);
       })
       .catch((err) => toast({ variant: 'error', title: 'Could not load', description: err.message }))
@@ -129,9 +128,19 @@ export default function BillingActivationPage() {
           <Banknote className="h-6 w-6 text-muted-foreground" />Billing activation
         </h1>
         <p className="mt-1 text-body text-muted-foreground">
-          Turn a billing charge on or off across many units at once. Preview before you apply.
+          Turn a recurring charge on or off across many units at once — bulk billing in a few clicks.
         </p>
       </header>
+
+      <Card><CardContent className="space-y-2 p-5">
+        <p className="text-sm font-medium text-charcoal-primary">How this works</p>
+        <ul className="ml-4 list-disc space-y-1 text-caption text-muted-foreground">
+          <li><span className="font-medium text-graphite">Activate</span> switches a charge on so the unit is billed for it each period; <span className="font-medium text-graphite">Deactivate</span> stops future billing (already-issued invoices are not affected).</li>
+          <li>Apply to <span className="font-medium text-graphite">all your units</span>, or <span className="font-medium text-graphite">pick units</span> to target specific ones.</li>
+          <li><span className="font-medium text-graphite">Attach to units that don&rsquo;t have it yet</span> adds the charge to units that were never set up with it; otherwise only units that already carry it are toggled.</li>
+          <li>Always hit <span className="font-medium text-graphite">Preview</span> first to see exactly how many units will change before you apply.</li>
+        </ul>
+      </CardContent></Card>
 
       {billingTypes.length === 0 ? (
         <Card><CardContent className="p-10 text-center">
@@ -140,19 +149,12 @@ export default function BillingActivationPage() {
         </CardContent></Card>
       ) : (
         <Card><CardContent className="space-y-5 p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="bt">Billing charge</Label>
-              <select id="bt" className={selectClass} value={billingTypeId} onChange={(e) => setBillingTypeId(e.target.value)}>
-                {billingTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="es">Estate</Label>
-              <select id="es" className={selectClass} value={estateId} onChange={(e) => setEstateId(e.target.value)}>
-                {estates.map((es) => <option key={es.id} value={es.id}>{es.name}</option>)}
-              </select>
-            </div>
+          <div className="space-y-1.5 sm:max-w-md">
+            <Label htmlFor="bt">Billing charge</Label>
+            <select id="bt" className={selectClass} value={billingTypeId} onChange={(e) => setBillingTypeId(e.target.value)}>
+              {billingTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <p className="text-caption text-muted-foreground">The charge to switch on or off. Manage your charges in Settings → Billing catalog.</p>
           </div>
 
           <div className="space-y-2">
@@ -160,7 +162,7 @@ export default function BillingActivationPage() {
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setScope('estate')}
                 className={cn('rounded-lg border px-3 py-1.5 text-sm', scope === 'estate' ? 'border-charcoal-primary bg-charcoal-primary text-white' : 'border-stone-surface text-graphite hover:bg-stone-surface/50')}>
-                All units in estate
+                All units
               </button>
               <button type="button" onClick={() => setScope('units')}
                 className={cn('rounded-lg border px-3 py-1.5 text-sm', scope === 'units' ? 'border-charcoal-primary bg-charcoal-primary text-white' : 'border-stone-surface text-graphite hover:bg-stone-surface/50')}>

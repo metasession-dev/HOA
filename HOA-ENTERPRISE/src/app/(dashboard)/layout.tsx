@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/layout/bottom-nav';
 import { Topbar } from '@/components/layout/topbar';
 import { InstallBanner } from '@/components/install-banner';
 import { PwaUpdater } from '@/components/pwa-updater';
+import { HelpAssistant } from '@/components/help-assistant';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, primaryRole } = useAuth();
@@ -63,6 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <BottomNav onMore={() => setMobileNavOpen(true)} />
         <InstallBanner />
         <PwaUpdater />
+        <HelpAssistant />
       </div>
     </OrgSettingsProvider>
   );
