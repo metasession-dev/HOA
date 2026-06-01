@@ -228,7 +228,16 @@ export class AssistantService {
     // RBAC on the routed intent.
     let intentSlug = classification?.intent.slug;
     if (classification && classification.intent.allowedRoles.size > 0) {
-      if (!classification.intent.allowedRoles.has(actor.role)) intentSlug = 'denied';
+      if (!classification.intent.allowedRoles.has(actor.role)) {
+        // A privileged role (admin/finance/board) that happens to match a
+        // narrower, resident-scoped intent shouldn't be bluntly denied — e.g.
+        // "how many outstanding invoices?" matches the resident `check_balance`
+        // pattern ("outstanding"). Route these to the LLM tool-calling path,
+        // which has its own per-tool RBAC and can answer finance questions for
+        // these roles. Genuinely unauthorized roles (residents, gate ops) still
+        // get the crisp denial so admins can see what they tried to ask.
+        intentSlug = LLM_FALLBACK_ROLES.has(actor.role) ? undefined : 'denied';
+      }
     }
 
     // Dispatch read-only actions OR surface state-changing suggestions.

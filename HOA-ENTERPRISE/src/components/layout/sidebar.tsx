@@ -7,7 +7,7 @@ import {
   BookOpen, BarChart3, MessageSquare, FolderOpen, Settings,
   KeyRound, ScanLine, ShieldAlert, Vote, ClipboardList, Gavel,
   Receipt, Truck, Wallet, PieChart, Landmark,
-  Sparkles, AlertTriangle, Banknote, Lock,
+  Sparkles, AlertTriangle, Banknote, Lock, ShieldCheck,
   KeySquare, Webhook, Inbox,
   Repeat, Hourglass, Workflow, CalendarDays,
   ChevronLeft, ChevronRight, ChevronDown,
@@ -22,6 +22,7 @@ const adminNav = [
   { title: 'Units', href: '/admin/units', icon: Home },
   { title: 'People', href: '/admin/people', icon: Users },
   { title: 'Team', href: '/admin/team', icon: Users },
+  { title: 'Roles & permissions', href: '/admin/team/roles', icon: ShieldCheck },
   { title: 'Anomalies', href: '/admin/anomalies', icon: AlertTriangle },
   { title: 'Assistant', href: '/assistant', icon: Sparkles },
 ];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, ChevronDown, ChevronRight, ShieldCheck, Lock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,9 +31,19 @@ type Form = {
 
 const blank = (): Form => ({ name: '', displayName: '', description: '', permissions: [], defaultApprovalLimit: '' });
 
-export default function CustomRolesPage() {
+// Humanize a permission slug like "financial.invoices.view" -> "Invoices · View".
+function humanizePerm(p: string): { module: string; label: string } {
+  const parts = p.split('.');
+  const module = parts[0] || 'other';
+  const rest = parts.slice(1).map((s) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+  return { module, label: rest.join(' · ') || p };
+}
+
+export default function RolesPermissionsPage() {
   const confirm = useConfirm();
   const [roles, setRoles] = useState<any[]>([]);
+  const [systemRoles, setSystemRoles] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [permsByModule, setPermsByModule] = useState<Record<string, Array<{ key: string; description: string }>>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any | null>(null);
@@ -45,9 +55,17 @@ export default function CustomRolesPage() {
     Promise.all([
       api.get<any>('/team/custom-roles').then((r) => setRoles(r.data || [])),
       api.get<any>('/team/permissions').then((r) => setPermsByModule(r.data?.byModule || {})),
+      api.get<any>('/team/system-roles').then((r) => setSystemRoles(r.data?.roles || [])).catch(() => {}),
     ]).catch(console.error).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
+
+  const toggleExpanded = (role: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(role) ? next.delete(role) : next.add(role);
+      return next;
+    });
 
   const openNew = () => { setEditing({}); setForm(blank()); };
   const openEdit = (r: any) => {
@@ -120,11 +138,85 @@ export default function CustomRolesPage() {
       </Link>
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Custom roles</h1>
-          <p className="mt-1 text-body text-muted-foreground">Compose roles from the permission catalog. Apply per-user limits and unit scoping at assignment.</p>
+          <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Roles &amp; permissions</h1>
+          <p className="mt-1 text-body text-muted-foreground">Built-in system roles (read-only) plus custom roles you compose from the permission catalog.</p>
         </div>
         <Button onClick={openNew}><Plus className="mr-1.5 h-4 w-4" />New custom role</Button>
       </header>
+
+      {/* System roles — read-only. Access is enforced by role, so these are not editable. */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-graphite" />
+          <h2 className="font-display text-heading-sm text-charcoal-primary">System roles</h2>
+          <Badge variant="muted">built-in</Badge>
+        </div>
+        <p className="text-caption text-muted-foreground">
+          The platform&rsquo;s standard roles and what each is designed to do. These are enforced by the system and can&rsquo;t be edited — create a custom role below if you need a different mix.
+        </p>
+        <Card><CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12" />)}</div>
+          ) : (
+            <div className="divide-y divide-stone-surface">
+              {systemRoles.map((r) => {
+                const isOpen = expanded.has(r.role);
+                const grouped: Record<string, string[]> = {};
+                for (const p of r.permissions as string[]) {
+                  const { module, label } = humanizePerm(p);
+                  (grouped[module] ??= []).push(label);
+                }
+                return (
+                  <div key={r.role} className="p-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(r.role)}
+                      className="flex w-full items-start justify-between gap-3 text-left"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-charcoal-primary">{r.displayName}</span>
+                          <Badge variant="muted">{r.role}</Badge>
+                          {r.fullAccess && <Badge variant="info">full access</Badge>}
+                          <span className="inline-flex items-center gap-1 text-caption text-muted-foreground"><Lock className="h-3 w-3" />read-only</span>
+                        </div>
+                        {r.description && <p className="mt-0.5 text-caption text-muted-foreground">{r.description}</p>}
+                        <p className="mt-1 text-caption text-muted-foreground">
+                          {r.fullAccess ? 'All permissions' : `${r.permissionCount} permission(s)`}
+                        </p>
+                      </div>
+                      {isOpen ? <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}
+                    </button>
+                    {isOpen && (
+                      <div className="mt-3 space-y-2">
+                        {r.fullAccess ? (
+                          <p className="text-caption text-graphite">This role has unrestricted access to every feature in the organization.</p>
+                        ) : r.permissionCount === 0 ? (
+                          <p className="text-caption text-muted-foreground">Scoped access governed by built-in role rules — no granular permission profile.</p>
+                        ) : (
+                          Object.entries(grouped).map(([mod, labels]) => (
+                            <div key={mod} className="rounded-lg bg-stone-surface/50 p-3">
+                              <p className="mb-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground">{mod}</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {labels.map((l) => <Badge key={l} variant="secondary">{l}</Badge>)}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent></Card>
+      </section>
+
+      <div className="flex items-center gap-2 pt-2">
+        <Plus className="h-4 w-4 text-graphite" />
+        <h2 className="font-display text-heading-sm text-charcoal-primary">Custom roles</h2>
+      </div>
 
       <Card><CardContent className="p-0">
         {loading ? (
