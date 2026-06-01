@@ -23,6 +23,10 @@ class CreateInvoiceDto {
   lineItems: InvoiceLineDto[];
 }
 
+class BulkDeleteInvoicesDto {
+  @IsArray() @IsString({ each: true }) ids: string[];
+}
+
 @ApiTags('Invoices')
 @ApiBearerAuth()
 @Controller('invoices')
@@ -69,5 +73,18 @@ export class InvoicesController {
   async void(@Param('id') id: string, @CurrentUser('organizationId') orgId: string) {
     const invoice = await this.service.void(id, orgId);
     return successResponse(invoice);
+  }
+
+  // Delete one or more UNPAID invoices at once (e.g. clearing erroneous /
+  // abandoned-prepay bills). Only invoices with no money received are removed.
+  @Roles('finance_officer')
+  @Post('bulk-delete')
+  async bulkDelete(
+    @Body() body: BulkDeleteInvoicesDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.service.bulkDeleteUnpaid(orgId, { userId, role }, body.ids));
   }
 }

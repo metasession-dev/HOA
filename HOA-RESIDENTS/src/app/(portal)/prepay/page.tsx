@@ -181,30 +181,51 @@ export default function PrepayPage() {
 
               <div className="rounded-lg border border-stone-surface bg-stone-surface/30 p-4">
                 {quoting ? (
-                  <Skeleton className="h-16" />
+                  <Skeleton className="h-20" />
                 ) : !quote ? (
-                  <p className="text-caption text-muted-foreground">Choose a term to see the total.</p>
+                  <p className="text-caption text-muted-foreground">Choose a term to see what you&rsquo;ll pay.</p>
                 ) : quote.count === 0 ? (
-                  <p className="text-caption text-muted-foreground">You&rsquo;re already covered for this period — nothing to prepay.</p>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="muted">Already covered</Badge>
+                    <p className="text-caption text-muted-foreground">
+                      You&rsquo;re already paid up for this charge over the period you selected — there&rsquo;s nothing to prepay right now.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-caption uppercase tracking-wider text-muted-foreground">Total for {quote.termLabel}</p>
-                        <p className="font-display text-heading-lg font-medium tabular-nums text-charcoal-primary">
-                          {formatCurrency(Number(quote.totalAmount))}
-                        </p>
-                      </div>
-                      <Badge variant="info">{quote.count} invoice{quote.count > 1 ? 's' : ''}</Badge>
-                    </div>
-                    {quote.periods?.length > 0 && (
-                      <p className="text-caption text-muted-foreground">
-                        Covers {formatDate(quote.periods[0].from)} → {formatDate(quote.periods[quote.periods.length - 1].to)}
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-caption uppercase tracking-wider text-muted-foreground">You&rsquo;re paying for</p>
+                      <p className="text-sm font-medium text-charcoal-primary">
+                        {selected.billingType?.name} · {quote.termLabel}
                       </p>
-                    )}
+                      <p className="text-caption text-muted-foreground">
+                        Covers {formatDate(quote.periods[0].from)} → {formatDate(quote.periods[quote.periods.length - 1].to)} · Unit {selected.unit?.unitNumber}
+                      </p>
+                    </div>
+
+                    {/* Itemized: exactly which periods will be billed. */}
+                    <ul className="divide-y divide-stone-surface rounded-lg border border-stone-surface bg-card">
+                      {quote.periods.map((p: any) => (
+                        <li key={p.periodKey} className="flex items-center justify-between px-3 py-2 text-sm">
+                          <span className="text-graphite">{formatDate(p.from)} → {formatDate(p.to)}</span>
+                          <span className="tabular-nums text-charcoal-primary">{formatCurrency(Number(p.amount))}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="flex items-end justify-between gap-3 border-t border-stone-surface pt-2">
+                      <span className="text-caption uppercase tracking-wider text-muted-foreground">Total ({quote.count} invoice{quote.count > 1 ? 's' : ''})</span>
+                      <span className="font-display text-heading-md font-medium tabular-nums text-charcoal-primary">{formatCurrency(Number(quote.totalAmount))}</span>
+                    </div>
                   </div>
                 )}
               </div>
+
+              {quote && quote.count > 0 && (
+                <p className="text-caption text-muted-foreground">
+                  Nothing is charged or billed until you complete payment — these invoices are created when your payment succeeds.
+                </p>
+              )}
 
               <div className="flex justify-end">
                 <Button onClick={pay} disabled={paying || !quote || quote.count === 0}>

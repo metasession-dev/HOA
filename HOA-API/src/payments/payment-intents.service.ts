@@ -155,12 +155,95 @@ export class PaymentIntentsService {
   }
 
   /**
-   * Phase 5: resident "pay any term" prepay. Materializes the chosen term's
-   * period invoices, then opens a single checkout that pays them all at once.
+   * Phase 5 (hardened): resident "pay any term" prepay.
+   *
+   * We quote the term (which validates eligibility + locks the exact periods and
+   * amounts) and open a checkout carrying that plan — but DO NOT create any
+   * invoices yet. The period invoices are materialized + paid atomically only on
+   * payment success (see markSuccess → materializePrepayFromPlan). This way an
+   * abandoned checkout never leaves stray unpaid invoices, and repeated attempts
+   * can't pile up duplicate billing (the per-unit period unique stays the guard).
    */
   async prepay(orgId: string, actor: Actor, unitBillingId: string, request: { periods?: number; days?: number }, opts: { callbackUrl?: string } = {}) {
-    const { invoiceIds } = await this.unitBilling.materializePrepay(actor, unitBillingId, request);
-    return this.createMultiInvoiceIntent(orgId, actor, invoiceIds, opts);
+    const quote = await this.unitBilling.quotePrepay(actor.userId, unitBillingId, request);
+    if (!quote || quote.count === 0) {
+      throw new ConflictException('You are already covered for this term — there is nothing to prepay.');
+    }
+    const currency = quote.currency;
+    const outstanding = new Decimal(quote.totalAmount.toString());
+    if (outstanding.lessThanOrEqualTo(0)) throw new ConflictException('Nothing to pay');
+
+    const actorUser = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { email: true } });
+    const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
+
+    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
+    let provider: 'paystack' | 'mock';
+    if (creds) provider = 'paystack';
+    else if (process.env.NODE_ENV !== 'production') provider = 'mock';
+    else throw new BadRequestException('Online payments are not configured for this organisation.');
+
+    const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
+    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3002/invoices';
+    const callbackUrl = `${callbackBase}?reference=${encodeURIComponent(reference)}&prepay=1`;
+
+    let authorizationUrl: string;
+    if (provider === 'paystack') {
+      const r = await this.paystack.initializeTransaction(
+        {
+          email: actorUser.email,
+          amountMinor,
+          currency,
+          reference,
+          callbackUrl,
+          metadata: { unitBillingId, organizationId: orgId, prepay: true },
+          subaccount: creds!.subaccountCode,
+          bearer: creds!.subaccountCode ? creds!.feeBearer : null,
+        },
+        creds!.secretKey,
+      );
+      authorizationUrl = r.authorizationUrl;
+    } else {
+      const mockBase = process.env.MOCK_CHECKOUT_URL || 'http://localhost:3002/mock-checkout';
+      authorizationUrl = `${mockBase}?reference=${encodeURIComponent(reference)}&amount=${amountMinor}&currency=${currency}&callback=${encodeURIComponent(callbackUrl)}`;
+    }
+
+    // The plan rides on providerMetadata so no invoices exist until payment.
+    const plan = {
+      unitBillingId,
+      termLabel: quote.termLabel,
+      billingTypeName: quote.billingTypeName,
+      currency,
+      periods: quote.periods, // [{ periodKey, from, to, amount }]
+    };
+
+    return this.prisma.$transaction(async (tx) => {
+      const intent = await tx.paymentIntent.create({
+        data: {
+          organizationId: orgId,
+          invoiceId: null,
+          invoiceIds: [],
+          initiatedByUserId: actor.userId,
+          provider,
+          providerReference: reference,
+          amount: outstanding,
+          currency,
+          authorizationUrl,
+          providerMetadata: { prepay: plan } as any,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: orgId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'payment_intent_created',
+          entityType: 'PaymentIntent',
+          entityId: intent.id,
+          changes: { prepay: true, unitBillingId, termLabel: quote.termLabel, amount: outstanding.toString(), currency } as any,
+        },
+      });
+      return intent;
+    });
   }
 
   /** Open a checkout that settles MANY invoices in one payment. */
@@ -362,18 +445,43 @@ export class PaymentIntentsService {
       return { ok: false, reason: 'currency-mismatch' };
     }
 
+    // Preserve the prepay plan (if any) on providerMetadata alongside the
+    // scrubbed processor payload.
+    const prepay = (intent.providerMetadata as any)?.prepay;
     await this.prisma.paymentIntent.update({
       where: { id: intent.id },
       data: {
         status: 'success',
         completedAt: new Date(),
-        providerMetadata: this.scrub(data) as any,
+        providerMetadata: { ...(intent.providerMetadata as any), paystack: this.scrub(data) } as any,
       },
     });
 
-    // Defer to the Payments path so we inherit all downstream side-effects. A
-    // multi-invoice (prepay) checkout allocates the lump sum across its invoices;
-    // the common single-invoice case stays on the verified logPayment path.
+    const amount = Number(intent.amount.toString());
+
+    if (prepay) {
+      // Prepay: materialize the planned period invoices NOW (idempotent via the
+      // per-unit period unique), then allocate this payment across them. Both
+      // steps are idempotent, so a webhook retry converges without duplicating.
+      const invoiceIds = await this.unitBilling.materializePrepayFromPlan(intent.organizationId, prepay, intent.initiatedByUserId);
+      if (invoiceIds.length > 0) {
+        await this.payments.logAllocatedPayment(
+          {
+            organizationId: intent.organizationId,
+            invoiceIds,
+            amount,
+            method: intent.provider,
+            processorReference: intent.providerReference,
+            currency: intent.currency,
+          },
+          intent.initiatedByUserId,
+        );
+      }
+      return { ok: true };
+    }
+
+    // Non-prepay: settle the pre-existing invoice(s). Single stays on the
+    // verified logPayment path; multi allocates the lump sum.
     const ids: string[] = (intent.invoiceIds && intent.invoiceIds.length > 0)
       ? intent.invoiceIds
       : (intent.invoiceId ? [intent.invoiceId] : []);
@@ -383,7 +491,7 @@ export class PaymentIntentsService {
         {
           organizationId: intent.organizationId,
           invoiceIds: ids,
-          amount: Number(intent.amount.toString()),
+          amount,
           method: intent.provider,
           processorReference: intent.providerReference,
           currency: intent.currency,
@@ -394,7 +502,7 @@ export class PaymentIntentsService {
       await this.payments.logPayment(
         {
           invoiceId: single,
-          amount: Number(intent.amount.toString()),
+          amount,
           method: intent.provider,
           processorReference: intent.providerReference,
         },
