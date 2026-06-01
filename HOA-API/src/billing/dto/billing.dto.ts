@@ -366,3 +366,65 @@ export class UpdateBillingTypeDto {
   @IsBoolean()
   isActive?: boolean;
 }
+
+// ============ Per-unit billing attachments (Phase 2) ============
+
+export class AttachUnitBillingDto {
+  @ApiProperty()
+  @IsString()
+  billingTypeId!: string;
+
+  // Optional snapshot override; defaults to the catalog defaultAmount.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amount?: number;
+}
+
+export class UpdateUnitBillingDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amount?: number;
+}
+
+// Either `unitIds` (explicit) or `estateIds` (all units in those estates); both
+// omitted = every unit in the org.
+export class BillingActivationTargetDto {
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  unitIds?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  estateIds?: string[];
+}
+
+export class BulkActivateBillingDto {
+  @ApiPropertyOptional({ type: BillingActivationTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BillingActivationTargetDto)
+  target?: BillingActivationTargetDto;
+
+  @ApiProperty()
+  @IsBoolean()
+  active!: boolean;
+
+  // When activating, also attach the type to units that don't have it yet.
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  attachIfMissing?: boolean;
+}

@@ -114,8 +114,13 @@ export class UnitsController {
 
   @Roles('property_manager')
   @Post('estates/:estateId/units')
-  async create(@Param('estateId') estateId: string, @Body() data: CreateUnitDto) {
-    const unit = await this.service.create(estateId, data);
+  async create(
+    @Param('estateId') estateId: string,
+    @Body() data: CreateUnitDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    const unit = await this.service.create(estateId, data, { orgId, userId });
     return successResponse(unit);
   }
 
@@ -124,9 +129,10 @@ export class UnitsController {
   async bulkCreate(
     @Param('estateId') estateId: string,
     @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
     @Body() data: BulkCreateUnitsDto,
   ) {
-    const result = await this.service.bulkCreate(estateId, orgId, data.rows as any);
+    const result = await this.service.bulkCreate(estateId, orgId, data.rows as any, userId);
     return successResponse(result);
   }
 

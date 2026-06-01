@@ -263,6 +263,7 @@ model Unit {
   violations          Violation[]
   resaleCertificates  ResaleCertificate[]
   requests            Request[]
+  unitBillings        UnitBilling[]
 
   @@unique([estateId, unitNumber])
   @@map("units")
@@ -2128,10 +2129,40 @@ model BillingType {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unitBillings UnitBilling[]
 
   @@unique([organizationId, key])
   @@index([organizationId, isActive])
   @@map("billing_types")
+}
+
+// Per-unit attachment of a BillingType (Phase 2 of unit-default-billing).
+// Price/term/currency are SNAPSHOTTED at attach time so editing the catalog
+// default does not silently re-price already-attached units. `isActive` is the
+// bulk activate/deactivate flag. One attachment per (unit, billingType) — the
+// unique makes auto-attach + manual attach idempotent.
+model UnitBilling {
+  id             String   @id @default(cuid())
+  unitId         String
+  billingTypeId  String
+  organizationId String
+  amount         Decimal  @db.Decimal(12, 2)
+  baseTerm       String
+  currency       String
+  isActive       Boolean  @default(true)
+  startedAt      DateTime?
+  deactivatedAt  DateTime?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  billingType BillingType @relation(fields: [billingTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([unitId, billingTypeId])
+  @@index([organizationId, isActive])
+  @@index([billingTypeId, isActive])
+  @@map("unit_billings")
 }
 
 // A payment plan rolls one or more overdue invoices into a series of

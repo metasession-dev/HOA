@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { UnitBillingsCard } from '@/components/unit-billings-card';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import {
@@ -275,6 +276,9 @@ export default function UnitDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Per-unit billings (catalog charges attached to this unit) */}
+      <UnitBillingsCard unitId={unit.id} />
 
       {/* Recent invoices */}
       <section>

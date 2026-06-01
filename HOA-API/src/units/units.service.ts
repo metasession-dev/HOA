@@ -1,6 +1,7 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PaginationDto, paginatedResponse } from '../common/dto';
+import { UnitBillingService } from '../billing/unit-billing.service';
 
 const ACQUISITION_METHODS = ['initial', 'purchase', 'transfer', 'inheritance', 'gift', 'other'] as const;
 const GENDERS = ['male', 'female', 'other', 'undisclosed'] as const;
@@ -9,7 +10,10 @@ const AGE_GROUPS = ['infant', 'child', 'teenager', 'adult', 'senior'] as const;
 
 @Injectable()
 export class UnitsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private unitBilling: UnitBillingService,
+  ) {}
 
   /**
    * Org-level unit list — every unit across the organization's estate(s).
@@ -122,7 +126,7 @@ export class UnitsService {
     return unit;
   }
 
-  async create(estateId: string, data: any) {
+  async create(estateId: string, data: any, ctx?: { orgId: string; userId: string }) {
     const unitNumber = (data.unitNumber ?? '').toString().trim();
     if (!unitNumber) {
       throw new BadRequestException('unitNumber is required');
@@ -140,8 +144,30 @@ export class UnitsService {
     await this.ensureUnitIdentityFree(estateId, { unitNumber, block, floor });
 
     const { ownerPersonId, ...rest } = data;
-    return this.prisma.unit.create({
-      data: { estateId, ...rest, unitNumber, block, street, floor },
+
+    // Resolve the org from the estate so we can auto-attach the org's default
+    // billing types (Phase 2 of unit-default-billing). When ctx is supplied we
+    // verify the estate belongs to that org; otherwise we trust the estate.
+    const estate = await this.prisma.estate.findUnique({
+      where: { id: estateId },
+      select: { organizationId: true },
+    });
+    if (!estate) throw new NotFoundException('Estate not found');
+    const orgId = estate.organizationId;
+    if (ctx?.orgId && ctx.orgId !== orgId) throw new ForbiddenException('Estate not in your organization');
+    const orgCurrency = await this.unitBilling.orgCurrency(orgId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const unit = await tx.unit.create({
+        data: { estateId, ...rest, unitNumber, block, street, floor },
+      });
+      await this.unitBilling.attachDefaults(tx, {
+        orgId,
+        unitId: unit.id,
+        orgCurrency,
+        createdBy: ctx?.userId || 'system',
+      });
+      return unit;
     });
   }
 
@@ -323,6 +349,7 @@ export class UnitsService {
       type?: string;
       ownerEmail?: string;
     }>,
+    createdBy = 'system',
   ) {
     await this.assertEstateInOrg(estateId, orgId);
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -336,6 +363,8 @@ export class UnitsService {
     // Track within-batch duplicates so two identical rows in the same file
     // surface clearly rather than the second silently colliding in the DB.
     const seen = new Set<string>();
+    // Snapshot currency for default billing attachments is the same for the batch.
+    const orgCurrency = await this.unitBilling.orgCurrency(orgId);
 
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
@@ -351,29 +380,37 @@ export class UnitsService {
         seen.add(key);
         await this.ensureUnitIdentityFree(estateId, { unitNumber, block, floor });
 
-        const created = await this.prisma.unit.create({
-          data: {
-            estateId,
-            unitNumber,
-            block,
-            street,
-            floor,
-            type: r.type && typeof r.type === 'string' ? r.type : undefined,
-          },
-        });
-
-        // Optional owner link by email — only if the person already exists.
+        let ownerId: string | null = null;
         if (r.ownerEmail && r.ownerEmail.trim()) {
           const owner = await this.prisma.person.findFirst({
             where: { organizationId: orgId, email: { equals: r.ownerEmail.trim(), mode: 'insensitive' } },
             select: { id: true },
           });
-          if (owner) {
-            await this.prisma.unitOwnership.create({
-              data: { unitId: created.id, personId: owner.id, acquisitionMethod: 'initial' },
+          ownerId = owner?.id ?? null;
+        }
+
+        // One transaction per row: unit + optional owner link + default billings.
+        // A bad row drops to the catch and doesn't sink the batch.
+        const created = await this.prisma.$transaction(async (tx) => {
+          const unit = await tx.unit.create({
+            data: {
+              estateId,
+              unitNumber,
+              block,
+              street,
+              floor,
+              type: r.type && typeof r.type === 'string' ? r.type : undefined,
+            },
+          });
+          if (ownerId) {
+            await tx.unitOwnership.create({
+              data: { unitId: unit.id, personId: ownerId, acquisitionMethod: 'initial' },
             });
           }
-        }
+          await this.unitBilling.attachDefaults(tx, { orgId, unitId: unit.id, orgCurrency, createdBy });
+          return unit;
+        });
+
         results.push({ row: i + 1, unitNumber, ok: true, unitId: created.id });
         succeeded++;
       } catch (e: any) {

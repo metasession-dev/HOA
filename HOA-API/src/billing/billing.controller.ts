@@ -6,10 +6,12 @@ import { RecurringInvoicesService } from './recurring.service';
 import { LateFeesService } from './late-fees.service';
 import { PaymentPlansService } from './payment-plans.service';
 import { BillingCatalogService } from './billing-catalog.service';
+import { UnitBillingService } from './unit-billing.service';
 import {
   CreateRecurringScheduleDto, UpdateRecurringScheduleDto, UpsertLateFeeConfigDto,
   CreatePaymentPlanDto, CancelPaymentPlanDto,
   CreateBillingTypeDto, UpdateBillingTypeDto,
+  AttachUnitBillingDto, UpdateUnitBillingDto, BulkActivateBillingDto, BillingActivationTargetDto,
 } from './dto/billing.dto';
 import { CurrentUser, Roles } from '../common/decorators';
 import { successResponse } from '../common/dto';
@@ -25,6 +27,7 @@ export class BillingController {
     private lateFees: LateFeesService,
     private plans: PaymentPlansService,
     private catalog: BillingCatalogService,
+    private unitBilling: UnitBillingService,
   ) {}
 
   // ============ Billing catalog (Phase 1 of unit-default-billing) ============
@@ -67,6 +70,65 @@ export class BillingController {
     @CurrentUser('role') role: string,
   ) {
     return successResponse(await this.catalog.archive(orgId, { userId, role }, id));
+  }
+
+  // ============ Per-unit billing attachments (Phase 2) ============
+
+  @Get('units/:unitId/billings')
+  @Roles('hoa_admin', 'finance_officer', 'property_manager', 'super_admin')
+  async listUnitBillings(@Param('unitId') unitId: string, @CurrentUser('organizationId') orgId: string) {
+    return successResponse(await this.unitBilling.listForUnit(orgId, unitId));
+  }
+
+  @Post('units/:unitId/billings')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async attachUnitBilling(
+    @Param('unitId') unitId: string,
+    @Body() dto: AttachUnitBillingDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.unitBilling.attach(orgId, { userId, role }, unitId, dto.billingTypeId, dto.amount));
+  }
+
+  @Put('unit-billings/:id')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async updateUnitBilling(
+    @Param('id') id: string,
+    @Body() dto: UpdateUnitBillingDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.unitBilling.update(orgId, { userId, role }, id, dto));
+  }
+
+  @Post('catalog/:id/activation-preview')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  async previewBillingActivation(
+    @Param('id') id: string,
+    @Body() target: BillingActivationTargetDto,
+    @CurrentUser('organizationId') orgId: string,
+  ) {
+    return successResponse(await this.unitBilling.previewBulk(orgId, id, target || {}));
+  }
+
+  @Post('catalog/:id/bulk-activate')
+  @Roles('hoa_admin', 'finance_officer', 'super_admin')
+  @Idempotent()
+  async bulkActivateBilling(
+    @Param('id') id: string,
+    @Body() dto: BulkActivateBillingDto,
+    @CurrentUser('organizationId') orgId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+  ) {
+    return successResponse(await this.unitBilling.bulkActivate(orgId, { userId, role }, id, {
+      target: dto.target || {},
+      active: dto.active,
+      attachIfMissing: dto.attachIfMissing,
+    }));
   }
 
   // ============ Recurring schedules ============
