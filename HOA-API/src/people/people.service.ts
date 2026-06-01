@@ -161,6 +161,19 @@ export class PeopleService {
         : Promise.resolve([]),
     ]);
 
+    // Resident self-service profile/household changes (audit trail).
+    const profileAudits = person.userId
+      ? await this.prisma.auditLog.findMany({
+          where: {
+            organizationId: orgId,
+            actorId: person.userId,
+            action: { in: ['resident_profile_updated', 'resident_household_added', 'resident_household_updated', 'resident_household_removed'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        })
+      : [];
+
     // Build a unified timeline of typed events.
     type Event = { type: string; at: Date; title: string; meta?: any; entityId?: string };
     const events: Event[] = [];
@@ -185,6 +198,15 @@ export class PeopleService {
     }
     for (const r of requests) {
       events.push({ type: 'request', at: r.createdAt, title: `Request: ${r.subject}`, meta: { status: r.status, priority: r.priority }, entityId: r.id });
+    }
+    const auditTitles: Record<string, string> = {
+      resident_profile_updated: 'Updated their profile',
+      resident_household_added: 'Added a household member',
+      resident_household_updated: 'Updated a household member',
+      resident_household_removed: 'Removed a household member',
+    };
+    for (const a of profileAudits) {
+      events.push({ type: a.action, at: a.createdAt, title: auditTitles[a.action] ?? a.action, meta: a.changes, entityId: a.id });
     }
     events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 

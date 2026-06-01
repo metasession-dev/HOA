@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Vote } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
 const statusBadge: Record<string, 'muted' | 'info' | 'success' | 'destructive'> = {
   open: 'success', closed: 'info', cancelled: 'destructive',
@@ -21,8 +22,13 @@ export default function ResidentVotesList() {
     api.get<any>('/votes').then((r) => setItems(r.data || [])).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  const open = items.filter((v) => v.status === 'open');
-  const past = items.filter((v) => v.status !== 'open');
+  const open = useMemo(() => items.filter((v) => v.status === 'open'), [items]);
+  const past = useMemo(() => items.filter((v) => v.status !== 'open'), [items]);
+  // Open votes are few; the Past section accumulates, so it gets search + paging.
+  const c = useListControls(past, {
+    searchText: (v: any) => `${v.title ?? ''} ${v.outcome ?? ''} ${v.status ?? ''}`,
+    date: (v: any) => v.closedAt ?? v.closesAt,
+  });
 
   return (
     <div className="space-y-6">
@@ -62,10 +68,16 @@ export default function ResidentVotesList() {
             </section>
           )}
           {past.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-caption font-semibold uppercase tracking-wider text-muted-foreground">Past votes</h2>
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-caption font-semibold uppercase tracking-wider text-muted-foreground">Past votes</h2>
+              </div>
+              <ListToolbar c={c} searchPlaceholder="Search past votes" />
+              {c.total === 0 ? (
+                <Card><CardContent className="p-8 text-center text-caption text-muted-foreground">No past votes match your filters.</CardContent></Card>
+              ) : (
               <div className="space-y-2">
-                {past.map((v) => (
+                {c.pageItems.map((v: any) => (
                   <Link key={v.id} href={`/votes/${v.id}`} className="block">
                     <Card><CardContent className="flex items-center justify-between p-4">
                       <div className="min-w-0">
@@ -80,6 +92,8 @@ export default function ResidentVotesList() {
                   </Link>
                 ))}
               </div>
+              )}
+              <ListPager c={c} />
             </section>
           )}
         </>

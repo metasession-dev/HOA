@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, BadRequestException, Logger,
+  Injectable, NotFoundException, BadRequestException, ConflictException, Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -559,7 +559,8 @@ export class UnitBillingService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
       const numbers = await reserveInvoiceNumbers(tx, orgId, periods.length);
       const issue = new Date();
       const invoiceIds: string[] = [];
@@ -618,7 +619,15 @@ export class UnitBillingService {
       });
 
       return { invoiceIds, totalMinor, currency: ccy, organizationId: orgId };
-    });
+      });
+    } catch (e: any) {
+      // A concurrent prepay already created an invoice for one of these periods
+      // (the per-unit period unique). Surface it clearly rather than a 500.
+      if (e?.code === 'P2002') {
+        throw new ConflictException('A payment for one or more of these periods has already been generated. Refresh to see the latest.');
+      }
+      throw e;
+    }
   }
 
   // ---- helpers ----

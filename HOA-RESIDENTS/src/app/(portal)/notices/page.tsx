@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
 function AttachmentRow({ att }: { att: any }) {
   const isImage = att.contentType?.startsWith('image/');
@@ -57,6 +58,11 @@ export default function NoticesPage() {
   }, []);
 
   const selected = notices.find((n) => n.id === selectedId) || null;
+  const c = useListControls(notices, {
+    searchText: (n: any) => `${n.subject ?? ''} ${n.body ?? ''}`,
+    date: (n: any) => n.sentAt ?? n.createdAt,
+    pageSize: 12,
+  });
 
   return (
     <div className="space-y-6">
@@ -77,9 +83,12 @@ export default function NoticesPage() {
         <div className="flex h-[calc(100vh-13rem)] overflow-hidden rounded-card border border-stone-surface bg-card">
           {/* Master list */}
           <div className={cn('flex w-full flex-col lg:w-80 lg:shrink-0 lg:border-r lg:border-stone-surface', selected && 'hidden lg:flex')}>
+            <div className="border-b border-stone-surface p-3">
+              <ListToolbar c={c} searchPlaceholder="Search notices" showDate={false} />
+            </div>
             <div className="flex-1 overflow-y-auto">
               <ul>
-                {notices.map((n) => {
+                {c.pageItems.map((n: any) => {
                   const active = n.id === selectedId;
                   const hasAtts = Array.isArray(n.attachments) && n.attachments.length > 0;
                   return (
@@ -103,6 +112,11 @@ export default function NoticesPage() {
                 })}
               </ul>
             </div>
+            {c.totalPages > 1 && (
+              <div className="border-t border-stone-surface px-3 py-2">
+                <ListPager c={c} />
+              </div>
+            )}
           </div>
 
           {/* Reading pane */}

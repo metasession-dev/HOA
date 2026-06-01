@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Receipt } from 'lucide-react';
 import { api } from '@/lib/api';
-import { formatCurrency, formatDate, getOrgCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { residentInvoiceStatus } from '@/lib/invoice-status';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
 export default function MyInvoicesPage() {
   const router = useRouter();
@@ -27,6 +28,11 @@ export default function MyInvoicesPage() {
 
   // Balance is server-authoritative: amount − amountPaid (the maintained ledger
   // cache). Never just sum invoice amounts — that ignores partial payments.
+  const c = useListControls(invoices, {
+    searchText: (i: any) => `${i.invoiceNumber ?? ''} ${i.unit?.unitNumber ?? ''} ${i.unit?.estate?.name ?? ''} ${i.status ?? ''}`,
+    date: (i: any) => i.dueDate,
+  });
+
   const outstanding = invoices
     .filter((i) => i.status !== 'paid' && i.status !== 'voided')
     .reduce((sum, i) => sum + Math.max(Number(i.amount || 0) - Number(i.amountPaid || 0), 0), 0);
@@ -48,7 +54,7 @@ export default function MyInvoicesPage() {
                 Outstanding
               </p>
               <p className="mt-1 font-display text-heading-lg font-medium text-charcoal-primary">
-                {formatCurrency(outstanding, invoices[0]?.currency || getOrgCurrency())}
+                {formatCurrency(outstanding)}
               </p>
             </div>
             <div className="text-right">
@@ -57,6 +63,10 @@ export default function MyInvoicesPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {!loading && invoices.length > 0 && (
+        <ListToolbar c={c} searchPlaceholder="Search by number, unit or status" />
       )}
 
       <Card>
@@ -75,6 +85,8 @@ export default function MyInvoicesPage() {
                 When your HOA issues an invoice, it will appear here.
               </p>
             </div>
+          ) : c.total === 0 ? (
+            <div className="p-10 text-center text-caption text-muted-foreground">No invoices match your filters.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -88,12 +100,12 @@ export default function MyInvoicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((inv: any, idx: number) => (
+                  {c.pageItems.map((inv: any, idx: number) => (
                     <tr
                       key={inv.id}
                       className={cn(
                         'cursor-pointer transition-colors hover:bg-stone-surface/50',
-                        idx !== invoices.length - 1 && 'border-b border-stone-surface',
+                        idx !== c.pageItems.length - 1 && 'border-b border-stone-surface',
                       )}
                       onClick={() => router.push(`/invoices/${inv.id}`)}
                     >
@@ -107,7 +119,7 @@ export default function MyInvoicesPage() {
                         <span className="text-muted-foreground"> · {inv.unit?.estate?.name}</span>
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-charcoal-primary">
-                        {formatCurrency(Number(inv.amount), inv.currency)}
+                        {formatCurrency(Number(inv.amount))}
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{formatDate(inv.dueDate)}</td>
                       <td className="px-6 py-4">
@@ -121,6 +133,8 @@ export default function MyInvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      {!loading && invoices.length > 0 && <ListPager c={c} />}
     </div>
   );
 }

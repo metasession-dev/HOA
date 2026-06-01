@@ -188,7 +188,9 @@ export default function InvoiceDetailPage() {
               <tbody>
                 {lineItems.map((item: any, idx: number) => {
                   const qty = Number(item.quantity) || 1;
-                  const unit = Number(item.unitPrice) || 0;
+                  // Manual invoices store `unitPrice`; generated/recurring ones
+                  // store `amount`. Normalize so unit price + total always show.
+                  const unit = Number(item.unitPrice ?? item.amount) || 0;
                   return (
                     <tr
                       key={idx}

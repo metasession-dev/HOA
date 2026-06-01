@@ -52,6 +52,10 @@ const timelineMeta: Record<string, { icon: any; tone: string }> = {
   gate_pass: { icon: KeyRound, tone: 'text-graphite' },
   violation: { icon: ShieldAlert, tone: 'text-coral-red' },
   request: { icon: Inbox, tone: 'text-graphite' },
+  resident_profile_updated: { icon: Pencil, tone: 'text-info' },
+  resident_household_added: { icon: Users, tone: 'text-meadow-green' },
+  resident_household_updated: { icon: Users, tone: 'text-info' },
+  resident_household_removed: { icon: Users, tone: 'text-muted-foreground' },
 };
 
 export default function PersonDetailPage() {

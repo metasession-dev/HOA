@@ -20,8 +20,68 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { toast } from '@/components/ui/use-toast';
-import { getInitials } from '@/lib/utils';
+import { getInitials, formatDateTime } from '@/lib/utils';
 import { HouseholdManager } from '@/components/household-manager';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const ACTION_LABEL: Record<string, string> = {
+  resident_profile_updated: 'Updated profile',
+  resident_household_added: 'Added a household member',
+  resident_household_updated: 'Updated a household member',
+  resident_household_removed: 'Removed a household member',
+};
+const FIELD_LABEL: Record<string, string> = {
+  firstName: 'first name', lastName: 'last name', phone: 'phone', avatarUrl: 'photo', language: 'language',
+};
+
+function historyDetail(it: any): string {
+  if (it.action === 'resident_profile_updated') {
+    const changed = it.changes?.changed ? Object.keys(it.changes.changed) : [];
+    return changed.length ? `Changed ${changed.map((k) => FIELD_LABEL[k] || k).join(', ')}` : '';
+  }
+  return it.changes?.member
+    ? `${it.changes.member}${it.changes.relationship ? ` · ${it.changes.relationship}` : ''}`
+    : '';
+}
+
+/** The resident's own change history (profile + household edits). */
+function ChangeHistory() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get<any>('/me/activity-log').then((r) => setItems(r.data || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-6">
+        <div>
+          <h2 className="font-display text-heading-sm font-medium text-charcoal-primary">Recent changes</h2>
+          <p className="mt-1 text-caption text-muted-foreground">A record of changes you’ve made to your account and household.</p>
+        </div>
+        {loading ? (
+          <Skeleton className="h-16" />
+        ) : items.length === 0 ? (
+          <p className="text-caption text-muted-foreground">No changes recorded yet.</p>
+        ) : (
+          <ul className="divide-y divide-stone-surface">
+            {items.map((it) => {
+              const detail = historyDetail(it);
+              return (
+                <li key={it.id} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-sm text-graphite">{ACTION_LABEL[it.action] ?? it.action}</p>
+                    {detail && <p className="text-caption text-muted-foreground">{detail}</p>}
+                  </div>
+                  <span className="shrink-0 text-caption text-muted-foreground">{formatDateTime(it.createdAt)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -322,6 +382,8 @@ export default function ProfilePage() {
       </Card>
 
       <HouseholdManager />
+
+      <ChangeHistory />
     </div>
   );
 }

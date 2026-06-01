@@ -66,6 +66,24 @@ export class MeService {
       .catch(() => { /* swallow */ });
   }
 
+  /**
+   * Record a resident self-service change to the audit trail so both the
+   * resident (GET /me/activity-log) and admins (People activity) keep a history.
+   * Best-effort — never blocks the underlying write.
+   */
+  private logChange(
+    organizationId: string | undefined | null,
+    actorId: string,
+    action: string,
+    entityType: string,
+    entityId: string,
+    changes: any,
+  ) {
+    return this.prisma.auditLog
+      .create({ data: { organizationId: organizationId || null, actorId, actorRole: 'resident', action, entityType, entityId, changes: changes as any } })
+      .catch(() => { /* never block the write on audit */ });
+  }
+
   private async actorDisplayName(userId: string): Promise<string> {
     const u = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -117,6 +135,10 @@ export class MeService {
     if (trimmed.phone && trimmed.phone.replace(/\D/g, '').length < 6) {
       throw new BadRequestException('phone is too short');
     }
+    const before = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, phone: true, avatarUrl: true, language: true },
+    });
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: trimmed,
@@ -135,15 +157,26 @@ export class MeService {
         photoUrl: trimmed.avatarUrl,
       },
     });
-    if (organizationId) {
-      const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
-      this.notifyManagersOfChange(
-        organizationId,
-        userId,
-        name,
-        'resident_profile_updated',
-        `${name} updated their profile details.`,
-      );
+    // Record exactly which fields changed for the history (both apps read this).
+    const FIELDS = ['firstName', 'lastName', 'phone', 'avatarUrl', 'language'] as const;
+    const changed: Record<string, { from: any; to: any }> = {};
+    for (const k of FIELDS) {
+      if ((trimmed as any)[k] !== undefined && before && (before as any)[k] !== (user as any)[k]) {
+        changed[k] = { from: (before as any)[k] ?? null, to: (user as any)[k] ?? null };
+      }
+    }
+    if (Object.keys(changed).length > 0) {
+      this.logChange(organizationId, userId, 'resident_profile_updated', 'User', userId, { changed });
+      if (organizationId) {
+        const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+        this.notifyManagersOfChange(
+          organizationId,
+          userId,
+          name,
+          'resident_profile_updated',
+          `${name} updated their profile details.`,
+        );
+      }
     }
     return user;
   }
@@ -500,12 +533,16 @@ export class MeService {
       },
     });
     const name = await this.actorDisplayName(userId);
+    const memberName = [created.firstName, created.lastName].filter(Boolean).join(' ').trim();
+    this.logChange(organizationId, userId, 'resident_household_added', 'AdditionalOccupant', created.id, {
+      member: memberName, relationship: created.relationship,
+    });
     this.notifyManagersOfChange(
       organizationId,
       userId,
       name,
       'resident_household_updated',
-      `${name} added a household member.`,
+      `${name} added a household member${memberName ? ` (${memberName})` : ''}.`,
     );
     return created;
   }
@@ -552,12 +589,16 @@ export class MeService {
       },
     });
     const name = await this.actorDisplayName(userId);
+    const memberName = [updated.firstName, updated.lastName].filter(Boolean).join(' ').trim();
+    this.logChange(organizationId, userId, 'resident_household_updated', 'AdditionalOccupant', updated.id, {
+      member: memberName, relationship: updated.relationship,
+    });
     this.notifyManagersOfChange(
       organizationId,
       userId,
       name,
       'resident_household_updated',
-      `${name} updated a household member.`,
+      `${name} updated a household member${memberName ? ` (${memberName})` : ''}.`,
     );
     return updated;
   }
@@ -569,13 +610,31 @@ export class MeService {
       data: { isActive: false },
     });
     const name = await this.actorDisplayName(userId);
+    const memberName = [removed.firstName, removed.lastName].filter(Boolean).join(' ').trim();
+    this.logChange(organizationId, userId, 'resident_household_removed', 'AdditionalOccupant', removed.id, {
+      member: memberName, relationship: removed.relationship,
+    });
     this.notifyManagersOfChange(
       organizationId,
       userId,
       name,
       'resident_household_updated',
-      `${name} removed a household member.`,
+      `${name} removed a household member${memberName ? ` (${memberName})` : ''}.`,
     );
     return removed;
+  }
+
+  /** Resident's own change history (profile + household), newest first. */
+  async activityLog(userId: string, limit = 50) {
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        actorId: userId,
+        action: { in: ['resident_profile_updated', 'resident_household_added', 'resident_household_updated', 'resident_household_removed'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 100),
+      select: { id: true, action: true, entityType: true, entityId: true, changes: true, createdAt: true },
+    });
+    return rows;
   }
 }
