@@ -131,6 +131,19 @@ export class FinanceController {
     return successResponse(report);
   }
 
+  @Get('reports/collections')
+  async collectionsReport(
+    @CurrentUser('organizationId') orgId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const now = new Date();
+    const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    return successResponse(
+      await this.service.getCollectionsReport(orgId, this.parseDate(from, yearStart), this.parseDate(to, now)),
+    );
+  }
+
   @Get('reports/income-statement')
   async incomeStatement(
     @CurrentUser('organizationId') orgId: string,

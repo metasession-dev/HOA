@@ -133,4 +133,94 @@ export class FinanceService {
       };
     });
   }
+
+  /**
+   * Billing collections report over a period: how much was billed, how much has
+   * been collected, how much is outstanding, plus the list of units/residents
+   * who still owe money (defaulters), sorted by amount.
+   *
+   * Scoped to invoices ISSUED within [from, to] (issue date = createdAt). Voided
+   * invoices are excluded. `collected` uses the server-authoritative amountPaid
+   * cache. All amounts are in the org currency.
+   */
+  async getCollectionsReport(orgId: string, from: Date, to: Date) {
+    const org = await this.prisma.organization.findUniqueOrThrow({
+      where: { id: orgId },
+      select: { currency: true },
+    });
+    const currency = (org.currency || 'ZAR').toUpperCase();
+    // Make `to` inclusive of the whole day (queries pass YYYY-MM-DD = midnight).
+    const toEnd = new Date(to.getTime() + 86_399_999);
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        organizationId: orgId,
+        status: { not: 'voided' },
+        createdAt: { gte: from, lte: toEnd },
+      },
+      include: {
+        unit: { include: { estate: true, occupancies: { where: { isActive: true }, include: { person: true } } } },
+      },
+    });
+
+    let billed = 0, collected = 0;
+    const now = Date.now();
+    const byUnit = new Map<string, {
+      unitId: string; unitNumber: string; estateName: string; resident: string;
+      billed: number; collected: number; outstanding: number; invoiceCount: number; oldestDueDate: Date;
+    }>();
+
+    for (const inv of invoices) {
+      const amt = Number(inv.amount) || 0;
+      const paid = Number(inv.amountPaid) || 0;
+      const outstanding = Math.max(amt - paid, 0);
+      billed += amt;
+      collected += paid;
+      if (outstanding <= 0.005) continue;
+
+      const resident = inv.unit.occupancies[0]?.person
+        ? `${inv.unit.occupancies[0].person.firstName} ${inv.unit.occupancies[0].person.lastName}`
+        : 'No active resident';
+      const cur = byUnit.get(inv.unitId) || {
+        unitId: inv.unitId, unitNumber: inv.unit.unitNumber, estateName: inv.unit.estate.name,
+        resident, billed: 0, collected: 0, outstanding: 0, invoiceCount: 0, oldestDueDate: inv.dueDate,
+      };
+      cur.billed += amt;
+      cur.collected += paid;
+      cur.outstanding += outstanding;
+      cur.invoiceCount += 1;
+      if (inv.dueDate < cur.oldestDueDate) cur.oldestDueDate = inv.dueDate;
+      byUnit.set(inv.unitId, cur);
+    }
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const defaulters = Array.from(byUnit.values())
+      .map((d) => ({
+        unitId: d.unitId,
+        unitNumber: d.unitNumber,
+        estateName: d.estateName,
+        resident: d.resident,
+        billed: round(d.billed),
+        collected: round(d.collected),
+        outstanding: round(d.outstanding),
+        invoiceCount: d.invoiceCount,
+        oldestDueDate: d.oldestDueDate,
+        daysOverdue: d.oldestDueDate < new Date() ? Math.floor((now - d.oldestDueDate.getTime()) / 86_400_000) : 0,
+      }))
+      .sort((a, b) => b.outstanding - a.outstanding);
+
+    return {
+      currency,
+      period: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
+      totals: {
+        billed: round(billed),
+        collected: round(collected),
+        outstanding: round(billed - collected),
+        collectionRate: billed > 0 ? Math.round((collected / billed) * 100) : 0,
+        invoiceCount: invoices.length,
+        defaulterUnits: defaulters.length,
+      },
+      defaulters,
+    };
+  }
 }

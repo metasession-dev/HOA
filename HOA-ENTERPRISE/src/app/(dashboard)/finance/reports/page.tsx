@@ -13,9 +13,10 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { IncomeStatementView, BalanceSheetView, CashFlowView } from './statement-views';
 
-type ReportView = 'arrears' | 'trial-balance' | 'income-statement' | 'balance-sheet' | 'cash-flow';
+type ReportView = 'collections' | 'arrears' | 'trial-balance' | 'income-statement' | 'balance-sheet' | 'cash-flow';
 
 const tabs: Array<{ id: ReportView; label: string }> = [
+  { id: 'collections', label: 'Collections' },
   { id: 'income-statement', label: 'Income statement' },
   { id: 'balance-sheet', label: 'Balance sheet' },
   { id: 'cash-flow', label: 'Cash flow' },
@@ -27,7 +28,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const yearStart = () => `${new Date().getUTCFullYear()}-01-01`;
 
 export default function ReportsPage() {
-  const [view, setView] = useState<ReportView>('income-statement');
+  const [view, setView] = useState<ReportView>('collections');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState(yearStart());
@@ -39,7 +40,8 @@ export default function ReportsPage() {
     // Clear stale data so a view-shape mismatch doesn't crash the next view's render
     setData(null);
     let url = '';
-    if (view === 'arrears') url = '/finance/reports/arrears';
+    if (view === 'collections') url = `/finance/reports/collections?from=${from}&to=${to}`;
+    else if (view === 'arrears') url = '/finance/reports/arrears';
     else if (view === 'trial-balance') url = '/finance/reports/trial-balance';
     else if (view === 'income-statement') url = `/finance/reports/income-statement?from=${from}&to=${to}`;
     else if (view === 'balance-sheet') url = `/finance/reports/balance-sheet?asOf=${asOf}`;
@@ -47,7 +49,7 @@ export default function ReportsPage() {
     api.get<any>(url).then((r) => setData(r.data)).catch(console.error).finally(() => setLoading(false));
   }, [view, from, to, asOf]);
 
-  const needsRange = view === 'income-statement' || view === 'cash-flow';
+  const needsRange = view === 'income-statement' || view === 'cash-flow' || view === 'collections';
   const needsAsOf = view === 'balance-sheet';
 
   return (
@@ -90,6 +92,8 @@ export default function ReportsPage() {
 
       {loading ? (
         <Card><CardContent className="p-6 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-12" />)}</CardContent></Card>
+      ) : view === 'collections' && data ? (
+        <CollectionsView data={data} />
       ) : view === 'income-statement' && data ? (
         <IncomeStatementView data={data} />
       ) : view === 'balance-sheet' && data ? (
@@ -102,6 +106,87 @@ export default function ReportsPage() {
         <TrialBalanceView data={data || []} />
       ) : null}
     </div>
+  );
+}
+
+function CollectionsView({ data }: { data: any }) {
+  const t = data.totals;
+  const defaulters: any[] = data.defaulters || [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CollStat label="Billed" value={formatCurrency(t.billed)} hint={`${t.invoiceCount} invoice(s)`} />
+        <CollStat label="Collected" value={formatCurrency(t.collected)} hint={`${t.collectionRate}% collection rate`} tone="green" />
+        <CollStat label="Outstanding" value={formatCurrency(t.outstanding)} hint={`${t.defaulterUnits} unit(s) owing`} tone="red" />
+        <CollStat label="Collection rate" value={`${t.collectionRate}%`} hint={`${data.period.from} → ${data.period.to}`} />
+      </div>
+
+      {/* Collected-vs-outstanding progress bar */}
+      <Card><CardContent className="p-5">
+        <div className="mb-2 flex items-center justify-between text-caption text-muted-foreground">
+          <span>Collected {formatCurrency(t.collected)}</span>
+          <span>Outstanding {formatCurrency(t.outstanding)}</span>
+        </div>
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-stone-surface">
+          <div className="h-full bg-meadow-green" style={{ width: `${t.collectionRate}%` }} />
+          <div className="h-full bg-coral-red" style={{ width: `${Math.max(0, 100 - t.collectionRate)}%` }} />
+        </div>
+      </CardContent></Card>
+
+      {/* Defaulters */}
+      <div>
+        <h2 className="mb-2 font-display text-heading-sm text-charcoal-primary">Residents with outstanding balances</h2>
+        {defaulters.length === 0 ? (
+          <Card><CardContent className="p-10 text-center">
+            <p className="text-body font-medium text-charcoal-primary">Everyone&rsquo;s paid up</p>
+            <p className="text-caption text-muted-foreground">No outstanding balances for invoices issued in this period.</p>
+          </CardContent></Card>
+        ) : (
+          <Card><CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-surface text-left text-caption font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-6 py-3">Resident</th><th className="px-6 py-3">Unit</th>
+                    <th className="px-6 py-3 text-right">Billed</th><th className="px-6 py-3 text-right">Paid</th>
+                    <th className="px-6 py-3 text-right">Outstanding</th><th className="px-6 py-3 text-right">Invoices</th>
+                    <th className="px-6 py-3 text-right">Overdue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {defaulters.map((d, idx) => (
+                    <tr key={d.unitId} className={cn('hover:bg-stone-surface/50', idx !== defaulters.length - 1 && 'border-b border-stone-surface')}>
+                      <td className="px-6 py-3 text-charcoal-primary font-medium">{d.resident}</td>
+                      <td className="px-6 py-3 text-graphite">Unit {d.unitNumber}<span className="text-muted-foreground"> · {d.estateName}</span></td>
+                      <td className="px-6 py-3 text-right text-graphite">{formatCurrency(d.billed)}</td>
+                      <td className="px-6 py-3 text-right text-meadow-green">{formatCurrency(d.collected)}</td>
+                      <td className="px-6 py-3 text-right font-medium text-coral-red">{formatCurrency(d.outstanding)}</td>
+                      <td className="px-6 py-3 text-right text-muted-foreground tabular-nums">{d.invoiceCount}</td>
+                      <td className="px-6 py-3 text-right">
+                        {d.daysOverdue > 0
+                          ? <span className="rounded-full bg-coral-red/10 px-2 py-0.5 text-[11px] font-medium text-coral-red">{d.daysOverdue}d</span>
+                          : <span className="text-caption text-muted-foreground">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent></Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CollStat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'green' | 'red' }) {
+  return (
+    <Card><CardContent className="p-5">
+      <p className="text-caption uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn('mt-1 text-heading-md font-semibold tabular-nums',
+        tone === 'green' ? 'text-meadow-green' : tone === 'red' ? 'text-coral-red' : 'text-charcoal-primary')}>{value}</p>
+      {hint && <p className="mt-0.5 text-caption text-muted-foreground">{hint}</p>}
+    </CardContent></Card>
   );
 }
 

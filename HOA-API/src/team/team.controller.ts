@@ -29,9 +29,30 @@ import {
   UpdateCustomRoleDto,
 } from './dto/team.dto';
 import { permissionsByModule } from './permissions';
+import { SystemRoles, RoleDisplayNames } from '../shared/constants/roles';
+import { Permissions, RolePermissions } from '../shared/constants/permissions';
 
 const ADMIN_ROLES = ['hoa_admin', 'super_admin'] as const;
 const PM_ROLES = ['property_manager'] as const;
+
+// Short, human descriptions of each built-in role for the roles & permissions
+// page. System-role access is enforced by role (see RolesGuard), not by an
+// editable permission set — these permission profiles are the documented intent.
+const SYSTEM_ROLE_DESCRIPTIONS: Record<string, string> = {
+  super_admin: 'Platform root — unrestricted access across every organization.',
+  hoa_admin: 'Full administrative access to this organization.',
+  property_manager: 'Day-to-day estate & property operations with basic finance.',
+  finance_officer: 'Invoicing, payments, GL, journals and reconciliation.',
+  exco_member: 'Board member — read-mostly oversight of finance & governance.',
+  exco_chairperson: 'Board chairperson — board oversight with chair privileges.',
+  communications_manager: 'Sends and manages community broadcasts.',
+  gate_security: 'Gate console — verify visitors and operate entry/exit.',
+  maintenance_coordinator: 'Triages and coordinates maintenance requests.',
+  external_accountant: 'Outside accountant — finance read & bookkeeping access.',
+  owner: 'Resident owner — own invoices, payments, documents, visitor passes.',
+  tenant: 'Resident tenant — own invoices, payments, documents, visitor passes.',
+  vendor: 'External supplier — own vendor profile and invoices only.',
+};
 
 @ApiTags('Team')
 @ApiBearerAuth()
@@ -245,6 +266,29 @@ export class TeamController {
   @Roles(...ADMIN_ROLES, ...PM_ROLES)
   async listPermissions() {
     return successResponse({ byModule: permissionsByModule() });
+  }
+
+  // Built-in system roles + their default permission profile. Read-only: system
+  // roles can't be edited (access is enforced by role), but admins can see every
+  // role and exactly what it's meant to do. Custom roles (above) remain editable.
+  @Get('system-roles')
+  @Roles(...ADMIN_ROLES, ...PM_ROLES)
+  async listSystemRoles() {
+    const allPermissionsCount = Object.values(Permissions).length;
+    const roles = Object.values(SystemRoles).map((role) => {
+      const permissions = RolePermissions[role] ?? [];
+      return {
+        role,
+        displayName: RoleDisplayNames[role],
+        description: SYSTEM_ROLE_DESCRIPTIONS[role] ?? '',
+        isSystem: true,
+        // hoa_admin / super_admin carry the full catalog.
+        fullAccess: permissions.length === allPermissionsCount,
+        permissions,
+        permissionCount: permissions.length,
+      };
+    });
+    return successResponse({ roles, allPermissionsCount });
   }
 
   // ============== Operations ==============
