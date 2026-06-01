@@ -81,6 +81,10 @@ export class MeetingsService {
   async send(id: string, orgId: string, actor: { userId: string; role: string }) {
     const m = await this.get(id, orgId);
     if (m.status === 'cancelled') throw new BadRequestException('Meeting is cancelled');
+    // A meeting that has already ended can't be (re)invited to.
+    if (new Date(m.endsAt) < new Date()) {
+      throw new BadRequestException('Cannot send invites for a meeting that has already ended');
+    }
 
     const recipients = await this.resolveAudience(orgId, m.audience as Audience);
     const userIds = recipients.map((r) => r.userId);

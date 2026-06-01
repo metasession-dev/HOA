@@ -106,7 +106,7 @@ export default function ResidentViolationDetailPage() {
             <CardWarm className="mt-3 p-4">
               <p className="font-mono text-caption text-muted-foreground">{v.fineInvoice.invoiceNumber}</p>
               <p className="text-heading-sm font-display font-medium text-charcoal-primary">
-                {formatCurrency(Number(v.fineAmount), v.fineCurrency)}
+                {formatCurrency(Number(v.fineAmount))}
               </p>
               <p className="text-caption text-muted-foreground mt-1">Due {formatDate(v.fineInvoice.dueDate)}</p>
             </CardWarm>

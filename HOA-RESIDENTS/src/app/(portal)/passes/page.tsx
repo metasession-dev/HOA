@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { KeyRound, Plus, Calendar, Car, User2 } from 'lucide-react';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -45,9 +46,16 @@ export default function MyPassesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = passes.filter((p) =>
-    tab === 'active' ? p.status === 'active' : p.status !== 'active',
+  // Memoized so the list-controls hook sees a stable reference (and doesn't
+  // reset the page on every render).
+  const filtered = useMemo(
+    () => passes.filter((p) => (tab === 'active' ? p.status === 'active' : p.status !== 'active')),
+    [passes, tab],
   );
+  const c = useListControls(filtered, {
+    searchText: (p: any) => `${p.visitorName ?? ''} ${p.code ?? ''} ${p.type ?? ''} ${p.vehicleReg ?? ''}`,
+    date: (p: any) => p.validFrom ?? p.createdAt,
+  });
 
   return (
     <div className="space-y-6">
@@ -84,6 +92,8 @@ export default function MyPassesPage() {
         </div>
       </header>
 
+      {!loading && filtered.length > 0 && <ListToolbar c={c} searchPlaceholder="Search by visitor, code or vehicle" />}
+
       {loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}
@@ -112,9 +122,11 @@ export default function MyPassesPage() {
             )}
           </CardContent>
         </Card>
+      ) : c.total === 0 ? (
+        <Card><CardContent className="p-10 text-center text-caption text-muted-foreground">No passes match your filters.</CardContent></Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((p: any) => (
+          {c.pageItems.map((p: any) => (
             <Link key={p.id} href={`/passes/${p.id}`} className="block group">
               <Card className="transition-shadow duration-200 hover:shadow-soft">
                 <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
@@ -154,6 +166,7 @@ export default function MyPassesPage() {
               </Card>
             </Link>
           ))}
+          <ListPager c={c} />
         </div>
       )}
     </div>

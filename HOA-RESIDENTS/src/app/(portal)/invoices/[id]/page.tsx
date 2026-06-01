@@ -89,7 +89,7 @@ export default function ResidentInvoiceDetail() {
           <span className="font-mono text-caption text-muted-foreground">{invoice.invoiceNumber}</span>
         </div>
         <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">
-          {formatCurrency(Number(invoice.amount), invoice.currency)}
+          {formatCurrency(Number(invoice.amount))}
         </h1>
         <p className="text-caption text-muted-foreground">
           Due {formatDate(invoice.dueDate)} · Unit {invoice.unit?.unitNumber} · {invoice.unit?.estate?.name}
@@ -103,7 +103,7 @@ export default function ResidentInvoiceDetail() {
               <div>
                 <p className="text-caption text-muted-foreground">Outstanding</p>
                 <p className="font-display text-heading-md font-medium text-charcoal-primary">
-                  {formatCurrency(outstanding, invoice.currency)}
+                  {formatCurrency(outstanding)}
                 </p>
               </div>
               <Button onClick={startCheckout} disabled={paying}>
@@ -156,16 +156,18 @@ export default function ResidentInvoiceDetail() {
                   <tbody className="divide-y divide-stone-surface">
                     {invoice.lineItems.map((li: any, i: number) => {
                       const qty = Number(li.quantity) || 1;
-                      const unit = Number(li.unitPrice) || 0;
+                      // Line items come in two shapes: manual invoices use
+                      // `unitPrice`, generated/recurring ones use `amount`.
+                      const unit = Number(li.unitPrice ?? li.amount) || 0;
                       return (
                         <tr key={i}>
                           <td className="px-4 py-3 text-graphite">{li.description}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-graphite">{qty}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-graphite">
-                            {formatCurrency(unit, invoice.currency)}
+                            {formatCurrency(unit)}
                           </td>
                           <td className="px-4 py-3 text-right font-medium tabular-nums text-charcoal-primary">
-                            {formatCurrency(unit * qty, invoice.currency)}
+                            {formatCurrency(unit * qty)}
                           </td>
                         </tr>
                       );
@@ -191,7 +193,7 @@ export default function ResidentInvoiceDetail() {
                       <p className="text-caption text-muted-foreground">{formatDate(p.createdAt)} · ref {p.processorReference}</p>
                     </div>
                     <span className="text-sm font-medium text-charcoal-primary tabular-nums">
-                      {formatCurrency(Number(p.amount), p.currency)}
+                      {formatCurrency(Number(p.amount))}
                     </span>
                   </li>
                 ))}

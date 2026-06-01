@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
 const statusBadge: Record<string, 'muted' | 'info' | 'warning' | 'success' | 'destructive' | 'accent'> = {
   open: 'warning',
@@ -28,12 +29,19 @@ export default function MyViolationsPage() {
     api.get<any>('/violations').then((r) => setItems(r.data || [])).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  const c = useListControls(items, {
+    searchText: (v: any) => `${v.category?.name ?? ''} ${v.description ?? ''} ${v.status ?? ''}`,
+    date: (v: any) => v.occurredAt,
+  });
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-heading-lg leading-tight text-charcoal-primary">Violations</h1>
         <p className="mt-1 text-body text-muted-foreground">Notices issued to your unit. Tap to view or appeal.</p>
       </header>
+
+      {!loading && items.length > 0 && <ListToolbar c={c} searchPlaceholder="Search violations" />}
 
       {loading ? (
         <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-24" />)}</div>
@@ -47,9 +55,11 @@ export default function MyViolationsPage() {
             <p className="text-caption text-muted-foreground">Thanks for being a good neighbour.</p>
           </CardContent>
         </Card>
+      ) : c.total === 0 ? (
+        <Card><CardContent className="p-10 text-center text-caption text-muted-foreground">No violations match your filters.</CardContent></Card>
       ) : (
         <div className="space-y-3">
-          {items.map((v) => (
+          {c.pageItems.map((v: any) => (
             <Link key={v.id} href={`/violations/${v.id}`} className="block group">
               <Card className="transition-shadow hover:shadow-soft">
                 <CardContent className="flex flex-wrap items-start justify-between gap-3 p-5">
@@ -66,6 +76,7 @@ export default function MyViolationsPage() {
               </Card>
             </Link>
           ))}
+          <ListPager c={c} />
         </div>
       )}
     </div>

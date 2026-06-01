@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { useListControls, ListToolbar, ListPager } from '@/components/ui/list-controls';
 
 const statusBadge: Record<string, 'default' | 'info' | 'warning' | 'success' | 'muted' | 'destructive'> = {
   submitted: 'info', triaged: 'info', in_progress: 'warning',
@@ -25,6 +26,11 @@ export default function MyRequestsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const c = useListControls(items, {
+    searchText: (r: any) => `${r.subject ?? ''} ${r.category?.name ?? ''} ${r.status ?? ''}`,
+    date: (r: any) => r.createdAt,
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -39,6 +45,8 @@ export default function MyRequestsPage() {
         </Link>
       </header>
 
+      {!loading && items.length > 0 && <ListToolbar c={c} searchPlaceholder="Search requests" />}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -51,9 +59,11 @@ export default function MyRequestsPage() {
               <p className="mt-3 text-body text-charcoal-primary font-medium">No requests yet</p>
               <p className="text-caption text-muted-foreground">Submit one when something needs the management team&rsquo;s attention.</p>
             </div>
+          ) : c.total === 0 ? (
+            <div className="p-10 text-center text-caption text-muted-foreground">No requests match your filters.</div>
           ) : (
             <ul className="divide-y divide-stone-surface">
-              {items.map((r) => (
+              {c.pageItems.map((r: any) => (
                 <li key={r.id}>
                   <Link href={`/requests/${r.id}`} className="block p-4 hover:bg-stone-surface/50 transition-colors">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -71,6 +81,8 @@ export default function MyRequestsPage() {
           )}
         </CardContent>
       </Card>
+
+      {!loading && items.length > 0 && <ListPager c={c} />}
     </div>
   );
 }

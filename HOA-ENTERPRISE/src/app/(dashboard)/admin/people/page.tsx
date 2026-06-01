@@ -81,40 +81,57 @@ export default function PeoplePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Create a person, optionally also sending them a resident invite (so they can
+  // set up a login) in the same action — reuses POST /team/invites.
+  const submitPerson = async (invite: boolean) => {
+    if (invite && !form.email.trim()) {
+      toast({ variant: 'error', title: 'Email required to invite', description: 'Add an email address to send an invitation.' });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post<any>('/people', { ...form, photoUrl: photo[0]?.url });
-      // Prepend the new row instead of refetching the whole list — the
-      // refetch is what caused the page to *feel* like it reloaded after a
-      // create: the drawer's close animation overlapped with a GET that
-      // replaced every list row, and the brief blank between old and new
-      // arrays read as a flicker. Optimistic insert eliminates that entirely.
-      // Falls back to refetch only if the API didn't return the created row.
+      // Prepend the new row instead of refetching the whole list (avoids the
+      // flicker of a full list replace during the drawer's close animation).
       const created = res?.data;
       if (created?.id) {
         setPeople((cur) => {
-          // De-dupe in case a search-driven refetch already raced in the new row.
           if (cur.some((p) => p.id === created.id)) return cur;
-          // Respect the current type filter: don't show an owner when "tenants"
-          // is selected. If filtered out, just toast and skip the visual update.
           if (typeFilter !== 'all' && created.type !== typeFilter) return cur;
           return [created, ...cur];
         });
       } else {
         fetchPeople(search);
       }
-      toast({ variant: 'success', title: 'Person added', description: `${form.firstName} ${form.lastName}` });
+
+      if (invite && created?.id) {
+        const roleName = created.type === 'tenant' ? 'tenant' : 'owner';
+        const idemp = `invite-${form.email.trim().toLowerCase()}-${Date.now()}`;
+        const inv = await api.post<any>('/team/invites', {
+          kind: 'resident',
+          email: form.email.trim().toLowerCase(),
+          firstName: form.firstName || undefined,
+          lastName: form.lastName || undefined,
+          roleName,
+          personId: created.id,
+        }, idemp);
+        const url = `${process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005'}/invites/${inv.data.token}`;
+        try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+        toast({ variant: 'success', title: 'Person added & invited', description: 'Invite link copied to clipboard.' });
+      } else {
+        toast({ variant: 'success', title: 'Person added', description: `${form.firstName} ${form.lastName}` });
+      }
       setShowCreate(false);
       setForm({ firstName: '', lastName: '', email: '', phone: '', type: 'owner' });
       setPhoto([]);
     } catch (err: any) {
-      toast({ variant: 'error', title: 'Could not add person', description: err.message });
+      toast({ variant: 'error', title: invite ? 'Could not add & invite' : 'Could not add person', description: err.message });
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleCreate = (e: React.FormEvent) => { e.preventDefault(); submitPerson(false); };
 
   const [view, setView] = useViewMode('people', 'card');
 
@@ -382,8 +399,11 @@ export default function PeoplePage() {
               <Button type="submit" loading={submitting}>
                 {submitting ? 'Saving…' : 'Add person'}
               </Button>
+              <Button type="button" variant="secondary" disabled={submitting} onClick={() => submitPerson(true)} title="Create the person and send them a resident invite">
+                Add &amp; invite
+              </Button>
               <DrawerClose asChild>
-                <Button type="button" variant="secondary">Cancel</Button>
+                <Button type="button" variant="ghost">Cancel</Button>
               </DrawerClose>
             </DrawerFooter>
           </form>

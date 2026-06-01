@@ -139,7 +139,7 @@ export default function PrepayPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-charcoal-primary">{c.billingType?.name}</p>
                         <p className="text-caption text-muted-foreground">
-                          {formatCurrency(Number(c.amount), c.currency)} / {TERM_UNIT[c.baseTerm] || c.baseTerm} · Unit {c.unit?.unitNumber}
+                          {formatCurrency(Number(c.amount))} / {TERM_UNIT[c.baseTerm] || c.baseTerm} · Unit {c.unit?.unitNumber}
                         </p>
                       </div>
                       {active && <Badge variant="success">selected</Badge>}
@@ -192,7 +192,7 @@ export default function PrepayPage() {
                       <div>
                         <p className="text-caption uppercase tracking-wider text-muted-foreground">Total for {quote.termLabel}</p>
                         <p className="font-display text-heading-lg font-medium tabular-nums text-charcoal-primary">
-                          {formatCurrency(Number(quote.totalAmount), quote.currency)}
+                          {formatCurrency(Number(quote.totalAmount))}
                         </p>
                       </div>
                       <Badge variant="info">{quote.count} invoice{quote.count > 1 ? 's' : ''}</Badge>
@@ -208,7 +208,7 @@ export default function PrepayPage() {
 
               <div className="flex justify-end">
                 <Button onClick={pay} disabled={paying || !quote || quote.count === 0}>
-                  {paying ? 'Starting checkout…' : <>Pay {quote && quote.count > 0 ? formatCurrency(Number(quote.totalAmount), quote.currency) : ''}<ArrowRight className="ml-1.5 h-4 w-4" /></>}
+                  {paying ? 'Starting checkout…' : <>Pay {quote && quote.count > 0 ? formatCurrency(Number(quote.totalAmount)) : ''}<ArrowRight className="ml-1.5 h-4 w-4" /></>}
                 </Button>
               </div>
             </CardContent></Card>

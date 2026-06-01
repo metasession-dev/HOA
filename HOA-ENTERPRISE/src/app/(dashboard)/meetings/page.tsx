@@ -8,7 +8,7 @@
  * link as the online URL.
  */
 import { useEffect, useState } from 'react';
-import { CalendarDays, Plus, Send, X, MapPin, Video, Users } from 'lucide-react';
+import { CalendarDays, Plus, Send, X, MapPin, Video, Users, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,7 @@ export default function MeetingsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [detail, setDetail] = useState<any | null>(null);
   const [form, setForm] = useState({
     title: '', description: '', location: '', onlineUrl: '',
     startsAt: localDefault(24), endsAt: localDefault(25), audience: 'all_residents',
@@ -160,11 +161,18 @@ export default function MeetingsPage() {
             return (
               <Card key={m.id}>
                 <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5">
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className="group min-w-0 flex-1 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetail(m)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail(m); } }}
+                  >
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-heading-sm font-medium text-charcoal-primary">{m.title}</h3>
+                      <h3 className="text-heading-sm font-medium text-charcoal-primary group-hover:text-ember-orange">{m.title}</h3>
                       <Badge variant={statusBadge[m.status] || 'muted'}>{m.status}</Badge>
                       {past && m.status !== 'cancelled' && <Badge variant="muted">past</Badge>}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>
                     <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{when(m)}</span>
@@ -177,9 +185,12 @@ export default function MeetingsPage() {
                   </div>
                   {m.status !== 'cancelled' && (
                     <div className="flex shrink-0 items-center gap-2">
-                      <Button size="sm" onClick={() => send(m)}>
-                        <Send className="mr-1 h-3.5 w-3.5" />{m.status === 'sent' ? 'Resend' : 'Send invites'}
-                      </Button>
+                      {/* A past meeting can't be (re)invited to — hide Send/Resend. */}
+                      {!past && (
+                        <Button size="sm" onClick={() => send(m)}>
+                          <Send className="mr-1 h-3.5 w-3.5" />{m.status === 'sent' ? 'Resend' : 'Send invites'}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => cancel(m)} title="Cancel meeting">
                         <X className="h-4 w-4 text-muted-foreground hover:text-coral-red" />
                       </Button>
@@ -249,6 +260,78 @@ export default function MeetingsPage() {
           </form>
         </DrawerContent>
       </Drawer>
+
+      {/* Meeting details */}
+      <Drawer open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DrawerContent size="lg">
+          {detail && (() => {
+            const dPast = new Date(detail.endsAt) < new Date();
+            return (
+              <div className="flex h-full flex-col">
+                <DrawerHeader>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DrawerTitle>{detail.title}</DrawerTitle>
+                    <Badge variant={statusBadge[detail.status] || 'muted'}>{detail.status}</Badge>
+                    {dPast && detail.status !== 'cancelled' && <Badge variant="muted">past</Badge>}
+                  </div>
+                </DrawerHeader>
+                <DrawerBody className="space-y-5">
+                  <div className="space-y-3">
+                    <DetailRow icon={CalendarDays} label="When" value={when(detail)} />
+                    {detail.location && <DetailRow icon={MapPin} label="Location" value={detail.location} />}
+                    {detail.onlineUrl && (
+                      <DetailRow
+                        icon={Video}
+                        label="Online link"
+                        value={<a href={detail.onlineUrl} target="_blank" rel="noopener" className="break-all text-ember-orange hover:underline">{detail.onlineUrl}</a>}
+                      />
+                    )}
+                    <DetailRow icon={Users} label="Audience" value={audienceLabel(detail.audience)} />
+                    {detail.status === 'sent' && (
+                      <DetailRow icon={Send} label="Invites" value={`${detail.invitedCount} invited · sent ${formatDate(detail.sentAt)}`} />
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-caption font-medium uppercase tracking-wider text-muted-foreground">Description / agenda</p>
+                    {detail.description
+                      ? <p className="whitespace-pre-wrap text-body text-graphite">{detail.description}</p>
+                      : <p className="text-body text-muted-foreground">No description or agenda was added.</p>}
+                  </div>
+                </DrawerBody>
+                <DrawerFooter>
+                  {detail.status !== 'cancelled' && (
+                    <>
+                      {!dPast && (
+                        <Button onClick={async () => { const cur = detail; setDetail(null); await send(cur); }}>
+                          <Send className="mr-1.5 h-4 w-4" />{detail.status === 'sent' ? 'Resend invites' : 'Send invites'}
+                        </Button>
+                      )}
+                      <Button variant="secondary" onClick={async () => { const cur = detail; setDetail(null); await cancel(cur); }}>
+                        Cancel meeting
+                      </Button>
+                    </>
+                  )}
+                  <DrawerClose asChild>
+                    <Button variant={detail.status === 'cancelled' ? 'secondary' : 'ghost'}>Close</Button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </div>
+            );
+          })()}
+        </DrawerContent>
+      </Drawer>
+    </div>
+  );
+}
+
+function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <p className="text-caption uppercase tracking-wider text-muted-foreground">{label}</p>
+        <div className="text-body text-graphite">{value}</div>
+      </div>
     </div>
   );
 }

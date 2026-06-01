@@ -115,6 +115,12 @@ export class MeController {
     return successResponse(await this.service.getProfile(userId));
   }
 
+  /** The resident's own change history (profile + household edits). */
+  @Get('activity-log')
+  async activityLog(@CurrentUser('sub') userId: string) {
+    return successResponse(await this.service.activityLog(userId));
+  }
+
   @Put('profile')
   async updateProfile(
     @CurrentUser('sub') userId: string,
