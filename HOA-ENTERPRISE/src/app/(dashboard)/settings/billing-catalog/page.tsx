@@ -77,7 +77,6 @@ const emptyForm = {
   description: '',
   defaultAmount: '',
   baseTerm: 'monthly',
-  currency: '',
   prorationMode: 'whole_period',
   allowResidentPrepay: true,
   attachByDefault: true,
@@ -115,7 +114,6 @@ export default function BillingCatalogPage() {
       description: t.description || '',
       defaultAmount: String(t.defaultAmount ?? ''),
       baseTerm: t.baseTerm,
-      currency: t.currency || '',
       prorationMode: t.prorationMode,
       allowResidentPrepay: t.allowResidentPrepay,
       attachByDefault: t.attachByDefault,
@@ -135,7 +133,8 @@ export default function BillingCatalogPage() {
       description: form.description.trim() || undefined,
       defaultAmount: Number(form.defaultAmount),
       baseTerm: form.baseTerm,
-      currency: form.currency.trim() ? form.currency.trim().toUpperCase() : null,
+      // Currency always follows the org settings currency — never per-charge.
+      currency: null,
       prorationMode: form.prorationMode,
       allowResidentPrepay: form.allowResidentPrepay,
       attachByDefault: form.attachByDefault,
@@ -302,12 +301,6 @@ export default function BillingCatalogPage() {
                   {PRORATION.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
                 <p className="text-caption text-muted-foreground">{PRORATION.find((p) => p.value === form.prorationMode)?.hint}</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="bt-currency">Currency (optional)</Label>
-                <Input id="bt-currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} placeholder={`Default — ${getOrgCurrency()}`} maxLength={3} />
-                <p className="text-caption text-muted-foreground">Leave blank to use your organisation currency.</p>
               </div>
 
               <div className="space-y-1.5">

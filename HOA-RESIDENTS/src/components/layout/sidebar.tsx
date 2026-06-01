@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, Receipt, FileText, Bell, KeyRound, ShieldAlert, Vote, ClipboardList, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { useState } from 'react';
 export const mainNav = [
   { title: 'Dashboard', href: '/', icon: Home },
   { title: 'Invoices', href: '/invoices', icon: Receipt },
+  { title: 'Pay ahead', href: '/prepay', icon: Wallet },
   { title: 'Gate passes', href: '/passes', icon: KeyRound },
   { title: 'Violations', href: '/violations', icon: ShieldAlert },
   { title: 'Votes', href: '/votes', icon: Vote },

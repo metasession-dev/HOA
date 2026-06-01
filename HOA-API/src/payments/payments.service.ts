@@ -207,6 +207,124 @@ export class PaymentsService implements OnModuleInit {
     return result.payment;
   }
 
+  /**
+   * Phase 5: settle ONE payment across MANY invoices (resident prepay checkout).
+   * Same integrity guarantees as logPayment — locked, idempotent on the receipt
+   * unique — but allocates the lump sum oldest-invoice-first across the set.
+   */
+  async logAllocatedPayment(
+    data: { organizationId: string; invoiceIds: string[]; amount: number; method: string; processorReference?: string; currency: string },
+    userId: string,
+  ) {
+    const reference = data.processorReference || `MOCK-${Date.now()}`;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.payment.findUnique({
+        where: {
+          organizationId_method_processorReference: {
+            organizationId: data.organizationId, method: data.method, processorReference: reference,
+          },
+        },
+      });
+      if (existing) return { payment: existing, invoices: [] as any[], paidInvoices: [] as any[], alreadyProcessed: true };
+
+      // Lock every target invoice row for the duration of the transaction.
+      for (const id of data.invoiceIds) {
+        await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${id} FOR UPDATE`;
+      }
+      const invoices = await tx.invoice.findMany({
+        where: { id: { in: data.invoiceIds }, organizationId: data.organizationId },
+        orderBy: { dueDate: 'asc' },
+        include: { unit: { select: { unitNumber: true } } },
+      });
+
+      const payment = await tx.payment.create({
+        data: {
+          invoiceId: invoices[0]?.id ?? null,
+          organizationId: data.organizationId,
+          amount: new Decimal(data.amount),
+          currency: data.currency,
+          method: data.method,
+          processorReference: reference,
+          status: 'completed',
+          processedAt: new Date(),
+          loggedBy: userId,
+        },
+      });
+
+      let remaining = new Decimal(data.amount);
+      const paidInvoices: any[] = [];
+      for (const inv of invoices) {
+        if (remaining.lessThanOrEqualTo(0)) break;
+        const outstanding = Decimal.max(new Decimal(inv.amount.toString()).minus(new Decimal(inv.amountPaid.toString())), new Decimal(0));
+        const applied = Decimal.min(remaining, outstanding);
+        if (applied.lessThanOrEqualTo(0)) continue;
+        await tx.paymentAllocation.create({ data: { paymentId: payment.id, invoiceId: inv.id, amount: applied } });
+        const newPaid = new Decimal(inv.amountPaid.toString()).plus(applied);
+        const newStatus = newPaid.greaterThanOrEqualTo(new Decimal(inv.amount.toString())) ? 'paid' : 'partial';
+        await tx.invoice.update({
+          where: { id: inv.id },
+          data: { amountPaid: newPaid, status: newStatus, paidAt: newStatus === 'paid' ? new Date() : inv.paidAt },
+        });
+        remaining = remaining.minus(applied);
+        if (newStatus === 'paid') paidInvoices.push(inv);
+      }
+
+      if (remaining.greaterThan(0)) {
+        await tx.payment.update({ where: { id: payment.id }, data: { amountUnallocated: remaining } });
+      }
+      await tx.auditLog.create({
+        data: {
+          organizationId: data.organizationId,
+          actorId: userId,
+          actorRole: 'system',
+          action: 'payment_allocated',
+          entityType: 'Payment',
+          entityId: payment.id,
+          changes: { invoiceIds: data.invoiceIds, amount: String(data.amount), surplus: remaining.toString() } as any,
+        },
+      });
+
+      return { payment, invoices, paidInvoices, alreadyProcessed: false };
+    });
+
+    if (!result.alreadyProcessed) {
+      for (const inv of result.paidInvoices) {
+        this.paymentPlans.onInstallmentInvoicePaid(inv.id).catch(() => { /* swallow */ });
+        this.sendPaidEmail(inv.id, result.payment.id).catch(() => { /* swallow */ });
+      }
+      const first = result.invoices[0];
+      if (first) {
+        this.webhooks.emit(data.organizationId, 'payment.received', {
+          paymentId: result.payment.id,
+          invoiceId: result.payment.invoiceId,
+          amount: result.payment.amount.toString(),
+          currency: result.payment.currency,
+          method: result.payment.method,
+          processorReference: result.payment.processorReference,
+          processedAt: result.payment.processedAt?.toISOString?.() ?? null,
+          unitId: first.unitId,
+          invoiceCount: result.invoices.length,
+        });
+        const amountText = `${data.currency} ${Number(data.amount).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const unitLabel = first.unit?.unitNumber ? ` (Unit ${first.unit.unitNumber})` : '';
+        this.notifications
+          .notifyByRole({
+            organizationId: data.organizationId,
+            roleNames: ['hoa_admin', 'super_admin', 'finance_officer'],
+            type: 'payment_received',
+            title: `Payment received: ${amountText}`,
+            body: `${amountText} prepaid across ${result.invoices.length} invoice(s)${unitLabel}.`,
+            entityType: 'Invoice',
+            entityId: first.id,
+            actionUrl: `/finance/invoices/${first.id}`,
+          })
+          .catch(() => { /* swallow */ });
+      }
+    }
+    return result.payment;
+  }
+
   /** Best-effort, fire-and-forget notifications that must run AFTER the payment
    *  transaction commits (so reads see the committed rows). Never throws. */
   private firePaymentSideEffects(invoice: any, payment: any, newStatus: string) {
