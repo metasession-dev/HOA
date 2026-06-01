@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -23,17 +24,25 @@ export function Topbar() {
             a URL fragment and navigates there. */}
         <RoleSwitcher />
         <NotificationBell />
-        <div className="flex items-center gap-3">
+        {/* Click name/avatar to manage your account (profile, photo, household). */}
+        <Link href="/profile" title="Your account" className="flex items-center gap-3 rounded-pill px-1.5 py-1 transition-colors hover:bg-stone-surface/60">
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium leading-tight text-charcoal-primary">
               {user?.firstName} {user?.lastName}
             </p>
             <p className="text-caption text-muted-foreground">Resident</p>
           </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ember-orange/15 text-[13px] font-medium text-ember-orange">
-            {user ? getInitials(user.firstName, user.lastName) : 'U'}
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-ember-orange/15 text-[13px] font-medium text-ember-orange">
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : user ? (
+              getInitials(user.firstName, user.lastName)
+            ) : (
+              'U'
+            )}
           </div>
-        </div>
+        </Link>
 
         <Button variant="ghost" size="icon" onClick={logout} title="Log out">
           <LogOut className="h-4 w-4" />

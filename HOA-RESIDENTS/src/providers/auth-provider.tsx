@@ -8,6 +8,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  avatarUrl?: string | null;
   roles: Array<{
     role: string;
     roleName: string;
