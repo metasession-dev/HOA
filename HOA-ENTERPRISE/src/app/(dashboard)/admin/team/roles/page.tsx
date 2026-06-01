@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Plus, Trash2, ChevronDown, ChevronRight, ShieldCheck, Lock } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -30,6 +30,14 @@ type Form = {
 };
 
 const blank = (): Form => ({ name: '', displayName: '', description: '', permissions: [], defaultApprovalLimit: '' });
+
+// Slugify a display name into a role key: "Block A managing agent" -> "block_a_managing_agent".
+function slugify(s: string): string {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
 
 // Humanize a permission slug like "financial.invoices.view" -> "Invoices · View".
 function humanizePerm(p: string): { module: string; label: string } {
@@ -67,6 +75,30 @@ export default function RolesPermissionsPage() {
       return next;
     });
 
+  // Every role name already in use (custom + built-in system roles), so an
+  // auto-generated slug never collides with an existing one.
+  const takenNames = useMemo(() => {
+    const set = new Set<string>();
+    roles.forEach((r) => r?.name && set.add(String(r.name).toLowerCase()));
+    systemRoles.forEach((r) => r?.role && set.add(String(r.role).toLowerCase()));
+    return set;
+  }, [roles, systemRoles]);
+
+  // Derive a unique slug from the display name, suffixing _2, _3, … on collision.
+  const uniqueSlug = (displayName: string): string => {
+    const base = slugify(displayName);
+    if (!base) return '';
+    if (!takenNames.has(base)) return base;
+    let i = 2;
+    while (takenNames.has(`${base}_${i}`)) i++;
+    return `${base}_${i}`;
+  };
+
+  // For NEW roles the slug is generated from the display name (it's immutable
+  // once the role exists, so editing leaves it untouched).
+  const onDisplayName = (value: string) =>
+    setForm((f) => ({ ...f, displayName: value, name: editing?.id ? f.name : uniqueSlug(value) }));
+
   const openNew = () => { setEditing({}); setForm(blank()); };
   const openEdit = (r: any) => {
     setEditing(r);
@@ -88,7 +120,8 @@ export default function RolesPermissionsPage() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.displayName.trim()) return toast({ variant: 'error', title: 'Name + display name required' });
+    if (!form.displayName.trim()) return toast({ variant: 'error', title: 'Display name required' });
+    if (!form.name.trim()) return toast({ variant: 'error', title: 'Add letters or numbers to the display name', description: 'The role slug is generated from it and came out empty.' });
     if (form.permissions.length === 0) return toast({ variant: 'error', title: 'Pick at least one permission' });
     setBusy(true);
     try {
@@ -258,12 +291,21 @@ export default function RolesPermissionsPage() {
             <DrawerBody className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Name (slug) <span className="text-coral-red">*</span></Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="block_a_agent" disabled={!!editing?.id} />
+                  <Label>Display name <span className="text-coral-red">*</span></Label>
+                  <Input value={form.displayName} onChange={(e) => onDisplayName(e.target.value)} required placeholder="Block A managing agent" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Display name <span className="text-coral-red">*</span></Label>
-                  <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} required placeholder="Block A managing agent" />
+                  <Label>Name (slug)</Label>
+                  <Input
+                    value={form.name}
+                    readOnly
+                    disabled={!!editing?.id}
+                    placeholder="auto-generated"
+                    className="font-mono text-[13px] text-muted-foreground"
+                  />
+                  <p className="text-caption text-muted-foreground">
+                    {editing?.id ? 'Fixed — the slug can’t change after a role is created.' : 'Generated from the display name; always unique.'}
+                  </p>
                 </div>
               </div>
               <div className="space-y-1.5">
