@@ -332,6 +332,10 @@ function AddUnitDrawer({
       toast({ variant: 'error', title: 'Tenant required', description: 'Select the tenant occupying this unit, or change the occupancy option.' });
       return;
     }
+    if (!estateId) {
+      toast({ variant: 'error', title: 'No estate yet', description: 'Your organisation has no estate to add units to. Reload the page and try again.' });
+      return;
+    }
     setSubmitting(true);
     try {
       // 1. Create the unit.
