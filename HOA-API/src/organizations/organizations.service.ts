@@ -40,9 +40,11 @@ export class OrganizationsService {
    * "Getting started" card in the admin console.
    */
   async getOnboarding(orgId: string) {
-    const [org, estates, units, teamRoles, teamInvites, residentInvites, residentUsers, invoices] = await Promise.all([
+    const [org, estatesWithAddress, units, teamRoles, teamInvites, residentInvites, residentUsers, invoices] = await Promise.all([
       this.prisma.organization.findUnique({ where: { id: orgId }, select: { logoUrl: true, accentColor: true, brandingTagline: true } }),
-      this.prisma.estate.count({ where: { organizationId: orgId } }),
+      // "Set up your estate" is done once the (auto-created) estate has a real
+      // address — naming + addressing it is the actual onboarding action.
+      this.prisma.estate.count({ where: { organizationId: orgId, NOT: { OR: [{ address: null }, { address: '' }] } } }),
       this.prisma.unit.count({ where: { estate: { organizationId: orgId } } }),
       this.prisma.userRole.count({ where: { organizationId: orgId, role: { name: { notIn: ['owner', 'tenant', 'vendor'] } } } }),
       this.prisma.invite.count({ where: { organizationId: orgId, kind: 'team_member' } }),
@@ -53,7 +55,7 @@ export class OrganizationsService {
 
     const steps = {
       branding: !!(org?.logoUrl || org?.accentColor || org?.brandingTagline),
-      estate: estates > 0,
+      estate: estatesWithAddress > 0,
       units: units > 0,
       team: teamRoles > 1 || teamInvites > 0,
       residents: residentInvites > 0 || residentUsers > 0,

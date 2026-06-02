@@ -68,6 +68,9 @@ export default function UnitsPage() {
   const [view, setView] = useViewMode('units', 'table');
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showEstate, setShowEstate] = useState(false);
+  const [estateForm, setEstateForm] = useState({ name: '', address: '' });
+  const [savingEstate, setSavingEstate] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -131,6 +134,34 @@ export default function UnitsPage() {
   }, [units]);
 
   const defaultEstateId = estates[0]?.id ?? '';
+  const estate = estates[0];
+  const estateNeedsAddress = !!estate && !estate.address?.trim();
+
+  const openEstate = () => {
+    setEstateForm({ name: estate?.name ?? '', address: estate?.address ?? '' });
+    setShowEstate(true);
+  };
+
+  const saveEstate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!estate?.id) return;
+    if (!estateForm.name.trim()) { toast({ variant: 'error', title: 'Estate name is required' }); return; }
+    setSavingEstate(true);
+    try {
+      await api.put(`/estates/${estate.id}`, {
+        name: estateForm.name.trim(),
+        address: estateForm.address.trim() || undefined,
+      });
+      toast({ variant: 'success', title: 'Estate updated' });
+      refreshSetupProgress(); // estate step completes once an address is set
+      setShowEstate(false);
+      await fetchAll();
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Save failed', description: err.message });
+    } finally {
+      setSavingEstate(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -142,6 +173,12 @@ export default function UnitsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {estate && (
+            <Button variant={estateNeedsAddress ? 'default' : 'secondary'} onClick={openEstate}>
+              <Building2 className="mr-1.5 h-4 w-4" />
+              {estateNeedsAddress ? 'Set up estate' : 'Estate details'}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setShowBulk(true)} disabled={!defaultEstateId}>
             <Upload className="mr-1.5 h-4 w-4" />
             Bulk upload
@@ -291,6 +328,32 @@ export default function UnitsPage() {
         defaultEstateId={defaultEstateId}
         onDone={fetchAll}
       />
+
+      <Drawer open={showEstate} onOpenChange={setShowEstate}>
+        <DrawerContent size="md">
+          <form onSubmit={saveEstate} className="flex h-full flex-col">
+            <DrawerHeader>
+              <DrawerTitle>Estate details</DrawerTitle>
+              <DrawerDescription>Name your estate and add its address — this completes the “estate” step of your setup.</DrawerDescription>
+            </DrawerHeader>
+            <DrawerBody className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="estateName">Estate name <span className="text-coral-red">*</span></Label>
+                <Input id="estateName" value={estateForm.name} onChange={(e) => setEstateForm({ ...estateForm, name: e.target.value })} placeholder="e.g. Acacia Park Estate" required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="estateAddress">Address</Label>
+                <Input id="estateAddress" value={estateForm.address} onChange={(e) => setEstateForm({ ...estateForm, address: e.target.value })} placeholder="Street, city, postal code" />
+                <p className="text-caption text-muted-foreground">Used on invoices, the resident app and official documents.</p>
+              </div>
+            </DrawerBody>
+            <DrawerFooter>
+              <Button type="submit" disabled={savingEstate}>{savingEstate ? 'Saving…' : 'Save estate'}</Button>
+              <DrawerClose asChild><Button type="button" variant="secondary">Cancel</Button></DrawerClose>
+            </DrawerFooter>
+          </form>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
