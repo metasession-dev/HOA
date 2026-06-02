@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Rocket, Check, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
@@ -10,6 +10,18 @@ import { cn } from '@/lib/utils';
 
 const ADMIN_ROLES = ['super_admin', 'hoa_admin', 'property_manager'];
 const DISMISS_KEY = 'hoa_onboarding_dismissed';
+
+// Any flow that completes a setup step (add a unit, invite someone, issue a
+// levy) can call this to refresh the "Setup X%" pill immediately, instead of
+// waiting for the next navigation / focus / poll.
+export const ONBOARDING_REFRESH_EVENT = 'hoa:onboarding-refresh';
+export function refreshSetupProgress() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(ONBOARDING_REFRESH_EVENT));
+}
+
+// Gentle safety-net poll so the pill catches changes made on the same page (or
+// by a teammate) within this window, even without a navigation/focus event.
+const POLL_MS = 30_000;
 
 // Ordered step metadata — keys match GET /organizations/onboarding.steps.
 const STEPS: { key: string; title: string; href: string }[] = [
@@ -28,18 +40,47 @@ const STEPS: { key: string; title: string; href: string }[] = [
 export function SetupProgress() {
   const { primaryRole } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [state, setState] = useState<any>(null);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!ADMIN_ROLES.includes(primaryRole)) return;
+  const isAdmin = ADMIN_ROLES.includes(primaryRole);
+
+  // Re-pull live onboarding state. It's fully derived from DB counts server-side,
+  // so each call reflects the latest reality; once complete, the pill hides.
+  const refresh = useCallback(() => {
+    if (!isAdmin) return;
     api
       .get<any>('/organizations/onboarding')
       .then((r) => {
-        if (r?.data && !r.data.completed) setState(r.data);
+        if (r?.data) setState(r.data.completed ? null : r.data);
       })
       .catch(() => {});
-  }, [primaryRole]);
+  }, [isAdmin]);
+
+  // Initial load + refetch on every navigation (catches steps finished on
+  // another page) and whenever the org changes role context.
+  useEffect(() => { refresh(); }, [refresh, pathname]);
+
+  // Realtime-ish triggers without a socket: refresh when the tab regains focus
+  // or visibility, on an explicit refreshSetupProgress() broadcast, and on a
+  // gentle interval as a backstop. All disabled for non-admins / when complete.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener(ONBOARDING_REFRESH_EVENT, refresh);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, POLL_MS);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(ONBOARDING_REFRESH_EVENT, refresh);
+      window.clearInterval(id);
+    };
+  }, [isAdmin, refresh]);
 
   if (!state) return null;
 
