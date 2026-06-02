@@ -154,7 +154,7 @@ export function HelpAssistant() {
       >
         {pulse && !open && <span className="absolute inset-0 animate-ping rounded-full bg-ember-orange/40" />}
         <span style={{ animation: open ? undefined : 'aida-bob 2.6s ease-in-out infinite' }}>
-          {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6 text-ember-orange" />}
+          {open ? <X className="h-6 w-6" /> : <HelpCircle className="h-6 w-6 text-ember-orange" />}
         </span>
       </button>
     </>
