@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 const STEP_DEFS = [
   { key: 'branding', title: 'Set up your organisation', desc: 'Currency, timezone & branding', href: '/settings', cta: 'Open settings' },
+  { key: 'estate', title: 'Create your estate', desc: 'Name your estate and add its address', href: '/admin/estates', cta: 'Manage estate' },
   { key: 'units', title: 'Add your units', desc: 'Create or bulk-import your units', href: '/admin/units', cta: 'Add units' },
   { key: 'residents', title: 'Invite residents', desc: 'Give owners & tenants their portal', href: '/admin/people', cta: 'Invite residents' },
   { key: 'team', title: 'Invite your team', desc: 'Finance, exco & managers', href: '/admin/team', cta: 'Invite team' },
