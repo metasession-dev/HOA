@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ViewToggle, useViewMode } from '@/components/ui/view-toggle';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { refreshSetupProgress } from '@/components/layout/setup-progress';
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription,
   DrawerBody, DrawerFooter, DrawerClose,
@@ -361,6 +362,7 @@ function AddUnitDrawer({
       }
 
       toast({ variant: 'success', title: `Unit ${form.unitNumber} added` });
+      refreshSetupProgress(); // units step may now be complete
       onOpenChange(false);
       reset();
       onDone();
@@ -556,6 +558,7 @@ function BulkUploadDrawer({
         title: `Imported ${res.data.succeeded}/${res.data.total} units`,
         description: res.data.failed > 0 ? `${res.data.failed} row(s) had errors.` : undefined,
       });
+      if (res.data.succeeded > 0) refreshSetupProgress(); // units step may now be complete
       onDone();
     } catch (err: any) {
       toast({ variant: 'error', title: 'Import failed', description: err.message });

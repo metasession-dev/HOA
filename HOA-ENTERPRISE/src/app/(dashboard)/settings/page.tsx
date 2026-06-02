@@ -16,6 +16,7 @@ import { useI18n } from '@/lib/i18n';
 import { useOrgSettings } from '@/providers/org-settings-provider';
 import { useAuth } from '@/providers/auth-provider';
 import { AFRICA_TIMEZONES, AFRICA_REGIONS, formatTimezoneLabel } from '@/lib/africa-timezones';
+import { refreshSetupProgress } from '@/components/layout/setup-progress';
 
 const selectClass = cn(
   'flex h-10 w-full rounded-lg bg-card px-3 text-sm text-foreground shadow-inset-stone',
@@ -51,6 +52,7 @@ export default function SettingsPage() {
         emailFromEmail: org.emailFromEmail?.trim() || null,
       });
       await reloadOrgSettings();
+      refreshSetupProgress(); // branding step may now be complete
       toast({ variant: 'success', title: 'Branding saved' });
     } catch (err: any) {
       toast({ variant: 'error', title: 'Save failed', description: err.message });

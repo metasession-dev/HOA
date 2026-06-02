@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ViewToggle, useViewMode } from '@/components/ui/view-toggle';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { Users } from 'lucide-react';
+import { refreshSetupProgress } from '@/components/layout/setup-progress';
 
 /** Display label + badge tint for the Person.type values. */
 function personTypeLabel(t?: string): string {
@@ -121,6 +122,7 @@ export default function PeoplePage() {
       } else {
         toast({ variant: 'success', title: 'Person added', description: `${form.firstName} ${form.lastName}` });
       }
+      refreshSetupProgress(); // residents step may now be complete
       setShowCreate(false);
       setForm({ firstName: '', lastName: '', email: '', phone: '', type: 'owner' });
       setPhoto([]);
