@@ -26,6 +26,7 @@ const POLL_MS = 30_000;
 // Ordered step metadata — keys match GET /organizations/onboarding.steps.
 const STEPS: { key: string; title: string; href: string }[] = [
   { key: 'branding', title: 'Set up your organisation', href: '/settings' },
+  { key: 'estate', title: 'Create your estate', href: '/admin/estates' },
   { key: 'units', title: 'Add your units', href: '/admin/units' },
   { key: 'residents', title: 'Invite residents', href: '/admin/people' },
   { key: 'team', title: 'Invite your team', href: '/admin/team' },
