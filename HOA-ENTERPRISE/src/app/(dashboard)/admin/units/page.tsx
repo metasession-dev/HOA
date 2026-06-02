@@ -135,7 +135,8 @@ export default function UnitsPage() {
 
   const defaultEstateId = estates[0]?.id ?? '';
   const estate = estates[0];
-  const estateNeedsAddress = !!estate && !estate.address?.trim();
+  // Incomplete = no estate yet, or it has no address. Drives the highlighted CTA.
+  const estateIncomplete = !estate || !estate.address?.trim();
 
   const openEstate = () => {
     setEstateForm({ name: estate?.name ?? '', address: estate?.address ?? '' });
@@ -144,15 +145,14 @@ export default function UnitsPage() {
 
   const saveEstate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!estate?.id) return;
     if (!estateForm.name.trim()) { toast({ variant: 'error', title: 'Estate name is required' }); return; }
     setSavingEstate(true);
     try {
-      await api.put(`/estates/${estate.id}`, {
-        name: estateForm.name.trim(),
-        address: estateForm.address.trim() || undefined,
-      });
-      toast({ variant: 'success', title: 'Estate updated' });
+      const body = { name: estateForm.name.trim(), address: estateForm.address.trim() || undefined };
+      // Update the existing estate, or create one if the org somehow has none.
+      if (estate?.id) await api.put(`/estates/${estate.id}`, body);
+      else await api.post('/estates', body);
+      toast({ variant: 'success', title: estate?.id ? 'Estate updated' : 'Estate created' });
       refreshSetupProgress(); // estate step completes once an address is set
       setShowEstate(false);
       await fetchAll();
@@ -162,6 +162,20 @@ export default function UnitsPage() {
       setSavingEstate(false);
     }
   };
+
+  // Deep-link from onboarding ("Set up your estate" → /admin/units?setup=estate)
+  // opens the estate editor directly, so there's an obvious place to add the
+  // address. Runs once after the initial load; the URL is then cleaned.
+  useEffect(() => {
+    if (loading) return;
+    try {
+      if (new URLSearchParams(window.location.search).get('setup') === 'estate') {
+        openEstate();
+        window.history.replaceState(null, '', '/admin/units');
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   return (
     <div className="space-y-6">
@@ -173,10 +187,10 @@ export default function UnitsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {estate && (
-            <Button variant={estateNeedsAddress ? 'default' : 'secondary'} onClick={openEstate}>
+          {!loading && (
+            <Button variant={estateIncomplete ? undefined : 'secondary'} onClick={openEstate}>
               <Building2 className="mr-1.5 h-4 w-4" />
-              {estateNeedsAddress ? 'Set up estate' : 'Estate details'}
+              {estateIncomplete ? 'Set up estate' : 'Estate details'}
             </Button>
           )}
           <Button variant="secondary" onClick={() => setShowBulk(true)} disabled={!defaultEstateId}>
