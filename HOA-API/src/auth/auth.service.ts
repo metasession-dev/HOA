@@ -112,6 +112,27 @@ export class AuthService implements OnModuleInit {
         `enterpriseAccess backfill skipped: ${err?.message ?? err}`,
       );
     }
+
+    // Backfill: every org needs at least one estate (the enterprise single-estate
+    // model). Orgs registered before estates were auto-created have none, which
+    // leaves their Units page with nothing to attach to so "Add unit" fails.
+    // Create a default estate (named after the org) for any org missing one.
+    try {
+      const orgsWithoutEstate = await this.prisma.organization.findMany({
+        where: { estates: { none: {} } },
+        select: { id: true, name: true },
+      });
+      if (orgsWithoutEstate.length > 0) {
+        await this.prisma.estate.createMany({
+          data: orgsWithoutEstate.map((o) => ({ organizationId: o.id, name: o.name })),
+        });
+        this.logger.log(
+          `Backfilled a default estate for ${orgsWithoutEstate.length} org(s) with none.`,
+        );
+      }
+    } catch (err: any) {
+      this.logger.warn(`Estate backfill skipped: ${err?.message ?? err}`);
+    }
   }
 
   static mfaChallenges() { return MFA_CHALLENGES; }
@@ -455,6 +476,13 @@ export class AuthService implements OnModuleInit {
           country: dto.country || 'NG',
           currency: orgCurrency,
         },
+      });
+
+      // Every org owns exactly one estate in the enterprise model — create it up
+      // front so the admin can add units immediately (without it, the Units page
+      // has no estate to attach to and "Add unit" fails).
+      await tx.estate.create({
+        data: { organizationId: org.id, name: dto.organizationName },
       });
 
       let adminRole = await tx.role.findUnique({
