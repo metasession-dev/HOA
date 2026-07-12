@@ -62,7 +62,29 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+This is a static Vite SPA (`vite build` → `dist/`, no server-side code). It is hosted on
+**Cloudflare Pages** — a static CDN — rather than an always-on Railway container, because a
+static bundle needs no running server and the container's reserved RAM was the dominant cost.
+
+### Cloudflare Pages settings
+
+Create the project once via **Workers & Pages → Create → Pages → Connect to Git**, select this
+repo, and use:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | `HOA-MARKETING` |
+| Build command | `npm install --legacy-peer-deps --no-audit && npm run build` |
+| Output directory | `dist` |
+| Node version | pinned to `20` via `.node-version` |
+
+`--legacy-peer-deps` is required because `lovable-tagger` declares React-18 peer deps that
+otherwise fail install. SPA deep-link fallback is automatic: `vite build` copies
+`public/_redirects` into `dist/_redirects`, which Cloudflare Pages honors (`/*  /index.html  200`).
+
+After the first successful build, point the marketing custom domain at the Pages project, verify a
+hard refresh of a client-side route (e.g. `/pricing`) returns 200, then delete the old
+`hoa-marketing` service in the Railway dashboard to stop its idle RAM charge.
 
 ## Can I connect a custom domain to my Lovable project?
 
