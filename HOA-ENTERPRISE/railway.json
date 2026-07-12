@@ -8,8 +8,10 @@
     "watchPatterns": ["HOA-ENTERPRISE/**"]
   },
   "deploy": {
-    "//": "Next.js standalone server. `output: 'standalone'` in next.config.js makes .next/standalone/server.js self-contained — Railway just runs it. PORT is injected by Railway and Next.js reads it automatically.",
-    "startCommand": "node .next/standalone/server.js",
+    "//": "Next.js standalone server. `output: 'standalone'` in next.config.js makes .next/standalone/server.js self-contained — Railway just runs it. PORT is injected by Railway and Next.js reads it automatically. NEXT_TELEMETRY_DISABLED=1 is required for sleepApplication to work: Next.js phones home telemetry, which counts as outbound traffic and would keep the service perpetually awake, defeating App Sleeping.",
+    "startCommand": "NEXT_TELEMETRY_DISABLED=1 node .next/standalone/server.js",
+    "//sleepApplication": "App Sleeping: sleep after ~10 min with no outbound traffic; the next inbound request wakes it (first request may 502 during cold start). This service is low-traffic, so idle RAM — the dominant cost — drops toward zero. Health checks are inbound and do not keep it awake.",
+    "sleepApplication": true,
     "healthcheckPath": "/login",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
