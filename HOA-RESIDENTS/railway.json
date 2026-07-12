@@ -8,8 +8,10 @@
     "watchPatterns": ["HOA-RESIDENTS/**"]
   },
   "deploy": {
-    "//": "Next.js standalone server (PWA). Same shape as HOA-ENTERPRISE.",
-    "startCommand": "node .next/standalone/server.js",
+    "//": "Next.js standalone server (PWA). Same shape as HOA-ENTERPRISE. NEXT_TELEMETRY_DISABLED=1 is required for sleepApplication to work: Next.js telemetry is outbound traffic that would keep the service perpetually awake.",
+    "startCommand": "NEXT_TELEMETRY_DISABLED=1 node .next/standalone/server.js",
+    "//sleepApplication": "App Sleeping: sleep after ~10 min with no outbound traffic; the next inbound request wakes it (first request may 502 during cold start). Low-traffic service, so idle RAM drops toward zero. Health checks are inbound and do not keep it awake.",
+    "sleepApplication": true,
     "healthcheckPath": "/login",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
