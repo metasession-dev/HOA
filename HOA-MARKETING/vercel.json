@@ -1,7 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "//": "SPA fallback for Vercel. Mirrors public/_redirects which covers Netlify / Render / Cloudflare Pages. Without this, hard-refreshing a client-side route like /login returns 404 because no file exists at that path.",
-  "rewrites": [
-    { "source": "/((?!assets/|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml|json|js|css|woff2?|map)$).*)", "destination": "/index.html" }
-  ]
-}
