@@ -27,6 +27,15 @@ glob so only changes inside that subfolder trigger a rebuild of that
 service. Railway's Nixpacks builder reads `package.json` engines +
 scripts and produces a Node container; no Dockerfiles needed.
 
+**All services are always-on.** `hoa-enterprise` and `hoa-residents`
+previously ran with App Sleeping (Railway's "Serverless" toggle) and
+both now pin `"sleepApplication": false` in their `railway.json`. A
+sleeping container costs the first visitor after an idle period a cold
+start — usually a 502 — which is not acceptable for either the admin
+console or the resident PWA. Because `railway.json` is config-as-code,
+the `false` overrides the dashboard toggle on the next deploy; leave
+the dashboard switch alone rather than fighting it by hand.
+
 ## 1. Prerequisites
 
 On your workstation:

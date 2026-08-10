@@ -8,10 +8,10 @@
     "watchPatterns": ["HOA-RESIDENTS/**"]
   },
   "deploy": {
-    "//": "Next.js standalone server (PWA). Same shape as HOA-ENTERPRISE. NEXT_TELEMETRY_DISABLED=1 is required for sleepApplication to work: Next.js telemetry is outbound traffic that would keep the service perpetually awake.",
+    "//": "Next.js standalone server (PWA). Same shape as HOA-ENTERPRISE. NEXT_TELEMETRY_DISABLED=1 stays on to keep the telemetry phone-home out of build/runtime; it no longer has any bearing on sleep now that App Sleeping is off.",
     "startCommand": "NEXT_TELEMETRY_DISABLED=1 node .next/standalone/server.js",
-    "//sleepApplication": "App Sleeping: sleep after ~10 min with no outbound traffic; the next inbound request wakes it (first request may 502 during cold start). Low-traffic service, so idle RAM drops toward zero. Health checks are inbound and do not keep it awake.",
-    "sleepApplication": true,
+    "//sleepApplication": "App Sleeping is OFF — this service must be always-on. A sleeping container cost the first visitor a cold start (often a 502), which is especially bad here: the PWA's service worker fetches on launch, so residents hit the stall before any UI paints. `false` is set explicitly rather than omitted so config-as-code overrides any lingering 'Serverless' toggle in the dashboard on the next deploy.",
+    "sleepApplication": false,
     "healthcheckPath": "/login",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
