@@ -17,8 +17,9 @@
 import Link from 'next/link';
 import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { marketingBaseUrl } from '@/lib/app-urls';
 
-const MARKETING_URL = process.env.NEXT_PUBLIC_MARKETING_URL || '';
+const MARKETING_URL = marketingBaseUrl();
 
 export default function RegisterPage() {
   return (

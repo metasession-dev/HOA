@@ -217,23 +217,39 @@ previous good image keeps serving (zero-downtime).
 
 ## 7. Custom domains (optional)
 
-Per service → *Settings → Domains → Add Custom Domain*:
+Per service → *Settings → Domains → Add Custom Domain*. The domains in
+use today:
 
-- `hoa-api`        → `api.hoa.africa`
-- `hoa-enterprise` → `admin.hoa.africa`
-- `hoa-residents`  → `app.hoa.africa`
-- `hoa-marketing`  → `hoa.africa` + `www.hoa.africa`
+| Service          | Custom domain                          |
+| ---------------- | -------------------------------------- |
+| `hoa-api`        | `api.hoa.africa`                       |
+| `hoa-enterprise` | `enterprise.hoa.africa`                |
+| `hoa-residents`  | `resident.hoa.africa` — **singular**   |
+| `hoa-marketing`  | `hoa.africa` + `www.hoa.africa`        |
 
-After DNS resolves, overwrite the URL vars so emails + CSP point at the
-custom hostnames instead of the `.up.railway.app` defaults. The Railway
-reference vars (`${{ … .RAILWAY_PUBLIC_DOMAIN }}`) are *fallbacks* —
-when you set `APP_ENTERPRISE_URL` explicitly to `https://admin.hoa.africa`,
-that wins.
+**Do not hand-write these hostnames into env vars.** Once a custom domain
+is attached, Railway's own `RAILWAY_PUBLIC_DOMAIN` for that service *becomes*
+the custom domain, so the reference vars the setup script writes
+(`https://${{ hoa-residents.RAILWAY_PUBLIC_DOMAIN }}`) already resolve to
+`https://resident.hoa.africa` with no further action. They are the single
+source of truth and they self-heal when a domain changes.
 
-On `hoa-api`, also widen `CORS_ORIGIN` to include the custom origins:
+This is not hypothetical: `APP_RESIDENTS_URL`, `RESIDENT_BASE_URL`,
+`CORS_ORIGIN` and both apps' `NEXT_PUBLIC_RESIDENTS_URL` were once
+overwritten by hand with `residents.hoa.africa` (plural) while the service
+was serving `resident.hoa.africa`. Invitation emails sent residents to a
+hostname that didn't exist, and the real resident origin was missing from
+the CORS allow-list.
 
-```
-CORS_ORIGIN=https://admin.hoa.africa,https://app.hoa.africa,https://hoa.africa,https://www.hoa.africa
+If you must pin a hostname literally — a domain served by something other
+than Railway, say — change it in **one** place per surface and re-run the
+setup script; never edit an individual variable in the dashboard.
+
+`CORS_ORIGIN` is likewise built from reference vars by the setup script and
+needs no manual widening. Verify it with:
+
+```bash
+railway variables --service hoa-api --json | grep CORS_ORIGIN
 ```
 
 ## 8. First-time bootstrap data
@@ -241,7 +257,7 @@ CORS_ORIGIN=https://admin.hoa.africa,https://app.hoa.africa,https://hoa.africa,h
 The API auto-creates an HOA on first registration via `/auth/register`.
 For a clean prod environment, you typically:
 
-1. Hit `https://admin.hoa.africa/register` and create the founding admin.
+1. Hit `https://enterprise.hoa.africa/register` and create the founding admin.
 2. Sign in. The API back-fill (`OnModuleInit` + inline-on-login) flips
    `enterpriseAccess=true` on any user holding an admin-shaped role,
    so existing admins migrated from staging keep working without
@@ -260,14 +276,27 @@ curl -fsS https://api.hoa.africa/api/health
 curl -fsS https://api.hoa.africa/api/docs | head -c 200
 
 # Enterprise login renders (HTML 200)
-curl -fsSI https://admin.hoa.africa/login
+curl -fsSI https://enterprise.hoa.africa/login
 
-# Resident login renders
-curl -fsSI https://app.hoa.africa/login
+# Resident login renders — note the SINGULAR hostname
+curl -fsSI https://resident.hoa.africa/login
 
 # Marketing root renders
 curl -fsSI https://hoa.africa/
 ```
+
+Then confirm the API agrees with reality about where the front-ends live.
+Every outbound link it mails is built from these, so a mismatch here is a
+mismatch in every invitation:
+
+```bash
+railway variables --service hoa-api --json \
+  | grep -E 'APP_RESIDENTS_URL|APP_ENTERPRISE_URL|CORS_ORIGIN'
+```
+
+Each host must match the table in §7 exactly, and `CORS_ORIGIN` must contain
+the resident and enterprise origins verbatim — a near-miss like a pluralised
+subdomain fails silently in email and loudly in the browser console.
 
 Then in the browser:
 

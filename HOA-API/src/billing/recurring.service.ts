@@ -7,6 +7,7 @@ import { Actor } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { MailService } from '../mail/mail.service';
 import { reserveInvoiceNumbers } from '../common/invoice-number';
+import { residentsBaseUrl } from '../config/app-urls';
 import { assertNoBillingPathConflict } from './billing-overlap';
 
 const FREQUENCIES = ['monthly', 'quarterly', 'annual'] as const;
@@ -373,7 +374,7 @@ export class RecurringInvoicesService {
         },
       },
     });
-    const payBase = process.env.RESIDENT_BASE_URL || 'http://localhost:3002';
+    const payBase = residentsBaseUrl();
     for (const inv of invs) {
       // Person has userId but no direct relation; look up the user separately.
       const personWithUserId = inv.unit.occupancies

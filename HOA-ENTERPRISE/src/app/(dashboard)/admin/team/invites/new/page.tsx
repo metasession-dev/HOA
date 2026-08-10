@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { inviteRedeemUrl } from '@/lib/app-urls';
 
 // Roles available to team-member invites. Excludes owner/tenant (those go
 // through the resident flow) and super_admin (platform-level, not org-scoped).
@@ -63,7 +64,7 @@ export default function NewTeamInvitePage() {
         ...(team.approvalLimit ? { approvalLimit: Number(team.approvalLimit) } : {}),
       };
       const r = await api.post<any>('/team/invites', payload, idemp);
-      const url = `${process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005'}/invites/${r.data.token}`;
+      const url = inviteRedeemUrl(r.data.token);
       try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
       toast({ variant: 'success', title: 'Invitation created', description: 'Link copied to clipboard' });
       router.push('/admin/team/invites');

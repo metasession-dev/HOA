@@ -20,13 +20,14 @@ import {
   DrawerBody, DrawerFooter, DrawerClose,
 } from '@/components/ui/drawer';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
+import { apiUrl } from '@/lib/app-urls';
 
 const BROADCAST_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
 
 function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }
 
 /**

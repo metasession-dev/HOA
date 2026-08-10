@@ -19,9 +19,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { residentsBaseUrl } from '@/lib/app-urls';
 
 const selectClass = 'flex h-10 w-full rounded-lg bg-card px-3 text-sm shadow-inset-stone focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
-const residentsBase = () => process.env.NEXT_PUBLIC_RESIDENTS_URL || process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005';
+const residentsBase = residentsBaseUrl;
 
 export default function NewResidentInvitePage() {
   const router = useRouter();

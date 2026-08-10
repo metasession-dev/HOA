@@ -6,6 +6,7 @@ import { Actor, isResidentRole, scopeRequestWhere, actorOccupiesUnit } from '../
 import { NotificationsService } from '../notifications/notifications.service';
 import { WebhooksService } from '../platform/webhooks.service';
 import { MailService } from '../mail/mail.service';
+import { baseUrlForApp } from '../config/app-urls';
 
 /**
  * Phase 1.1 Resident Requests.
@@ -110,9 +111,7 @@ export class RequestsService {
       where: { id: { in: userIds }, isActive: true },
       select: { id: true, email: true, firstName: true },
     });
-    const base = opts.audience === 'resident'
-      ? (process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002')
-      : (process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000');
+    const base = baseUrlForApp(opts.audience === 'resident' ? 'residents' : 'enterprise');
     const path = opts.audience === 'resident' ? `/requests/${opts.requestId}` : `/admin/requests/${opts.requestId}`;
     for (const u of users) {
       if (!u.email) continue;

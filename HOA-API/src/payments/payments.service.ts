@@ -7,10 +7,7 @@ import { WebhooksService } from '../platform/webhooks.service';
 import { PaymentPlansService } from '../billing/payment-plans.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
-
-const ENTERPRISE_BASE = (
-  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
-).replace(/\/$/, '');
+import { enterpriseUrl } from '../config/app-urls';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -366,7 +363,7 @@ export class PaymentsService implements OnModuleInit {
           subject: `Payment received — ${invoice.invoiceNumber}`,
           message: `${amountText} has been received on invoice ${invoice.invoiceNumber}${unitLabel}. The invoice is now ${newStatus}.`,
           ctaLabel: 'View invoice',
-          ctaUrl: `${ENTERPRISE_BASE}/finance/invoices/${invoice.id}`,
+          ctaUrl: enterpriseUrl(`/finance/invoices/${invoice.id}`),
         },
       })
       .catch(() => { /* swallow */ });

@@ -17,12 +17,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { cn } from '@/lib/utils';
+import { residentsBaseUrl } from '@/lib/app-urls';
 
 const statuses = ['all', 'pending', 'redeemed', 'expired', 'revoked'] as const;
 const statusBadge: Record<string, 'muted' | 'info' | 'success' | 'destructive' | 'warning'> = {
   pending: 'warning', redeemed: 'success', expired: 'muted', revoked: 'destructive',
 };
-const residentsBase = () => process.env.NEXT_PUBLIC_RESIDENTS_URL || process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005';
+const residentsBase = residentsBaseUrl;
 
 export default function ResidentInvitesListPage() {
   const confirm = useConfirm();

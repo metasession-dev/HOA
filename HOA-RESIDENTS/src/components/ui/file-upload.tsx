@@ -19,6 +19,7 @@ import { Upload, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Label } from './label';
 import { toast } from './use-toast';
 import { cn } from '@/lib/utils';
+import { apiBaseUrl, apiUrl } from '@/lib/app-urls';
 
 export type UploadedFile = {
   /** Signed URL fragment, e.g. `/api/files/:id/download?exp=…&sig=…`. */
@@ -96,7 +97,7 @@ export function FileUpload({
     fd.append('file', file);
     fd.append('kind', kind);
     if (isPublicKind) fd.append('isPublic', 'true');
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+    const apiBase = apiBaseUrl();
     const token =
       typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
 
@@ -174,7 +175,7 @@ export function FileUpload({
     // can be reaped by an admin sweep later.
     if (target.storedFileId) {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+        const apiBase = apiBaseUrl();
         const token =
           typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
         await fetch(`${apiBase}/api/files/${target.storedFileId}`, {
@@ -299,7 +300,7 @@ export function FileUpload({
 function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }
 
 function humanSize(bytes: number): string {

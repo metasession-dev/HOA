@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { IncomeStatementView, BalanceSheetView, CashFlowView } from '../statement-views';
+import { apiBaseUrl } from '@/lib/app-urls';
 
 export default function BoardPackPage() {
   const sp = useSearchParams();
@@ -31,7 +32,7 @@ export default function BoardPackPage() {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+      const apiBase = apiBaseUrl();
       const token = typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
       const res = await fetch(
         `${apiBase}/api/finance/reports/board-pack.pdf?from=${from}&to=${to}&download=1`,

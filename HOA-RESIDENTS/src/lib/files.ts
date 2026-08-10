@@ -1,4 +1,5 @@
 import { api } from './api';
+import { apiUrl } from '@/lib/app-urls';
 
 /**
  * File download helpers.
@@ -18,7 +19,7 @@ import { api } from './api';
 export function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }
 
 /** Pull the stored file id out of a `/api/files/:id/download…` URL. */

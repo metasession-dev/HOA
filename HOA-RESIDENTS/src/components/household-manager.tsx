@@ -25,6 +25,7 @@ import { cn, getInitials } from '@/lib/utils';
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerBody, DrawerFooter, DrawerClose,
 } from '@/components/ui/drawer';
+import { apiUrl } from '@/lib/app-urls';
 
 const RELATIONSHIPS = ['spouse', 'partner', 'child', 'parent', 'sibling', 'relative', 'domestic_staff', 'other'];
 const GENDERS = ['male', 'female', 'other', 'undisclosed'];
@@ -343,5 +344,5 @@ export function HouseholdManager() {
 function resolveUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }

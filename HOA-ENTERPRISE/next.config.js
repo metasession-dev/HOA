@@ -58,6 +58,11 @@ const withPWA = require('next-pwa')({
  * `connect-src` reads NEXT_PUBLIC_API_URL + observability hosts at build
  * time. Keeping it env-driven means no manual sync when the API moves.
  */
+// These four are the ONE deliberate exception to "all base URLs come from
+// src/lib/app-urls.ts". This file is CommonJS evaluated by the Next build
+// before any TypeScript is compiled, so it cannot import that module. The
+// values and the localhost fallbacks must be kept identical to the `DEV` map
+// there — if you change a port or add a surface, change both.
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
 const residentsUrl = process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005';
 const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_URL || '';

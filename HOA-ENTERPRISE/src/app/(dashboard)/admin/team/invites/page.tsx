@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/ui/confirm-provider';
 import { cn } from '@/lib/utils';
+import { inviteRedeemUrl } from '@/lib/app-urls';
 
 const statuses = ['all', 'pending', 'redeemed', 'expired', 'revoked'] as const;
 const statusBadge: Record<string, 'muted' | 'info' | 'success' | 'destructive' | 'warning'> = {
@@ -63,7 +64,7 @@ export default function InvitesListPage() {
       // a fresh rotation.
       const idemp = `invite-resend-${inv.id}-${Math.floor(Date.now() / 30_000)}`;
       const r = await api.post<any>(`/team/invites/${inv.id}/resend`, {}, idemp);
-      const url = `${process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005'}/invites/${r.data.token}`;
+      const url = inviteRedeemUrl(r.data.token);
       try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
       toast({ variant: 'success', title: 'Invite rotated', description: 'New link copied to clipboard · email queued' });
       load();
@@ -73,7 +74,7 @@ export default function InvitesListPage() {
   };
 
   const copyLink = (inv: any) => {
-    const url = `${process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005'}/invites/${inv.token}`;
+    const url = inviteRedeemUrl(inv.token);
     navigator.clipboard.writeText(url);
     toast({ variant: 'success', title: 'Link copied' });
   };

@@ -9,6 +9,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
 import { AppModule } from './app.module';
+import { defaultDevCorsOrigins } from './config/app-urls';
 
 /**
  * Production sanity checks. Refuse to boot if any of these critical secrets
@@ -114,7 +115,11 @@ async function bootstrap() {
   // as a single garbled value that matches no real Origin header. Tolerating
   // both is one regex character; the alternative is a CORS outage every
   // time someone edits the allow-list in the UI.
-  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  // The unset default is both dev front-ends, sourced from config/app-urls so
+  // it can't drift from the ports they actually run on. The previous default
+  // was a bare localhost:3000, which is neither app — every local request was
+  // CORS-blocked until an operator set the var by hand.
+  const corsOrigins = (process.env.CORS_ORIGIN || defaultDevCorsOrigins())
     .split(/[,\n]/)
     .map((o) => o.trim())
     .filter(Boolean);

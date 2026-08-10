@@ -20,12 +20,8 @@ import {
   DecideAppealDto,
   ALLOWED_CONTENT_TYPES,
 } from './dto/create-violation.dto';
+import { residentUrl, residentsBaseUrl } from '../config/app-urls';
 
-const RESIDENT_BASE = (
-  process.env.APP_RESIDENTS_URL ||
-  process.env.RESIDENT_BASE_URL ||
-  'http://localhost:3002'
-).replace(/\/$/, '');
 
 // Server-side state machine. Any transition not listed is rejected with 409.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -269,7 +265,7 @@ export class ViolationsService {
         subject: 'A violation was logged for your unit',
         message: `A violation has been logged for your unit${unitLabel}: ${catName}.\n\n${v.description}\n\nPlease log in to your resident portal for details and next steps.`,
         ctaLabel: 'View violation',
-        ctaUrl: `${RESIDENT_BASE}/violations/${v.id}`,
+        ctaUrl: residentUrl(`/violations/${v.id}`),
       },
     });
 
@@ -332,7 +328,7 @@ export class ViolationsService {
     });
 
     if (recipientUserIds.length > 0) {
-      const residentBase = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+      const residentBase = residentsBaseUrl();
       await this.notifications.enqueueFor({
         organizationId: orgId,
         recipientUserIds,

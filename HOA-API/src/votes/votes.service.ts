@@ -15,6 +15,7 @@ import {
   findPersonForUser,
   isPersonEligible,
 } from './eligibility.util';
+import { residentUrl } from '../config/app-urls';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ['open', 'cancelled'],
@@ -22,9 +23,6 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   closed: [],
   cancelled: [],
 };
-
-const RESIDENT_BASE = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
-const ENTERPRISE_BASE = process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005';
 
 // Board/exco users eligible to vote on `exco_only` polls (e.g. contract-bid
 // awards). These users have no resident Person record, so exco ballots are
@@ -296,7 +294,7 @@ export class VotesService {
           subject: `New vote: ${opened.title}`,
           message: `${opened.description || 'A new vote is now open.'}\n\nVoting closes ${new Date(opened.closesAt).toLocaleString()}.`,
           ctaLabel: 'Cast your vote',
-          ctaUrl: `${RESIDENT_BASE}/votes/${opened.id}`,
+          ctaUrl: residentUrl(`/votes/${opened.id}`),
         },
       });
     }

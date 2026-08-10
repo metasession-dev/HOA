@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiBaseUrl } from '@/lib/app-urls';
+
+const API_URL = apiBaseUrl();
 
 class ApiClient {
   private token: string | null = null;

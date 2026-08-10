@@ -19,15 +19,9 @@ import {
   TenderAiDraftDto,
 } from './dto/tenders.dto';
 import { createLlmProvider } from '../assistant/llm/provider';
+import { enterpriseUrl } from '../config/app-urls';
 
 type Actor = { userId: string; role: string };
-
-const RESIDENT_BASE = (
-  process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || 'http://localhost:3002'
-).replace(/\/$/, '');
-const ENTERPRISE_BASE = (
-  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
-).replace(/\/$/, '');
 
 const PROCUREMENT_ROLES = ['hoa_admin', 'super_admin', 'finance_officer', 'property_manager'];
 
@@ -293,7 +287,7 @@ export class TendersService {
         subject: `You've been awarded the contract: ${t.title}`,
         message: `Good news — your bid for "${t.title}" has been selected as the winning bid.\n\nThe HOA office will be in touch with next steps.`,
         ctaLabel: 'View tender',
-        ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${t.id}`,
+        ctaUrl: enterpriseUrl(`/vendor/tenders/${t.id}`),
       },
     });
     for (const b of t.bids) {
@@ -305,7 +299,7 @@ export class TendersService {
           subject: `Outcome of "${t.title}"`,
           message: `Thank you for bidding on "${t.title}". On this occasion the contract was awarded to another vendor.\n\nWe value your participation and look forward to future opportunities.`,
           ctaLabel: 'View tender',
-          ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${t.id}`,
+          ctaUrl: enterpriseUrl(`/vendor/tenders/${t.id}`),
         },
       });
     }
@@ -450,7 +444,7 @@ export class TendersService {
       subject: `New contract opportunity: ${tender.title}`,
       message: `A new tender, "${tender.title}", is open for bids until ${dateText(tender.closesAt)}.\n\nSign in to your vendor portal to review the details and submit a bid.`,
       ctaLabel: 'View tender',
-      ctaUrl: `${ENTERPRISE_BASE}/vendor/tenders/${tender.id}`,
+      ctaUrl: enterpriseUrl(`/vendor/tenders/${tender.id}`),
     };
     for (const v of vendors) {
       if (v.userId) {

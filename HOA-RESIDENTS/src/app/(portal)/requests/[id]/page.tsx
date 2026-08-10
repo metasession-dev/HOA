@@ -15,6 +15,7 @@ import { useConfirm } from '@/components/ui/confirm-provider';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiUrl } from '@/lib/app-urls';
 
 const ATTACH_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
 
@@ -23,7 +24,7 @@ type Attachment = { url: string; filename: string; contentType: string; size?: n
 function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }
 
 function AttachmentList({ items }: { items: Attachment[] }) {

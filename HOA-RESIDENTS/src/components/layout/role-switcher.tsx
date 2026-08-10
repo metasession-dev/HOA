@@ -14,6 +14,7 @@ import { ChevronDown, KeyRound, Users, ShieldCheck, Briefcase, Coins, RadioTower
 import { useAuth } from '@/providers/auth-provider';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { enterpriseBaseUrl, residentsBaseUrl } from '@/lib/app-urls';
 
 const RESIDENT_ROLES = new Set(['owner', 'tenant']);
 
@@ -79,11 +80,7 @@ export function RoleSwitcher() {
       const inResidentApp = true;
 
       if (targetsResidentApp !== inResidentApp) {
-        const residentBase =
-          process.env.NEXT_PUBLIC_RESIDENTS_URL || window.location.origin;
-        const enterpriseBase =
-          process.env.NEXT_PUBLIC_ENTERPRISE_URL || 'http://localhost:3002';
-        const target = targetsResidentApp ? residentBase : enterpriseBase;
+        const target = targetsResidentApp ? residentsBaseUrl() : enterpriseBaseUrl();
         const newToken = typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
         const url = `${target}/#token=${encodeURIComponent(newToken ?? '')}&role=${encodeURIComponent(newRole)}`;
         window.location.assign(url);

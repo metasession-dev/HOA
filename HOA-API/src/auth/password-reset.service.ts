@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { sha256 } from '../common/encryption';
+import { baseUrlForApp } from '../config/app-urls';
 
 /**
  * Password reset flow — request a token + email it, then confirm with the
@@ -32,9 +33,8 @@ import { sha256 } from '../common/encryption';
  *     password the same way `auth.register` does (cost 12).
  *
  * Origin: the `app` parameter ('enterprise' | 'residents') is server-side
- * resolved into a URL from APP_ENTERPRISE_URL / APP_RESIDENTS_URL env vars.
- * The client never supplies a redirect URL, so there's no open-redirect
- * surface.
+ * resolved into a URL by `config/app-urls`. The client never supplies a
+ * redirect URL, so there's no open-redirect surface.
  */
 
 const TOKEN_ALPHABET = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -230,17 +230,6 @@ export class PasswordResetService {
   }
 
   private appBaseUrl(app: ResetApp): string {
-    if (app === 'residents') {
-      return (
-        process.env.APP_RESIDENTS_URL ||
-        process.env.RESIDENT_BASE_URL ||
-        'http://localhost:3005'
-      );
-    }
-    return (
-      process.env.APP_ENTERPRISE_URL ||
-      process.env.ENTERPRISE_BASE_URL ||
-      'http://localhost:3002'
-    );
+    return baseUrlForApp(app);
   }
 }

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
+import { apiBaseUrl } from '@/lib/app-urls';
 
 export default function InviteRedeemPage() {
   const params = useParams<{ token: string }>();
@@ -21,7 +22,7 @@ export default function InviteRedeemPage() {
   const [form, setForm] = useState({ password: '', confirmPassword: '', firstName: '', lastName: '' });
 
   useEffect(() => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+    const API_URL = apiBaseUrl();
     fetch(`${API_URL}/api/team/invites/public/${token}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
@@ -42,7 +43,7 @@ export default function InviteRedeemPage() {
     if (form.password !== form.confirmPassword) return toast({ variant: 'error', title: 'Passwords do not match' });
     if (!form.firstName.trim() || !form.lastName.trim()) return toast({ variant: 'error', title: 'Name required' });
     setBusy(true);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+    const API_URL = apiBaseUrl();
     try {
       const r = await fetch(`${API_URL}/api/team/invites/public/redeem`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -25,8 +25,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { marketingBaseUrl } from '@/lib/app-urls';
 
-const MARKETING_URL = process.env.NEXT_PUBLIC_MARKETING_URL || "";
+const MARKETING_URL = marketingBaseUrl();
 
 function LoginInner() {
   const [email, setEmail] = useState("");

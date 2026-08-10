@@ -6,12 +6,7 @@ import { WebhooksService } from '../platform/webhooks.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { StorageService } from '../storage/storage.service';
-
-// Public origin of THIS API, so signed attachment links in emails are absolute
-// and fetchable by Resend. Must be set to the public API URL in production.
-const API_BASE = (
-  process.env.API_PUBLIC_URL || process.env.PUBLIC_API_URL || 'http://localhost:3003'
-).replace(/\/$/, '');
+import { apiUrl } from '../config/app-urls';
 // Files we attach to the email itself (vs link only). Email size limits make
 // real attachments unsuitable for video / very large files.
 const EMAIL_ATTACH_MAX_BYTES = 20 * 1024 * 1024;
@@ -132,13 +127,15 @@ export class CommunicationsService {
     // rows without an id fall back to their stored url.
     const rawAtts: any[] = Array.isArray((updated as any).attachments) ? (updated as any).attachments : [];
     const signedAtts = rawAtts.map((a) => {
+      // Absolute origin matters here: the links have to survive in an inbox and
+      // be fetchable by Resend, so a relative path is useless.
       let url: string = a.url;
       if (a.storedFileId) {
         try {
-          url = `${API_BASE}${this.storage.signUrl(a.storedFileId, 7 * 24 * 3600).url}`;
+          url = apiUrl(this.storage.signUrl(a.storedFileId, 7 * 24 * 3600).url);
         } catch { /* keep stored url */ }
-      } else if (url && !/^https?:\/\//i.test(url)) {
-        url = `${API_BASE}${url}`;
+      } else if (url) {
+        url = apiUrl(url);
       }
       return { filename: a.filename, url, contentType: a.contentType, size: a.size };
     });

@@ -13,6 +13,7 @@ import { PrismaService } from '../common/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
 import { CreateInviteDto, BulkInviteDto, RedeemInviteDto, SYSTEM_ROLE_NAMES } from './dto/team.dto';
+import { residentUrl } from '../config/app-urls';
 
 export type Actor = { userId: string; role: string };
 
@@ -256,14 +257,10 @@ export class InvitesService {
         args.invite.roleName?.replace(/_/g, ' ') ||
         (args.kind === 'resident' ? 'resident' : 'team member');
 
-      // Single base URL for now — both kinds land on the residents PWA's
+      // Single base URL for now — all three kinds land on the residents PWA's
       // redeem page. Once a dedicated admin-side redeem page exists, switch
-      // here on `args.kind` and route team invites to APP_ENTERPRISE_URL.
-      const baseUrl =
-        process.env.APP_RESIDENTS_URL ||
-        process.env.RESIDENT_BASE_URL ||
-        'http://localhost:3005';
-      const redeemUrl = `${baseUrl.replace(/\/$/, '')}/invites/${args.rawToken}`;
+      // here on `args.kind` and route team invites through enterpriseUrl().
+      const redeemUrl = residentUrl(`/invites/${args.rawToken}`);
 
       await this.mail.enqueue(
         {

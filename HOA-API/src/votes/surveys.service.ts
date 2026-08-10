@@ -5,8 +5,7 @@ import { CreateSurveyDto, SubmitSurveyResponseDto } from './dto/votes.dto';
 import { createLlmProvider } from '../assistant/llm/provider';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
-
-const RESIDENT_BASE = process.env.APP_RESIDENTS_URL || process.env.RESIDENT_BASE_URL || process.env.RESIDENTS_BASE_URL || 'http://localhost:3002';
+import { residentUrl } from '../config/app-urls';
 
 const SURVEY_TRANSITIONS: Record<string, string[]> = {
   draft: ['open'],
@@ -281,7 +280,7 @@ export class SurveysService {
             subject: `New survey: ${updated.title}`,
             message: updated.description || 'A new survey is open for your input.',
             ctaLabel: 'Take the survey',
-            ctaUrl: `${RESIDENT_BASE}/surveys/${updated.id}`,
+            ctaUrl: residentUrl(`/surveys/${updated.id}`),
           },
         });
       }

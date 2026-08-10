@@ -23,6 +23,7 @@ import {
   DrawerBody,
   DrawerFooter,
 } from '@/components/ui/drawer';
+import { residentUrl } from '@/lib/app-urls';
 
 const statusBadge: Record<string, 'muted' | 'info' | 'success' | 'destructive' | 'warning'> = {
   draft: 'muted', issued: 'success', superseded: 'warning', cancelled: 'destructive',
@@ -120,8 +121,7 @@ export default function ResaleDetailPage() {
   };
 
   const copyUrl = (token: string) => {
-    const base = process.env.NEXT_PUBLIC_RESIDENT_URL || 'http://localhost:3005';
-    const url = `${base}/r/${token}`;
+    const url = residentUrl(`/r/${token}`);
     navigator.clipboard.writeText(url);
     toast({ variant: 'success', title: 'Link copied' });
   };

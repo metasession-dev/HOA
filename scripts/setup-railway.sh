@@ -354,8 +354,24 @@ rv "$API_SERVICE" CORS_ORIGIN \
 
 # Email link bases — emails (invites, password reset) need fully-qualified
 # URLs so users can click from any inbox.
+#
+# These MUST stay as Railway reference variables rather than literal
+# hostnames. RAILWAY_PUBLIC_DOMAIN resolves to whatever domain is actually
+# attached to that service — the custom domain once one is bound, the
+# *.up.railway.app default until then — so it cannot drift. Hand-typing the
+# hostname here is precisely how the API once mailed residents
+# `residents.hoa.africa` while the service was serving `resident.hoa.africa`;
+# the link 404'd and the origin wasn't in CORS either.
 rv "$API_SERVICE" APP_ENTERPRISE_URL "https://\${{ ${ENT_SERVICE}.RAILWAY_PUBLIC_DOMAIN }}"
 rv "$API_SERVICE" APP_RESIDENTS_URL  "https://\${{ ${RES_SERVICE}.RAILWAY_PUBLIC_DOMAIN }}"
+rv "$API_SERVICE" API_PUBLIC_URL     "https://\${{ ${API_SERVICE}.RAILWAY_PUBLIC_DOMAIN }}"
+
+# Legacy alias vars. src/config/app-urls.ts still reads these as lower-priority
+# fallbacks, so a stale value left on the service silently shadows nothing —
+# but only as long as it agrees with the canonical var. Point them at the same
+# reference so a half-migrated environment can't disagree with itself.
+rv "$API_SERVICE" RESIDENT_BASE_URL   "https://\${{ ${RES_SERVICE}.RAILWAY_PUBLIC_DOMAIN }}"
+rv "$API_SERVICE" ENTERPRISE_BASE_URL "https://\${{ ${ENT_SERVICE}.RAILWAY_PUBLIC_DOMAIN }}"
 
 rv "$API_SERVICE" VAPID_SUBJECT      "mailto:notifications@hoa.africa"
 rv "$API_SERVICE" OPENAI_MODEL       "gpt-4o-mini"
@@ -450,9 +466,13 @@ Next steps:
      are already set. If not, click into each service and set it once.
   4. Trigger an initial deploy: push to ${MONOREPO}'s connected branch,
      or run \`railway up --service <name>\` from each app's directory.
-  5. (Optional) Map custom domains: \`api.hoa.africa\`, \`admin.hoa.africa\`,
-     \`app.hoa.africa\`, \`hoa.africa\` — then overwrite the CORS_ORIGIN +
-     APP_*_URL vars to point at them instead of *.up.railway.app.
+  5. (Optional) Map custom domains in Settings → Domains:
+     \`api.hoa.africa\`, \`enterprise.hoa.africa\`, \`resident.hoa.africa\`
+     (singular), \`hoa.africa\`. Do NOT then hand-edit CORS_ORIGIN or the
+     APP_*_URL vars: attaching a domain makes it that service's
+     RAILWAY_PUBLIC_DOMAIN, and every one of those vars already points at
+     that reference, so they update themselves. Typing the hostname by hand
+     is how the plural/singular resident mismatch happened.
 
 See RAILWAY_DEPLOY.md for the full operator runbook.
 EOF

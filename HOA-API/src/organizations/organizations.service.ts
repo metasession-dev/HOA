@@ -1,10 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { enterpriseUrl } from '../config/app-urls';
 
-const ENTERPRISE_URL = (
-  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
-).replace(/\/$/, '');
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'dev@metasession.co';
 
 // Step labels for the nudge email's "still to do" list.
@@ -129,7 +127,7 @@ export class OrganizationsService {
               message:
                 `You're ${status.percent}% of the way there! A few quick steps will get ${org.name} fully up and running on HOA.africa:\n\n${checklist}\n\nIt only takes a few minutes — and once you're set up, levies, payments and resident communication run themselves. Need a hand? Just reply or reach us at ${SUPPORT_EMAIL}.`,
               ctaLabel: 'Finish setup',
-              ctaUrl: `${ENTERPRISE_URL}/admin`,
+              ctaUrl: enterpriseUrl('/admin'),
             },
           });
         }

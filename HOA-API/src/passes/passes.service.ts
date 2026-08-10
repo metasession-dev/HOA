@@ -11,12 +11,7 @@ import { generatePassCode, normalizePassCode } from '../common/code.util';
 import { WebhooksService } from '../platform/webhooks.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePassDto } from './dto/create-pass.dto';
-
-const RESIDENT_BASE = (
-  process.env.APP_RESIDENTS_URL ||
-  process.env.RESIDENT_BASE_URL ||
-  'http://localhost:3002'
-).replace(/\/$/, '');
+import { residentUrl } from '../config/app-urls';
 
 type Validity = { valid: boolean; reason?: string };
 
@@ -285,7 +280,7 @@ export class PassesService {
         subject: 'Your gate pass was just used',
         message: `A visitor gate pass${visitor} linked to your unit was used at the gate just now${isOverride ? ' (manually overridden by security)' : ''}.\n\nIf this wasn't expected, please contact estate security.`,
         ctaLabel: 'View gate passes',
-        ctaUrl: `${RESIDENT_BASE}/passes`,
+        ctaUrl: residentUrl('/passes'),
       },
     });
 

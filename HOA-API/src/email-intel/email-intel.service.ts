@@ -7,6 +7,7 @@ import { LlmProvider, LlmMessage } from '../assistant/llm/provider';
 import { MockLlmProvider } from '../assistant/llm/mock.provider';
 import { createLlmProvider } from '../assistant/llm/provider';
 import { MailService } from '../mail/mail.service';
+import { residentUrl } from '../config/app-urls';
 
 const MAX_BODY_BYTES = 256_000; // 256kb of body text — emails larger than this get truncated
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -374,7 +375,7 @@ export class EmailIntelService {
     let body = '';
     switch (row.intentSlug as IntentSlug) {
       case 'payment_inquiry':
-        body = `Hi ${row.fromName || ''},\n\nThanks for reaching out. We've received your payment query and a team member will look at your account and reply shortly.\n\nIf you need to settle right away, you can pay online at ${process.env.RESIDENT_BASE_URL || 'http://localhost:3002'}/invoices.\n\n— HOA.africa`;
+        body = `Hi ${row.fromName || ''},\n\nThanks for reaching out. We've received your payment query and a team member will look at your account and reply shortly.\n\nIf you need to settle right away, you can pay online at ${residentUrl('/invoices')}.\n\n— HOA.africa`;
         break;
       case 'request_submission':
         body = routedId

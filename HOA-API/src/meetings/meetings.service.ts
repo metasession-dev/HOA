@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../common/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
+import { apiBaseUrl } from '../config/app-urls';
 
 const AUDIENCES = ['all_residents', 'owners', 'exco', 'everyone'] as const;
 type Audience = (typeof AUDIENCES)[number];
@@ -202,11 +203,7 @@ export class MeetingsService {
   // ---------- helpers ----------
 
   private apiBase(): string {
-    return (
-      process.env.API_PUBLIC_URL ||
-      process.env.PUBLIC_API_URL ||
-      (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:3003')
-    ).replace(/\/$/, '');
+    return apiBaseUrl();
   }
 
   private googleCalUrl(m: { title: string; description: string | null; location: string | null; onlineUrl: string | null; startsAt: Date; endsAt: Date }): string {

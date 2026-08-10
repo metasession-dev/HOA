@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils';
 import { Card, CardContent, CardWarm } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiBaseUrl } from '@/lib/app-urls';
 
 const reasonLabel: Record<string, string> = {
   revoked: 'Revoked',
@@ -26,7 +27,7 @@ export default function PublicVisitorView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+    const API_URL = apiBaseUrl();
     fetch(`${API_URL}/api/passes/public/${code}`)
       .then(async (res) => {
         if (!res.ok) {

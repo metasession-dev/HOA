@@ -9,6 +9,7 @@ import { PaystackService } from './paystack.service';
 import { PaymentsService } from './payments.service';
 import { PaymentConfigService } from './payment-config.service';
 import { UnitBillingService } from '../billing/unit-billing.service';
+import { residentUrl } from '../config/app-urls';
 
 /**
  * Phase 1.3 PaymentIntents orchestration.
@@ -94,7 +95,7 @@ export class PaymentIntentsService {
 
     // Build callback URL with the reference embedded so the success page can
     // poll verify; we still rely on the webhook as the authoritative signal.
-    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3002/invoices';
+    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || residentUrl('/invoices');
     const callbackUrl = `${callbackBase}?reference=${encodeURIComponent(reference)}&invoiceId=${invoice.id}`;
 
     let authorizationUrl: string;
@@ -122,7 +123,7 @@ export class PaymentIntentsService {
     } else {
       // Mock provider: surface a URL that points to a "simulate success" page
       // so dev environments can exercise the full flow without a real key.
-      const mockBase = process.env.MOCK_CHECKOUT_URL || 'http://localhost:3002/mock-checkout';
+      const mockBase = process.env.MOCK_CHECKOUT_URL || residentUrl('/mock-checkout');
       authorizationUrl = `${mockBase}?reference=${encodeURIComponent(reference)}&amount=${amountMinor}&currency=${invoice.currency}&callback=${encodeURIComponent(callbackUrl)}`;
     }
 
@@ -183,7 +184,7 @@ export class PaymentIntentsService {
     else throw new BadRequestException('Online payments are not configured for this organisation.');
 
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
-    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3002/invoices';
+    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || residentUrl('/invoices');
     const callbackUrl = `${callbackBase}?reference=${encodeURIComponent(reference)}&prepay=1`;
 
     let authorizationUrl: string;
@@ -203,7 +204,7 @@ export class PaymentIntentsService {
       );
       authorizationUrl = r.authorizationUrl;
     } else {
-      const mockBase = process.env.MOCK_CHECKOUT_URL || 'http://localhost:3002/mock-checkout';
+      const mockBase = process.env.MOCK_CHECKOUT_URL || residentUrl('/mock-checkout');
       authorizationUrl = `${mockBase}?reference=${encodeURIComponent(reference)}&amount=${amountMinor}&currency=${currency}&callback=${encodeURIComponent(callbackUrl)}`;
     }
 
@@ -271,7 +272,7 @@ export class PaymentIntentsService {
     else throw new BadRequestException('Online payments are not configured for this organisation.');
 
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
-    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:3002/invoices';
+    const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || residentUrl('/invoices');
     const callbackUrl = `${callbackBase}?reference=${encodeURIComponent(reference)}&prepay=1`;
 
     let authorizationUrl: string;
@@ -291,7 +292,7 @@ export class PaymentIntentsService {
       );
       authorizationUrl = r.authorizationUrl;
     } else {
-      const mockBase = process.env.MOCK_CHECKOUT_URL || 'http://localhost:3002/mock-checkout';
+      const mockBase = process.env.MOCK_CHECKOUT_URL || residentUrl('/mock-checkout');
       authorizationUrl = `${mockBase}?reference=${encodeURIComponent(reference)}&amount=${amountMinor}&currency=${currency}&callback=${encodeURIComponent(callbackUrl)}`;
     }
 

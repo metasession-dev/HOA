@@ -22,6 +22,7 @@ import { ViewToggle, useViewMode } from '@/components/ui/view-toggle';
 import { FileUpload, type UploadedFile } from '@/components/ui/file-upload';
 import { Users } from 'lucide-react';
 import { refreshSetupProgress } from '@/components/layout/setup-progress';
+import { apiUrl, inviteRedeemUrl } from '@/lib/app-urls';
 
 /** Display label + badge tint for the Person.type values. */
 function personTypeLabel(t?: string): string {
@@ -116,7 +117,7 @@ export default function PeoplePage() {
           roleName,
           personId: created.id,
         }, idemp);
-        const url = `${process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005'}/invites/${inv.data.token}`;
+        const url = inviteRedeemUrl(inv.data.token);
         try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
         toast({ variant: 'success', title: 'Person added & invited', description: 'Invite link copied to clipboard.' });
       } else {
@@ -228,7 +229,7 @@ export default function PeoplePage() {
                 <div className="flex items-start gap-3">
                   {person.photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={person.photoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL || ''}${person.photoUrl}` : person.photoUrl}
+                    <img src={person.photoUrl.startsWith('/') ? `${apiUrl(person.photoUrl)}` : person.photoUrl}
                       alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
                   ) : (
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-surface text-[13px] font-medium text-graphite">

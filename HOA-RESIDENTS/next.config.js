@@ -50,6 +50,11 @@ const withPWA = require('next-pwa')({
  * `connect-src` includes the API URL + observability hosts so push +
  * Sentry + PostHog work without CSP violations.
  */
+// These four are the ONE deliberate exception to "all base URLs come from
+// src/lib/app-urls.ts". This file is CommonJS evaluated by the Next build
+// before any TypeScript is compiled, so it cannot import that module. The
+// values and the localhost fallbacks must be kept identical to the `DEV` map
+// there — if you change a port or add a surface, change both.
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
 const enterpriseUrl = process.env.NEXT_PUBLIC_ENTERPRISE_URL || 'http://localhost:3002';
 const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_URL || '';

@@ -19,6 +19,7 @@ import {
   DrawerBody, DrawerFooter, DrawerClose,
 } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
+import { apiBaseUrl } from '@/lib/app-urls';
 
 /**
  * Real file upload. The file picker streams the binary to the Phase 1.5
@@ -89,7 +90,7 @@ export default function DocumentsPage() {
       const fd = new FormData();
       fd.append('file', picked.file);
       fd.append('kind', 'document');
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003';
+      const apiBase = apiBaseUrl();
       const token = typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
 
       // Use XHR (not fetch) so we can surface real progress while the file flies.

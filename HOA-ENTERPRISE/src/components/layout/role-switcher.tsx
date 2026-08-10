@@ -18,6 +18,7 @@ import { ChevronDown, KeyRound, Users, ShieldCheck, Briefcase, Coins, RadioTower
 import { useAuth } from '@/providers/auth-provider';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { enterpriseBaseUrl, residentsBaseUrl } from '@/lib/app-urls';
 
 const RESIDENT_ROLES = new Set(['owner', 'tenant']);
 
@@ -89,11 +90,7 @@ export function RoleSwitcher() {
       if (targetsResidentApp !== inResidentApp) {
         // Cross-app: hand the token off via URL fragment so it never appears
         // in server logs, then navigate to the other app's root.
-        const residentBase =
-          process.env.NEXT_PUBLIC_RESIDENTS_URL || 'http://localhost:3005';
-        const enterpriseBase =
-          process.env.NEXT_PUBLIC_ENTERPRISE_URL || window.location.origin;
-        const target = targetsResidentApp ? residentBase : enterpriseBase;
+        const target = targetsResidentApp ? residentsBaseUrl() : enterpriseBaseUrl();
         const newToken = typeof window !== 'undefined' ? localStorage.getItem('hoa_token') : null;
         const url = `${target}/#token=${encodeURIComponent(newToken ?? '')}&role=${encodeURIComponent(newRole)}`;
         window.location.assign(url);

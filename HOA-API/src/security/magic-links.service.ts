@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { PrismaService } from '../common/prisma.service';
 import { sha256, randomToken } from '../common/encryption';
 import { MailService } from '../mail/mail.service';
+import { residentUrl } from '../config/app-urls';
 
 const TTL_MINUTES = 15;
 const MAX_PER_HOUR_PER_EMAIL = 5;
@@ -59,7 +60,7 @@ export class MagicLinksService {
       // login flow on a slow mail provider. The endpoint stays enumeration-
       // resistant because the mail enqueue happens after the constant-time
       // path completes.
-      const loginUrl = `${process.env.RESIDENT_BASE_URL || 'http://localhost:3002'}/login?token=${raw}`;
+      const loginUrl = residentUrl(`/login?token=${raw}`);
       this.mail.enqueue({
         templateKey: 'magic_link',
         data: {

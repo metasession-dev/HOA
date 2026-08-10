@@ -35,6 +35,7 @@ import {
   DrawerBody, DrawerFooter, DrawerClose,
 } from '@/components/ui/drawer';
 import { formatDate, formatCurrency, getInitials, cn } from '@/lib/utils';
+import { apiUrl } from '@/lib/app-urls';
 
 function personTypeLabel(t?: string): string {
   switch (t) { case 'tenant': return 'Tenant'; case 'stakeholder': return 'Stakeholder'; default: return 'Owner'; }
@@ -110,7 +111,7 @@ export default function PersonDetailPage() {
         {person.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={person.photoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL || ''}${person.photoUrl}` : person.photoUrl}
+            src={person.photoUrl.startsWith('/') ? `${apiUrl(person.photoUrl)}` : person.photoUrl}
             alt={`${person.firstName} ${person.lastName}`}
             className="h-16 w-16 shrink-0 rounded-full object-cover" />
         ) : (

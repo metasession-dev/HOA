@@ -6,12 +6,7 @@ import { Actor, scopeInvoiceWhere } from '../common/scope.util';
 import { FxService } from '../fx/fx.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { nextInvoiceNumber } from '../common/invoice-number';
-
-const RESIDENT_BASE = (
-  process.env.APP_RESIDENTS_URL ||
-  process.env.RESIDENT_BASE_URL ||
-  'http://localhost:3002'
-).replace(/\/$/, '');
+import { residentUrl } from '../config/app-urls';
 
 @Injectable()
 export class InvoicesService {
@@ -267,7 +262,7 @@ export class InvoicesService {
         subject: `Invoice ${invoice.invoiceNumber} from your HOA`,
         message: `A new invoice (${invoice.invoiceNumber}) for ${amountText} has been issued to your unit${unitLabel}.\n\nIt is due on ${dueText}. You can view and pay it from your resident portal.`,
         ctaLabel: 'View invoice',
-        ctaUrl: `${RESIDENT_BASE}/invoices/${invoice.id}`,
+        ctaUrl: residentUrl(`/invoices/${invoice.id}`),
       },
     });
 

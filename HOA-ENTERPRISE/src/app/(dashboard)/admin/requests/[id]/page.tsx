@@ -25,6 +25,7 @@ import {
   DrawerBody,
   DrawerFooter,
 } from '@/components/ui/drawer';
+import { apiUrl } from '@/lib/app-urls';
 
 type Detail = any;
 
@@ -33,7 +34,7 @@ const ATTACH_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
 function resolveFileUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http')) return url;
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003'}${url}`;
+  return apiUrl(url);
 }
 
 function AttachmentList({ items }: { items: Array<{ url: string; filename: string; contentType: string }> }) {

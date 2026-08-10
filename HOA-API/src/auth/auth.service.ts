@@ -9,10 +9,8 @@ import { RegisterDto } from './dto/register.dto';
 import { sha256 } from '../common/encryption';
 import { isResidentRole } from '../common/scope.util';
 import { MailService } from '../mail/mail.service';
+import { enterpriseBaseUrl } from '../config/app-urls';
 
-const ENTERPRISE_URL = (
-  process.env.APP_ENTERPRISE_URL || process.env.ENTERPRISE_BASE_URL || 'http://localhost:3005'
-).replace(/\/$/, '');
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'dev@metasession.co';
 
 // Short-lived in-memory store for MFA challenges keyed by sha256(challengeToken).
@@ -605,7 +603,7 @@ export class AuthService implements OnModuleInit {
         data: {
           recipientFirstName: result.user.firstName || 'there',
           organizationName: result.org.name,
-          dashboardUrl: ENTERPRISE_URL,
+          dashboardUrl: enterpriseBaseUrl(),
           supportEmail: SUPPORT_EMAIL,
         },
       });
