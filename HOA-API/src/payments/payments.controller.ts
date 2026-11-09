@@ -1,6 +1,7 @@
 import {
-  Controller, Get, Post, Body, Query, Param, Req, Headers, BadRequestException, UseInterceptors,
+  Controller, Get, Post, Body, Query, Param, Req, Headers, BadRequestException, UseInterceptors, HttpCode,
 } from '@nestjs/common';
+import { PaystackWebhookRouter } from './paystack-webhook.router';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
@@ -42,6 +43,7 @@ export class PaymentsController {
     private intents: PaymentIntentsService,
     private paystack: PaystackService,
     private unitBilling: UnitBillingService,
+    private webhookRouter: PaystackWebhookRouter,
   ) {}
 
   // ============ Resident prepay / choose-your-term (Phase 5) ============
@@ -141,11 +143,12 @@ export class PaymentsController {
   async listIntents(
     @Query('invoiceId') invoiceId: string | undefined,
     @Query('status') status: string | undefined,
+    @Query('reference') reference: string | undefined,
     @CurrentUser('organizationId') orgId: string,
     @CurrentUser('sub') userId: string,
     @CurrentUser('role') role: string,
   ) {
-    return successResponse(await this.intents.list(orgId, { userId, role }, { invoiceId, status }));
+    return successResponse(await this.intents.list(orgId, { userId, role }, { invoiceId, status, reference }));
   }
 
   @Post('intents/:id/verify')
@@ -186,6 +189,7 @@ export class PaymentsController {
   @Public()
   @Throttle({ short: { limit: 30, ttl: 1000 }, medium: { limit: 600, ttl: 60_000 } })
   @Post('webhook/paystack')
+  @HttpCode(200)
   async paystackWebhook(
     @Req() req: Request,
     @Headers('x-paystack-signature') signature: string | undefined,
@@ -193,8 +197,9 @@ export class PaymentsController {
   ) {
     const raw = (req as any).rawBody;
     if (!raw) throw new BadRequestException('Raw body unavailable; webhook cannot be verified');
-    // Signature is verified inside handleWebhook against the owning org's secret.
-    const result = await this.intents.handleWebhook(raw.toString('utf8'), signature, body);
+    // Resident AND platform events are accepted here (see PaystackWebhookRouter);
+    // each is verified against the secret of the account it belongs to.
+    const result = await this.webhookRouter.route(raw.toString('utf8'), signature, body);
     return successResponse(result);
   }
 

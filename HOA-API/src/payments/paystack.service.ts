@@ -232,6 +232,29 @@ export class PaystackService {
     }, key);
   }
 
+  /**
+   * Check a secret key against Paystack with a harmless read (list 1
+   * transaction). `invalid` = Paystack rejected the key (401/403);
+   * `unreachable` = network/timeout/5xx, so we couldn't tell.
+   */
+  async validateSecretKey(secretKey: string): Promise<'valid' | 'invalid' | 'unreachable'> {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${PAYSTACK_BASE}/transaction?perPage=1`, {
+        headers: { Authorization: `Bearer ${secretKey}` },
+        signal: ctrl.signal,
+      });
+      if (res.ok) return 'valid';
+      if (res.status === 401 || res.status === 403) return 'invalid';
+      return 'unreachable';
+    } catch {
+      return 'unreachable';
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   // ============ Internals ============
 
   /**

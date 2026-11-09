@@ -3,12 +3,11 @@ import { PrismaService } from '../common/prisma.service';
 import { PaystackService } from '../payments/paystack.service';
 import {
   PlatformBillingController,
-  PlatformBillingWebhookController,
 } from './platform-billing.controller';
 import { PlatformBillingService } from './platform-billing.service';
 
 @Module({
-  controllers: [PlatformBillingController, PlatformBillingWebhookController],
+  controllers: [PlatformBillingController],
   providers: [PlatformBillingService, PaystackService, PrismaService],
   exports: [PlatformBillingService],
 })

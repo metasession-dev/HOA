@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { encrypt, decrypt } from '../common/encryption';
+import { PaystackService } from './paystack.service';
 
 /**
  * Per-organization Paystack configuration.
@@ -27,7 +28,7 @@ export interface ResolvedPaystackCreds {
 export class PaymentConfigService {
   private readonly logger = new Logger(PaymentConfigService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private paystack: PaystackService) {}
 
   /** Non-sensitive view for the admin settings page. Never returns the secret. */
   async getPublicConfig(orgId: string) {
@@ -77,6 +78,39 @@ export class PaymentConfigService {
     const willHaveSecret = data.secretKeyEncrypted !== undefined || !!existing?.secretKeyEncrypted;
     if (data.isEnabled && !willHaveSecret) {
       throw new Error('A Paystack secret key is required before enabling payments.');
+    }
+
+    // Test mode must match the keys on file: sk_test_/pk_test_ in test mode,
+    // sk_live_/pk_live_ otherwise. Check the effective post-save state, so
+    // flipping the toggle alone is validated against the stored secret too.
+    const testMode: boolean = data.testMode ?? existing?.testMode ?? true;
+    const mode = testMode ? 'test' : 'live';
+    const newSecret = typeof dto.secretKey === 'string' && dto.secretKey.trim() ? dto.secretKey.trim() : null;
+    let effectiveSecret: string | null = newSecret;
+    if (!effectiveSecret && existing?.secretKeyEncrypted) {
+      try { effectiveSecret = decrypt(existing.secretKeyEncrypted); } catch { effectiveSecret = null; }
+    }
+    if (effectiveSecret && !effectiveSecret.startsWith(`sk_${mode}_`)) {
+      throw new Error(
+        testMode
+          ? 'Test mode is on, but the secret key is not a test key (sk_test_…). Use your test key or turn test mode off.'
+          : 'Test mode is off, but the secret key is not a live key (sk_live_…). Use your live key or turn test mode on.',
+      );
+    }
+    const effectivePublic = data.publicKey !== undefined ? data.publicKey : existing?.publicKey ?? null;
+    if (effectivePublic && !effectivePublic.startsWith(`pk_${mode}_`)) {
+      throw new Error(`The public key must be a ${mode} key (pk_${mode}_…) to match ${testMode ? 'test mode' : 'live mode'}.`);
+    }
+
+    // Confirm a newly entered secret actually works before storing it.
+    if (newSecret) {
+      const check = await this.paystack.validateSecretKey(newSecret);
+      if (check === 'invalid') {
+        throw new Error('Paystack rejected this secret key. Check you copied it correctly from Settings → API Keys & Webhooks.');
+      }
+      if (check === 'unreachable') {
+        throw new Error('Could not reach Paystack to verify the secret key. Please try again in a moment.');
+      }
     }
 
     const saved = await this.prisma.paystackConfig.upsert({

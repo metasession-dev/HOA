@@ -487,6 +487,9 @@ model Payment {
   organizationId     String?
   amount             Decimal   @db.Decimal(12, 2)
   amountUnallocated  Decimal   @db.Decimal(12, 2) @default(0)
+  // Cumulative amount refunded (partial refunds). Equals `amount` once fully
+  // refunded, at which point status flips to "reversed".
+  amountRefunded     Decimal   @db.Decimal(12, 2) @default(0)
   currency           String    @default("ZAR")
   method             String
   processorReference String?
@@ -498,6 +501,7 @@ model Payment {
   invoice      Invoice?            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   organization Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   allocations  PaymentAllocation[]
+  refunds      PaymentRefund[]
 
   @@unique([organizationId, method, processorReference])
   @@index([invoiceId])
@@ -508,6 +512,25 @@ model Payment {
 // The allocation ledger — the source of truth for what money landed on which
 // invoice. A payment is applied to a given invoice at most once (unique →
 // replay-safe). `amountPaid` on Invoice is a maintained cache of SUM(amount).
+// One row per processor refund applied to a payment. The unique on
+// (organizationId, providerRefundId) makes refund webhooks replay-safe.
+model PaymentRefund {
+  id               String   @id @default(cuid())
+  organizationId   String
+  paymentId        String
+  providerRefundId String
+  amount           Decimal  @db.Decimal(12, 2)
+  currency         String
+  reason           String?
+  createdAt        DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, providerRefundId])
+  @@index([paymentId])
+  @@map("payment_refunds")
+}
+
 model PaymentAllocation {
   id        String   @id @default(cuid())
   paymentId String

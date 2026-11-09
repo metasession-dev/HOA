@@ -102,6 +102,7 @@ async function bootstrap() {
     verify: (req: any, _res, buf) => {
       if (
         req.originalUrl?.startsWith('/api/payments/webhook/paystack') ||
+        req.originalUrl?.startsWith('/api/platform-billing/webhook') ||
         req.originalUrl?.startsWith('/api/mail/webhook/resend')
       ) {
         req.rawBody = buf;
