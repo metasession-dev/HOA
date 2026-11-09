@@ -7,7 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 import { Actor, isResidentRole, actorOccupiesUnit, scopeInvoiceWhere } from '../common/scope.util';
 import { PaystackService } from './paystack.service';
 import { PaymentsService } from './payments.service';
-import { PaymentConfigService } from './payment-config.service';
+import { PaymentConfigService, ResolvedPaystackCreds } from './payment-config.service';
 import { UnitBillingService } from '../billing/unit-billing.service';
 import { residentUrl } from '../config/app-urls';
 
@@ -38,6 +38,29 @@ export class PaymentIntentsService {
     private paymentConfig: PaymentConfigService,
     private unitBilling: UnitBillingService,
   ) {}
+
+  /**
+   * Resolve the credentials + provider for a NEW checkout.
+   *  - No credentials: mock in dev, refuse in production (never fake a charge).
+   *  - Test keys (sk_test_…) in production: refuse. A test-card "payment" must
+   *    never settle a real resident's invoice.
+   */
+  private async resolveCheckout(orgId: string): Promise<{ creds: ResolvedPaystackCreds | null; provider: 'paystack' | 'mock' }> {
+    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
+    const isProd = process.env.NODE_ENV === 'production';
+    if (!creds) {
+      if (!isProd) return { creds: null, provider: 'mock' };
+      throw new BadRequestException(
+        'Online payments are not configured for this organisation. An administrator must add Paystack keys under Settings → Payment configuration.',
+      );
+    }
+    if (isProd && creds.secretKey.startsWith('sk_test_')) {
+      throw new BadRequestException(
+        'Online payments are in test mode for this organisation and cannot take real payments. An administrator must add live Paystack keys under Settings → Payment configuration.',
+      );
+    }
+    return { creds, provider: 'paystack' };
+  }
 
   /**
    * Initialise a checkout intent for `invoiceId`. Resident-scoped: a resident
@@ -75,20 +98,9 @@ export class PaymentIntentsService {
 
     const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
 
-    // Resolve the owning org's Paystack credentials (its own encrypted key, or
-    // the platform env key as a legacy fallback). With no credentials we mock in
-    // dev; in production we refuse rather than silently faking a charge.
-    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
-    let provider: 'paystack' | 'mock';
-    if (creds) {
-      provider = 'paystack';
-    } else if (process.env.NODE_ENV !== 'production') {
-      provider = 'mock';
-    } else {
-      throw new BadRequestException(
-        'Online payments are not configured for this organisation. An administrator must add Paystack keys under Settings → Payment configuration.',
-      );
-    }
+    // Owning org's Paystack credentials (mock in dev; refused in production
+    // when missing or when they are test keys).
+    const { creds, provider } = await this.resolveCheckout(orgId);
 
     // Compute amount in minor units (Paystack expects kobo / cents).
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
@@ -177,11 +189,9 @@ export class PaymentIntentsService {
     const actorUser = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { email: true } });
     const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
 
-    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
-    let provider: 'paystack' | 'mock';
-    if (creds) provider = 'paystack';
-    else if (process.env.NODE_ENV !== 'production') provider = 'mock';
-    else throw new BadRequestException('Online payments are not configured for this organisation.');
+    // Owning org's Paystack credentials (mock in dev; refused in production
+    // when missing or when they are test keys).
+    const { creds, provider } = await this.resolveCheckout(orgId);
 
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
     const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || residentUrl('/invoices');
@@ -249,13 +259,25 @@ export class PaymentIntentsService {
 
   /** Open a checkout that settles MANY invoices in one payment. */
   async createMultiInvoiceIntent(orgId: string, actor: Actor, invoiceIds: string[], opts: { callbackUrl?: string } = {}) {
+    const uniqueIds = Array.from(new Set(invoiceIds));
+    if (uniqueIds.length === 0) throw new BadRequestException('invoiceIds is required');
+    // Same resident scoping as the single-invoice checkout: a resident may only
+    // pay invoices on units they actively occupy.
     const invoices = await this.prisma.invoice.findMany({
-      where: { id: { in: invoiceIds }, organizationId: orgId },
-      select: { id: true, amount: true, amountPaid: true, currency: true, unitId: true, invoiceNumber: true },
+      where: scopeInvoiceWhere({ id: { in: uniqueIds }, organizationId: orgId }, actor),
+      select: { id: true, amount: true, amountPaid: true, currency: true, unitId: true, invoiceNumber: true, status: true },
     });
-    if (invoices.length === 0) throw new NotFoundException('No invoices to pay');
+    // All-or-nothing: if any requested invoice is missing or out of scope,
+    // refuse rather than silently charging for a subset.
+    if (invoices.length !== uniqueIds.length) throw new NotFoundException('One or more invoices were not found');
+    const blocked = invoices.find((i) => ['paid', 'voided', 'on_plan'].includes(i.status));
+    if (blocked) throw new ConflictException(`Cannot start a checkout for a ${blocked.status} invoice (${blocked.invoiceNumber})`);
+    invoiceIds = uniqueIds;
 
     const currency = invoices[0].currency;
+    if (invoices.some((i) => i.currency !== currency)) {
+      throw new BadRequestException('All invoices in one checkout must share a currency');
+    }
     let outstanding = new Decimal(0);
     for (const inv of invoices) {
       outstanding = outstanding.plus(Decimal.max(new Decimal(inv.amount.toString()).minus(new Decimal(inv.amountPaid.toString())), new Decimal(0)));
@@ -265,11 +287,9 @@ export class PaymentIntentsService {
     const actorUser = await this.prisma.user.findUniqueOrThrow({ where: { id: actor.userId }, select: { email: true } });
     const reference = `hoa_${crypto.randomBytes(12).toString('hex')}`;
 
-    const creds = await this.paymentConfig.getResolvedCredentials(orgId);
-    let provider: 'paystack' | 'mock';
-    if (creds) provider = 'paystack';
-    else if (process.env.NODE_ENV !== 'production') provider = 'mock';
-    else throw new BadRequestException('Online payments are not configured for this organisation.');
+    // Owning org's Paystack credentials (mock in dev; refused in production
+    // when missing or when they are test keys).
+    const { creds, provider } = await this.resolveCheckout(orgId);
 
     const amountMinor = outstanding.times(100).toDecimalPlaces(0).toNumber();
     const callbackBase = opts.callbackUrl || process.env.PAYSTACK_CALLBACK_URL || residentUrl('/invoices');
@@ -339,7 +359,11 @@ export class PaymentIntentsService {
     if (!payload || typeof payload !== 'object') {
       throw new BadRequestException('Empty webhook payload');
     }
-    const reference = payload?.data?.reference;
+    // Refund events carry the ORIGINAL charge's reference as
+    // `transaction_reference` (no top-level `reference`), so look there too —
+    // otherwise refunds are dropped here before they ever reach the handler.
+    const d = payload?.data;
+    const reference = d?.reference || d?.transaction_reference || d?.transaction?.reference;
     if (!reference) {
       this.logger.warn('Webhook missing reference; ignoring');
       return { ok: true, ignored: true };
@@ -386,8 +410,21 @@ export class PaymentIntentsService {
       });
       if (!refIntent) return { ok: true, ignored: true, event };
       if (event === 'refund.processed') {
-        const reversed = await this.payments.reverseByReference(refIntent.organizationId, txRef, 'paystack_refund');
-        return { ok: true, refunded: !!reversed };
+        // Paystack sends the refunded amount in minor units; it may be less than
+        // the original charge (partial refund).
+        const refundMinor = Number(data?.amount);
+        const refundId = data?.id ?? data?.refund_reference;
+        if (!Number.isFinite(refundMinor) || refundMinor <= 0 || refundId == null) {
+          this.logger.warn(`refund.processed for ${txRef} missing amount/id — ignoring`);
+          return { ok: true, ignored: true, event };
+        }
+        const refunded = await this.payments.refundByReference(refIntent.organizationId, txRef, {
+          amount: refundMinor / 100,
+          currency: data?.currency,
+          providerRefundId: String(refundId),
+          reason: 'paystack_refund',
+        });
+        return { ok: true, refunded: !!refunded };
       }
       return { ok: true, ignored: true, event };
     }
@@ -423,6 +460,18 @@ export class PaymentIntentsService {
   }
 
   private async markSuccess(intent: any, data: any) {
+    // Paystack labels every transaction with `domain: 'test' | 'live'`. In
+    // production a test charge must never settle an invoice — this catches
+    // intents opened before an HOA switched keys, or a mislabelled key.
+    if (process.env.NODE_ENV === 'production' && String(data?.domain ?? '').toLowerCase() === 'test') {
+      this.logger.error(`Test-mode charge ${intent.providerReference} rejected in production`);
+      await this.prisma.paymentIntent.update({
+        where: { id: intent.id },
+        data: { status: 'failed', failureReason: 'test_mode_charge', providerMetadata: { ...(intent.providerMetadata as any), paystack: this.scrub(data) } as any },
+      });
+      return { ok: false, reason: 'test-mode-charge' };
+    }
+
     // Sanity: confirm the amount Paystack actually charged matches what we asked for.
     // Reject mismatches — these are either tampering or a misconfigured key.
     const expectedMinor = new Decimal(intent.amount.toString()).times(100).toDecimalPlaces(0).toNumber();
@@ -562,9 +611,10 @@ export class PaymentIntentsService {
     return this.prisma.paymentIntent.findUniqueOrThrow({ where: { id: intentId } });
   }
 
-  async list(orgId: string, actor: Actor, query: { invoiceId?: string; status?: string } = {}) {
+  async list(orgId: string, actor: Actor, query: { invoiceId?: string; status?: string; reference?: string } = {}) {
     let where: any = { organizationId: orgId };
     if (query.invoiceId) where.invoiceId = query.invoiceId;
+    if (query.reference) where.providerReference = query.reference;
     if (query.status) where.status = query.status;
     if (isResidentRole(actor.role)) {
       where = {

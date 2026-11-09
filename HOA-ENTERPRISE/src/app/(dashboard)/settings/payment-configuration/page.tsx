@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
+import { apiBaseUrl } from '@/lib/app-urls';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -104,6 +105,19 @@ export default function PaymentConfigurationPage() {
           Connect your HOA&rsquo;s Paystack account. Residents&rsquo; levy payments settle directly into it.
         </p>
       </header>
+
+      <Card>
+        <CardContent className="space-y-2 p-6">
+          <h3 className="text-heading-sm font-display font-medium text-charcoal-primary">Webhook URL</h3>
+          <p className="text-caption text-muted-foreground">
+            In your Paystack dashboard (Settings → API Keys &amp; Webhooks), set this as the Webhook URL for
+            both Test and Live mode. Without it, payments and refunds may not be recorded promptly.
+          </p>
+          <code className="block break-all rounded-lg bg-stone-surface/40 p-3 text-sm">
+            {`${apiBaseUrl()}/api/payments/webhook/paystack`}
+          </code>
+        </CardContent>
+      </Card>
 
       <form onSubmit={save}>
         <Card>

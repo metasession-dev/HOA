@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PaginationDto, paginatedResponse } from '../common/dto';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -417,15 +417,121 @@ export class PaymentsService implements OnModuleInit {
     });
   }
 
-  /** Best-effort: reverse a completed payment matched by processor reference
-   *  (used by the Paystack refund webhook). Returns null if no match. */
-  async reverseByReference(orgId: string, reference: string, reason?: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { organizationId: orgId, processorReference: reference, status: 'completed' },
-      select: { id: true },
+  /**
+   * Apply a processor refund (full OR partial) to the completed payment matched
+   * by `reference`. Used by the Paystack refund webhook. Returns null if no
+   * payment matches.
+   *
+   *  - Replay-safe: one PaymentRefund row per (org, providerRefundId).
+   *  - The refunded amount comes off unallocated credit first, then off the
+   *    allocations newest-invoice-first (so a refunded prepay drops the furthest
+   *    future periods), decrementing each invoice's `amountPaid` + status.
+   *  - Once cumulative refunds reach the payment amount the receipt is marked
+   *    `reversed`, matching a manual full reversal.
+   */
+  async refundByReference(
+    orgId: string,
+    reference: string,
+    refund: { amount: number; currency?: string; providerRefundId: string; reason?: string },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { organizationId: orgId, processorReference: reference, status: 'completed' },
+        include: { allocations: { include: { invoice: { select: { dueDate: true } } } } },
+      });
+      if (!payment) return null;
+
+      const already = await tx.paymentRefund.findUnique({
+        where: { organizationId_providerRefundId: { organizationId: orgId, providerRefundId: refund.providerRefundId } },
+      });
+      if (already) return payment;
+
+      if (refund.currency && refund.currency.toUpperCase() !== payment.currency.toUpperCase()) {
+        throw new BadRequestException(`Refund currency ${refund.currency} does not match payment currency ${payment.currency}`);
+      }
+
+      const payAmount = new Decimal(payment.amount.toString());
+      const refundedSoFar = new Decimal(payment.amountRefunded.toString());
+      // Never refund more than is left on the receipt.
+      const requested = new Decimal(refund.amount);
+      const amount = Decimal.min(requested, payAmount.minus(refundedSoFar));
+      if (amount.lessThanOrEqualTo(0)) return payment;
+
+      await tx.paymentRefund.create({
+        data: {
+          organizationId: orgId,
+          paymentId: payment.id,
+          providerRefundId: refund.providerRefundId,
+          amount,
+          currency: payment.currency,
+          reason: refund.reason ?? null,
+        },
+      });
+
+      // 1. Unallocated credit absorbs the refund first.
+      let remaining = amount;
+      const unallocated = new Decimal(payment.amountUnallocated.toString());
+      const fromCredit = Decimal.min(remaining, unallocated);
+      remaining = remaining.minus(fromCredit);
+
+      // 2. Then allocations, newest due date first.
+      const allocs = [...payment.allocations].sort(
+        (a, b) => new Date(b.invoice.dueDate).getTime() - new Date(a.invoice.dueDate).getTime(),
+      );
+      for (const alloc of allocs) {
+        if (remaining.lessThanOrEqualTo(0)) break;
+        const allocAmount = new Decimal(alloc.amount.toString());
+        const take = Decimal.min(remaining, allocAmount);
+        remaining = remaining.minus(take);
+
+        await tx.$queryRaw`SELECT id FROM invoices WHERE id = ${alloc.invoiceId} FOR UPDATE`;
+        const invoice = await tx.invoice.findUnique({ where: { id: alloc.invoiceId } });
+        if (invoice) {
+          const newPaid = Decimal.max(new Decimal(invoice.amountPaid.toString()).minus(take), new Decimal(0));
+          const invAmount = new Decimal(invoice.amount.toString());
+          const newStatus = newPaid.greaterThanOrEqualTo(invAmount) ? 'paid' : newPaid.greaterThan(0) ? 'partial' : 'sent';
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: { amountPaid: newPaid, status: newStatus, paidAt: newStatus === 'paid' ? invoice.paidAt : null },
+          });
+        }
+        if (take.equals(allocAmount)) {
+          await tx.paymentAllocation.delete({ where: { id: alloc.id } });
+        } else {
+          await tx.paymentAllocation.update({ where: { id: alloc.id }, data: { amount: allocAmount.minus(take) } });
+        }
+      }
+
+      const newRefunded = refundedSoFar.plus(amount);
+      const fullyRefunded = newRefunded.greaterThanOrEqualTo(payAmount);
+      const updated = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          amountRefunded: newRefunded,
+          amountUnallocated: fullyRefunded ? new Decimal(0) : unallocated.minus(fromCredit),
+          ...(fullyRefunded ? { status: 'reversed' } : {}),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId: orgId,
+          actorId: 'system',
+          actorRole: 'system',
+          action: fullyRefunded ? 'payment_reversed' : 'payment_partially_refunded',
+          entityType: 'Payment',
+          entityId: payment.id,
+          changes: {
+            reason: refund.reason || null,
+            providerRefundId: refund.providerRefundId,
+            refundAmount: amount.toString(),
+            totalRefunded: newRefunded.toString(),
+            paymentAmount: payAmount.toString(),
+          } as any,
+        },
+      });
+      return updated;
     });
-    if (!payment) return null;
-    return this.reversePayment(orgId, 'system', payment.id, reason);
   }
 
   private async sendPaidEmail(invoiceId: string, paymentId: string) {

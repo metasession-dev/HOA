@@ -29,11 +29,35 @@ export default function MyInvoicesPage() {
   const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
+    const loadInvoices = () =>
+      api
+        .get<any>('/invoices')
+        .then((res) => setInvoices(res.data || []))
+        .catch(console.error)
+        .finally(() => setLoading(false));
+
+    // Returning from a prepay checkout (?reference=…): the period invoices are
+    // only created once the payment is confirmed, so verify with the processor
+    // now instead of waiting on the webhook, then load the list.
+    const ref = new URLSearchParams(window.location.search).get('reference');
+    if (!ref) {
+      loadInvoices();
+      return;
+    }
     api
-      .get<any>('/invoices')
-      .then((res) => setInvoices(res.data || []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .get<any>(`/payments/intents?reference=${encodeURIComponent(ref)}`)
+      .then(async (r) => {
+        const intent = (r.data || [])[0];
+        if (intent && intent.status !== 'success') {
+          await api.post(`/payments/intents/${intent.id}/verify`, {});
+        }
+      })
+      .catch(() => { /* webhook will still reconcile */ })
+      .finally(() => {
+        router.replace('/invoices');
+        loadInvoices();
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Distinct billing types present on the resident's invoices, for the filter.

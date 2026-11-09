@@ -2,15 +2,11 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
-  HttpCode,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser, Roles, Public } from '../common/decorators';
@@ -80,37 +76,5 @@ export class PlatformBillingController {
     @CurrentUser('sub') actorId: string,
   ) {
     return successResponse(await this.service.cancel({ organizationId: orgId, reason: dto.reason, actorId }));
-  }
-}
-
-/**
- * Paystack webhook receiver. Separate controller so it can be marked @Public
- * (no JWT) without compromising the rest of the surface. Signature is verified
- * against the raw body via the global rawBody middleware in main.ts; for
- * platform billing we re-stringify the JSON because we don't yet have a raw
- * preserver. Paystack tolerates either form provided the signature was
- * computed against the same payload our backend received.
- */
-@ApiTags('Platform Billing')
-@Controller('platform-billing/webhook')
-export class PlatformBillingWebhookController {
-  constructor(private readonly service: PlatformBillingService, private readonly paystack: PaystackService) {}
-
-  @Public()
-  @Post()
-  @HttpCode(200)
-  async receive(@Req() req: Request, @Headers('x-paystack-signature') signature: string | undefined, @Body() body: any) {
-    // Paystack signs the *exact* JSON they sent. Express's bodyParser has
-    // already parsed it, so re-stringify deterministically. If the signature
-    // doesn't match (e.g. integrator using a different payload encoding) we
-    // accept iff PAYSTACK_WEBHOOK_LENIENT=1 — but only in dev.
-    const raw = JSON.stringify(body);
-    try {
-      this.paystack.verifyWebhookSignature(raw, signature);
-    } catch (err) {
-      if (process.env.PAYSTACK_WEBHOOK_LENIENT !== '1') throw err;
-    }
-    await this.service.handleWebhook(body);
-    return { ok: true };
   }
 }
