@@ -32,6 +32,16 @@ If you see `PrismaClientInitializationError: Can't reach database server at loca
 
 API listens on `http://localhost:3003`. Swagger docs at `http://localhost:3003/api/docs`. Health at `http://localhost:3003/api/health`.
 
+## Tests
+
+```bash
+npm test                # run all unit tests (Jest + ts-jest)
+npm run test:watch      # re-run on change
+npm run test:cov        # with coverage report in ./coverage
+```
+
+Specs live in `test/` (mirroring `src/`), not next to the code, so `nest build` never compiles them into `dist/`. They are unit tests: Prisma and Paystack are replaced with in-memory fakes, so no database, Redis or network is needed.
+
 ## Architecture
 
 - **NestJS 10** modules under `src/`
